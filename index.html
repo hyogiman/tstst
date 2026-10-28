@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#26785e">
+<meta name="theme-color" content="#a91e3c">
 <meta name="description" content="스페인어 교육 학습관리 시스템. 과제, 복습 퀴즈, 다음 수업 안내, 출석과 피드백을 한곳에서 관리하세요.">
-<title>Hola Class | 수강생 학습공간</title>
+<title>쎄뇨라유 스페인어 | 수강생 학습공간</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap');
 :root{--bg:#f7f7f3;--surface:#fff;--ink:#222927;--muted:#737d78;--line:#e6eae5;--primary:#26785e;--primary-deep:#15563f;--primary-light:#e8f4ed;--accent:#edab69;--danger:#bf5050;--shadow:0 12px 36px rgba(23,43,32,.055);--radius:19px}
@@ -13,7 +13,7 @@
 @media(max-width:980px){.auth-shell{grid-template-columns:1fr}.auth-hero{min-height:240px;padding:28px 35px}.auth-hero h1{font-size:34px}.auth-hero p{margin-top:12px}.auth-hero footer{display:none}.auth-right{padding:42px 20px}.admin-shell{grid-template-columns:1fr}.sidebar{position:relative;height:auto;gap:13px;padding:15px 20px}.sidebar .brand{padding:0}.side-nav{flex-direction:row;overflow:auto;padding-bottom:5px}.side-link{width:auto;white-space:nowrap;padding:9px 12px}.sidebar-footer{display:none}.admin-main{padding:25px 22px 50px}.admin-topbar{padding-bottom:19px}}
 @media(max-width:640px){.grid2,.grid3{grid-template-columns:1fr}.student-app{padding:0 15px 113px}.student-header{padding:16px 0;margin-bottom:24px}.student-header .brand small{font-size:9px}.student-header .brand strong{font-size:14px}.student-hero{padding:23px 20px}.student-hero .emoji{font-size:43px}.card{padding:19px}.section-title{gap:11px}h1{font-size:27px}h2{font-size:22px}.auth-hero{min-height:205px;padding:25px}.auth-hero h1{font-size:30px}.auth-hero p{font-size:12px;margin-top:10px}.admin-main{padding:22px 15px}.admin-topbar .field{min-width:100%;width:100%}.admin-topbar{align-items:stretch}.info-grid{grid-template-columns:110px 1fr}.tab{padding:9px 11px}}
 
-/* Hola Class — studio redesign v2: warm editorial design system */
+/* 쎄뇨라유 스페인어 — studio redesign v2: warm editorial design system */
 :root{
  --bg:#f5f6f7;--surface:#ffffff;--ink:#20303d;--muted:#71808b;
  --line:#e5eaf0;--primary:#c9604d;--primary-deep:#a94637;
@@ -175,7 +175,46 @@ a.media-item{background:#f7f9fa;border:1px solid #e8ecef;border-radius:11px;colo
 .quiz-ox-label{font-weight:800;font-size:21px;color:#235f48}
 .media-preview{aspect-ratio:16/9;object-fit:contain;background:#111b17}
 @media(max-width:600px){.quiz-editor-question{padding:15px}.quiz-choice-row{gap:7px;padding:7px}.quiz-choice-row .btn{padding:5px}}
+
+/* 쎄뇨라유 스페인어 · Brand System v4 */
+:root{--bg:#fdf8f6;--surface:#ffffff;--ink:#35262b;--muted:#806d72;--line:#f0dce0;--primary:#b4233b;--primary-deep:#84152d;--primary-light:#fff0f2;--accent:#e9a783;--danger:#b92a44;--shadow:0 9px 34px rgba(106,28,49,.055);--radius:18px}
+body{background:var(--bg);color:var(--ink)}
+.logo{background:#fff!important;border:1px solid #f1d5dc!important;box-shadow:0 4px 16px rgba(100,25,44,.10)!important;border-radius:13px!important;overflow:hidden;width:47px;height:47px;padding:6px}
+.logo img{display:block;width:100%;height:100%;object-fit:contain}
+.brand strong{font-weight:800;font-size:16px;letter-spacing:-.7px}.brand small{font-size:10px;letter-spacing:1.2px}
+.eyebrow,.kicker{color:var(--primary)}
+.btn{box-shadow:none}.btn:hover{box-shadow:0 5px 17px rgba(144,30,55,.13)}
+.btn.secondary:hover,.btn.ghost:hover{background:#fff5f6}.btn.soft:hover{background:#ffe3e8}
+.pill.green{background:#fce8ed;color:#9a1b32}.pill.amber{background:#fff2e5;color:#975725}
+.pill.gray{background:#f7eff1;color:#736069}.pill.red{background:#fff0f2;color:#a72742}
+.field>label,.field-label{color:#57383e}.field input,.field select,.field textarea,.input{border-color:#ead8dd}
+.field input:focus,.field select:focus,.field textarea:focus,.input:focus{border-color:#c74159;box-shadow:0 0 0 3px #ffe4e8}
+.card{border-color:#f0e3e5;box-shadow:var(--shadow)}.subtle,.mini-stat,.media-item{background:#fff9f9;border-color:#f1e3e5}
+.notice{background:#fff0f3;color:#8d2238}.notice.warn{background:#fff4ea;color:#8b5b36}
+.empty{background:#fffbfa;border-color:#eecdd4}.loading:before{border-color:#f1c2cc;border-top-color:var(--primary)}
+.auth-hero{background:linear-gradient(150deg,#66182c 0%,#a82040 65%,#be485e 100%)}.auth-hero .brand small{color:#f8dce3}.auth-hero p{color:#ffe4e9}.auth-hero footer{color:#f3ccd5}
+.auth-hero:before{opacity:.045}.auth-hero h1{font-family:'Noto Sans KR',system-ui,sans-serif;font-weight:800}
+.sidebar{background:#58182a!important}.sidebar .brand strong{font-size:13px!important;white-space:nowrap;letter-spacing:-.8px}.sidebar-footer{background:rgba(255,255,255,.065)!important;border:1px solid rgba(255,255,255,.13)!important}.side-link.active{background:#fff1f3!important;color:#8e1e36!important}.side-link:hover:not(.active){background:rgba(255,255,255,.10)}
+.sidebar .brand strong,.sidebar .brand small{color:#fff!important}.sidebar-footer{border-top-color:rgba(255,255,255,.13)!important}.sidebar-footer strong,.sidebar-footer .hint{color:#f4d8df!important}
+.admin-topbar{border-bottom:1px solid #f0e0e3}.side-emoji{font-size:17px}
+.student-header{margin-bottom:29px}.student-nav{border-top-color:#f0dce0;box-shadow:0 -5px 20px rgba(114,29,51,.05)}
+.student-nav-inner{width:min(100%,760px);grid-template-columns:repeat(6,minmax(0,1fr));gap:2px}
+.nav-item{min-width:0;padding:7px 2px!important;gap:1px}.nav-item>span:last-child{font-size:11px;white-space:nowrap;letter-spacing:-.5px}.nav-item>span:first-child{font-size:19px!important}
+.student-app{max-width:1040px}.student-feedback{border-color:#f0dce0;background:#fff9fa}.feedback{border-color:#f2dde1;background:#fffafb}
+.answer-option.selected{background:#fff0f3!important;border-color:#bc344f!important;color:#7c1a2c!important}.progress>div{background:var(--primary)}
+.name-avatar{background:#ffecf0!important;color:#9e2942!important}.roster-count{color:#a51e3c!important}.roster-summary{border-color:#f0dce0!important;background:#fff!important}
+.question-thread{border:1px solid var(--line);border-radius:14px;padding:17px;background:#fff;cursor:pointer;transition:border .15s,transform .15s}.question-thread:hover{border-color:#c95468;transform:translateY(-1px)}
+.thread-open{border-color:#d76b7d;background:#fff7f8}.reply-bubble{padding:13px 15px;border-radius:14px;border:1px solid #f0e2e5;background:#fff;max-width:94%;overflow-wrap:anywhere}
+.reply-bubble.teacher{background:#fff0f3;border-color:#f5d3dc;margin-left:auto}.reply-bubble.student{margin-right:auto}
+.reply-bubble .hint{margin-bottom:6px}.question-list{display:grid;gap:10px}.classmate-card{display:flex;align-items:center;gap:12px;border:1px solid #f0e2e5;padding:16px;border-radius:15px;background:#fff}
+.classmate-avatar{width:39px;height:39px;border-radius:12px;background:#ffe9ee;color:#922440;display:grid;place-items:center;font-weight:800}
+.focus-card{padding:27px;border-radius:19px;background:#fff;border:1px solid #efe0e3}.quiet-note{background:#fff3f5;padding:12px 15px;border-radius:12px;color:#7f3346;font-size:13px}
+.tabset{background:#f9e9ed}.tab.active{color:#9e1f3b}.data-table th{background:#fff6f7!important}
+@media(max-width:680px){.student-app{padding:0 15px 100px}.student-header{padding:15px 0;margin-bottom:21px}.brand strong{font-size:14px}.student-header .row{gap:4px}.student-header .row .pill{display:none}.student-nav{padding:6px 6px calc(6px + env(safe-area-inset-bottom))}.student-nav-inner{gap:0}.nav-item>span:last-child{font-size:10px}.card,.focus-card{padding:17px}.section-title{margin-bottom:15px}.question-thread{padding:13px}}
+@media(max-width:370px){.nav-item>span:last-child{font-size:9px}.nav-item>span:first-child{font-size:17px!important}}
+
 </style>
+<link rel="icon" type="image/png" href="senorayu-icon.png">
 </head>
 <body>
 <div id="root"></div>
@@ -183,7 +222,7 @@ a.media-item{background:#f7f9fa;border:1px solid #e8ecef;border-radius:11px;colo
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signOut, sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
-import { getFirestore, doc, getDoc, getDocs, collection, query, where, addDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, arrayUnion } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
+import { getFirestore, doc, getDoc, getDocs, collection, query, where, addDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, arrayUnion, onSnapshot, writeBatch, runTransaction } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
 import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-storage.js';
 
 // 두 HTML 파일에 동일한 Firebase 웹 앱 설정을 입력하세요. API key는 비밀 키가 아니며 보안은 Rules가 담당합니다.
@@ -212,7 +251,7 @@ function empty(title,detail=''){return `<div class="empty"><span class="symbol">
 function makeId(){return (globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2));}
 const enId = (uid,cid)=>`${uid}_${cid}`;
 const isMedia = (file,kind) => kind==='audio'?file.type.startsWith('audio/'):kind==='image'?file.type.startsWith('image/'):kind==='video'?file.type.startsWith('video/'):true;
-const sizeLimit={audio:15*1024*1024,image:8*1024*1024,video:200*1024*1024,file:20*1024*1024};
+const sizeLimit={audio:15*1024*1024,image:8*1024*1024,video:2*1024*1024*1024,file:20*1024*1024};
 async function uploadMedia(file,path,kind,progressEl){
   if(!file)throw Error('파일을 선택해 주세요.');
   if(!isMedia(file,kind))throw Error('선택한 파일 형식을 확인해 주세요.');
@@ -291,7 +330,7 @@ async function ensureProfile(user){
   await setDoc(r,data);
   return data;
 }
-function signedOut(){return `<div class="auth-shell"><div class="auth-hero"><div class="brand"><span class="logo">¡</span><div><strong>Hola Class</strong><small>ESPAÑOL · LEARNING SPACE</small></div></div><div><div class="eyebrow" style="color:#c5ead6">MI PEQUEÑO UNIVERSO</div><h1>오늘의 스페인어가<br>내일의 일상이 되도록.</h1><p>과제를 제출하고, 단어를 복습하고, 다음 수업을 준비하세요. 수업이 끝난 뒤에도 배움은 이어집니다.</p></div><footer>Aprender juntos, crecer juntos. ✨</footer></div><div class="auth-right"><div class="auth-card"><div class="eyebrow">WELCOME BACK</div><h2>반갑습니다 👋</h2><p>학습 공간에 로그인해 주세요.</p><div id="setup-note" class="setup-warning ${CONFIGURED?'hide':''}">Firebase 설정이 비어 있습니다. 두 HTML에 동일한 firebaseConfig를 입력해 주세요.</div><form id="login-form" class="stack"><div class="field"><label>이메일</label><input name="email" type="email" autocomplete="email" required placeholder="name@example.com"></div><div class="field"><label>비밀번호</label><input name="password" type="password" autocomplete="current-password" required placeholder="비밀번호"></div><button class="btn full" type="submit">로그인 →</button></form><div class="auth-links"><button id="auth-alt" class="linkbutton" type="button">회원가입</button><button id="forgot-password" class="linkbutton" type="button">비밀번호 재설정</button></div><div id="login-message" class="error" style="margin-top:15px"></div></div></div></div>`}
+function signedOut(){return `<div class="auth-shell"><div class="auth-hero"><div class="brand"><span class="logo"><img src="senorayu-icon.png" alt="쎄뇨라유 스페인어 로고"></span><div><strong>쎄뇨라유 스페인어</strong><small>ESPAÑOL · LEARNING SPACE</small></div></div><div><div class="eyebrow" style="color:#c5ead6">MI PEQUEÑO UNIVERSO</div><h1>오늘의 스페인어가<br>내일의 일상이 되도록.</h1><p>과제를 제출하고, 단어를 복습하고, 다음 수업을 준비하세요. 수업이 끝난 뒤에도 배움은 이어집니다.</p></div><footer>Aprender juntos, crecer juntos. ✨</footer></div><div class="auth-right"><div class="auth-card"><div class="eyebrow">WELCOME BACK</div><h2>반갑습니다 👋</h2><p>학습 공간에 로그인해 주세요.</p><div id="setup-note" class="setup-warning ${CONFIGURED?'hide':''}">Firebase 설정이 비어 있습니다. 두 HTML에 동일한 firebaseConfig를 입력해 주세요.</div><form id="login-form" class="stack"><div class="field"><label>이메일</label><input name="email" type="email" autocomplete="email" required placeholder="name@example.com"></div><div class="field"><label>비밀번호</label><input name="password" type="password" autocomplete="current-password" required placeholder="비밀번호"></div><button class="btn full" type="submit">로그인 →</button></form><div class="auth-links"><button id="auth-alt" class="linkbutton" type="button">회원가입</button><button id="forgot-password" class="linkbutton" type="button">비밀번호 재설정</button></div><div id="login-message" class="error" style="margin-top:15px"></div></div></div></div>`}
 function mountAuth(root,opts={signup:true}){
   root.innerHTML=signedOut(); const alt=$('#auth-alt');if(!opts.signup)alt.classList.add('hide');
   let mode='login';alt?.addEventListener('click',()=>{mode=mode==='login'?'signup':'login';const form=$('#login-form');form.innerHTML=mode==='login'?`<div class="field"><label>이메일</label><input name="email" type="email" required autocomplete="email"></div><div class="field"><label>비밀번호</label><input name="password" type="password" required autocomplete="current-password"></div><button class="btn full" type="submit">로그인 →</button>`:`<div class="field"><label>이름</label><input name="name" type="text" required maxlength="35" autocomplete="name" placeholder="실명 또는 강사에게 알린 이름"></div><div class="field"><label>이메일</label><input name="email" type="email" required autocomplete="email"></div><div class="field"><label>비밀번호 (6자 이상)</label><input name="password" type="password" required minlength="6" autocomplete="new-password"></div><button class="btn full" type="submit">수강생 계정 만들기</button>`;alt.textContent=mode==='login'?'회원가입':'로그인으로 돌아가기';$('#login-message').textContent='';});
@@ -316,13 +355,37 @@ function wireMediaUi(container,onFile){const status=$('[data-rec-status]',contai
 
 // ===== INDEX PAGE =====
 const root=$('#root');
-const S={user:null,profile:null,classes:[],classId:'',weeks:[],weekId:'',tab:'assignment',assignmentFile:null,quiz:null};
-const NAV=[['assignment','✍🏻','과제'],['quiz','✦','복습'],['preview','▤','다음차시안내'],['mypage','◉','마이페이지']];
+const S={user:null,profile:null,classes:[],classId:'',weeks:[],weekId:'',tab:'assignment',assignmentFile:null,quiz:null,live:{},activeQuestionId:'',directory:[]};
+const NAV=[['assignment','✍🏻','과제'],['quiz','✦','복습'],['preview','▤','다음차시'],['questions','💬','질문'],['classmates','♙','우리 반'],['mypage','◉','내 정보']];
 const week=()=>S.weeks.find(w=>w.id===S.weekId);
 const currentClass=()=>S.classes.find(c=>c.id===S.classId);
+function stopLive(key){if(S.live[key]){S.live[key]();delete S.live[key]}}
+function clearPageLive(){for(const k of Object.keys(S.live))if(!['enrollments','weeks'].includes(k))stopLive(k)}
+function onLiveError(err){console.error('실시간 구독 실패',err);toast('실시간 연결을 확인해 주세요: '+ex(err),true)}
+function startWeekLive(){stopLive('weeks');if(!S.classId)return;
+  S.live.weeks=onSnapshot(query(collection(db,'classes',S.classId,'weeks'),where('published','==',true)),snap=>{
+    const incoming=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.order??0)-(b.order??0));
+    const old=JSON.stringify(S.weeks),now=JSON.stringify(incoming);if(old===now)return;
+    S.weeks=incoming;if(!incoming.some(w=>w.id===S.weekId))S.weekId=incoming.at(-1)?.id||'';
+    if(document.activeElement?.matches('textarea,input,[contenteditable]')){toast('새 학습자료가 반영되었습니다. 메뉴를 다시 선택하면 확인할 수 있습니다.');return}
+    if($('#student-body'))renderBody();
+  },onLiveError);
+}
+function startEnrollmentLive(){stopLive('enrollments');
+  S.live.enrollments=onSnapshot(query(collection(db,'enrollments'),where('uid','==',S.user.uid)),async snap=>{
+    const active=snap.docs.filter(d=>d.data().status==='active');
+    const next=active[0]?.data().classId||'';
+    if(next===S.classId)return;
+    stopLive('weeks');clearPageLive();
+    S.classId=next;S.classes=[];S.weeks=[];S.weekId='';
+    if(next){try{const c=await getDoc(doc(db,'classes',next));if(c.exists()&&!c.data().archived){S.classes=[{id:c.id,...c.data()}];await loadWeeks();startWeekLive()}}catch(e){onLiveError(e)}}
+    frame();toast(next?'강사가 지정한 반 정보가 반영되었습니다.':'수강 상태가 변경되었습니다.');
+  },onLiveError);
+}
+
 const wselect=()=>`<select id="student-week-picker" class="input week-chooser">${S.weeks.map(w=>`<option value="${esc(w.id)}" ${w.id===S.weekId?'selected':''}>${esc(w.label)}</option>`).join('')}</select>`;
 function frame(){
-  root.innerHTML=`<div class="student-app"><header class="student-header"><div class="brand"><div class="logo">¡</div><div><strong>Hola Class</strong><small>MI ESPACIO DE ESPAÑOL</small></div></div><div class="row"><span class="pill green">${esc(((S.profile?.displayName==='수강생'&&S.user?.displayName)?S.user.displayName:S.profile?.displayName)||S.user?.displayName||'수강생')} 님</span><button id="student-logout" class="btn ghost small">로그아웃</button></div></header><main id="student-body"></main></div><nav class="student-nav" aria-label="하단 메뉴"><div class="student-nav-inner">${NAV.map(([key,emoji,label])=>`<button type="button" class="nav-item ${S.tab===key?'active':''}" data-tab="${key}"><span style="font-size:21px">${emoji}</span><span>${label}</span></button>`).join('')}</div></nav>`;
+  root.innerHTML=`<div class="student-app"><header class="student-header"><div class="brand"><div class="logo"><img src="senorayu-icon.png" alt="쎄뇨라유 스페인어 로고"></div><div><strong>쎄뇨라유 스페인어</strong><small>MI ESPACIO DE ESPAÑOL</small></div></div><div class="row"><span class="pill green">${esc(((S.profile?.displayName==='수강생'&&S.user?.displayName)?S.user.displayName:S.profile?.displayName)||S.user?.displayName||'수강생')} 님</span><button id="student-logout" class="btn ghost small">로그아웃</button></div></header><main id="student-body"></main></div><nav class="student-nav" aria-label="하단 메뉴"><div class="student-nav-inner">${NAV.map(([key,emoji,label])=>`<button type="button" class="nav-item ${S.tab===key?'active':''}" data-tab="${key}"><span style="font-size:21px">${emoji}</span><span>${label}</span></button>`).join('')}</div></nav>`;
   $('#student-logout').addEventListener('click',()=>signOut(auth));
   $$('[data-tab]').forEach(b=>b.addEventListener('click',()=>{S.tab=b.dataset.tab;S.quiz=null;renderBody()}));
   renderBody();
@@ -331,9 +394,11 @@ function bodyHeader(title,description){return `<div class="page-head"><div class
 function weekHeader(title,description){return `<div class="section-title"><div>${bodyHeader(title,description)}</div>${S.weeks.length?wselect():''}</div>`}
 function weeklyPicker(){ $('#student-week-picker')?.addEventListener('change',e=>{S.weekId=e.target.value;S.quiz=null;renderBody()}) }
 function renderBody(){
-  $$('.nav-item').forEach(el=>el.classList.toggle('active',el.dataset.tab===S.tab));const body=$('#student-body');if(!body)return;
-  if(!S.classes.length){renderJoin(body);return}
+  clearPageLive();$$('.nav-item').forEach(el=>el.classList.toggle('active',el.dataset.tab===S.tab));const body=$('#student-body');if(!body)return;
+  if(!S.classes.length){if(S.hadEnrollment){body.innerHTML=bodyHeader('수강 상태를 확인해 주세요','현재 참여 중인 반이 없습니다.')+empty('강사에게 수강반 확인을 요청해 주세요','반 변경과 수강 재등록은 강사 페이지에서 처리합니다.');return}renderJoin(body);return}
   if(S.tab==='mypage'){renderMyPage(body);return}
+  if(S.tab==='questions'){renderQuestions(body);return}
+  if(S.tab==='classmates'){renderClassmates(body);return}
   if(!S.weeks.length){body.innerHTML=bodyHeader('첫 수업을 준비하고 있어요','강사가 콘텐츠를 공개하면 이곳에서 확인할 수 있습니다.')+empty('아직 공개된 주차가 없습니다','강사가 학습 자료를 게시한 뒤 다시 확인해 주세요.');return}
   if(S.tab==='assignment')renderAssignment(body);
   if(S.tab==='quiz')renderQuiz(body);
@@ -350,6 +415,8 @@ function wireJoin(){const form=$('#join-form');form?.addEventListener('submit',a
     const cid=mapping.data().classId;
     const entry={uid:S.user.uid,classId:cid,studentName:((S.profile.displayName==='수강생'&&S.user.displayName)?S.user.displayName:S.profile.displayName)||S.user.email,email:S.user.email||'',joinCode:code,status:'active',joinedAt:serverTimestamp()};
     await setDoc(doc(db,'enrollments',enId(S.user.uid,cid)),entry);
+    try{await setDoc(doc(db,'classes',cid,'members',S.user.uid),{uid:S.user.uid,name:entry.studentName,status:'active',joinedAt:serverTimestamp()},{merge:true})}catch(err){console.warn('반 명단 업데이트 실패',err)}
+    try{await updateDoc(doc(db,'users',S.user.uid),{assignedClassId:cid})}catch(err){console.warn('소속반 고정 정보 저장 실패',err)}
     toast('수강반에 참여했습니다!');await loadStudent(cid);
   }catch(err){toast('수강 코드로 입장할 수 없습니다. '+ex(err),true)}
   finally{if(btn?.isConnected)btn.disabled=false}
@@ -357,11 +424,13 @@ function wireJoin(){const form=$('#join-form');form?.addEventListener('submit',a
 async function loadStudent(forcedClass){
   const snaps=await getDocs(query(collection(db,'enrollments'),where('uid','==',S.user.uid)));
   const active=snaps.docs.filter(d=>d.data().status==='active');
-  S.classes=(await Promise.all(active.map(async d=>{try{const c=await getDoc(doc(db,'classes',d.data().classId));return c.exists()&&!c.data().archived?{id:c.id,...c.data()}:null}catch(e){console.warn(e);return null}}))).filter(Boolean);
-  const preferred=forcedClass||localStorage.getItem('spanish-lms-class')||'';
-  S.classId=S.classes.some(c=>c.id===preferred)?preferred:(S.classes[0]?.id||'');
-  if(S.classId){localStorage.setItem('spanish-lms-class',S.classId);await loadWeeks();}else{S.weeks=[];S.weekId=''}
-  frame();
+  S.hadEnrollment=snaps.docs.length>0;
+  const selected=active[0]?.data().classId||'';
+  if(selected&&!S.profile?.assignedClassId){try{await updateDoc(doc(db,'users',S.user.uid),{assignedClassId:selected});S.profile.assignedClassId=selected}catch(e){console.warn('기존 수강생 소속반 갱신 실패',e)}}
+  S.classes=[];S.classId='';
+  if(selected){const c=await getDoc(doc(db,'classes',selected));if(c.exists()&&!c.data().archived){S.classId=selected;S.classes=[{id:c.id,...c.data()}];await loadWeeks()}}
+  else{S.weeks=[];S.weekId=''}
+  frame();startWeekLive();startEnrollmentLive();
 }
 async function loadWeeks(){const snap=await getDocs(query(collection(db,'classes',S.classId,'weeks'),where('published','==',true)));
   S.weeks=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.order??0)-(b.order??0));
@@ -373,13 +442,21 @@ function feedbackMarkup(obj){
   if(!comments.length)return '';
   return `<div class="student-feedback"><h3 style="margin-bottom:12px">💬 선생님의 피드백 (${comments.length})</h3><div class="stack">${comments.map(f=>`<div class="feedback"><strong>선생님 · ${esc(typeof f.createdAt==='string'?f.createdAt.slice(0,16).replace('T',' '):fmt(f.createdAt))}</strong>${f.text?`<div style="white-space:pre-wrap">${esc(f.text)}</div>`:''}${f.audioPath?`<div style="margin-top:10px"><audio controls preload="none" data-media-path="${esc(f.audioPath)}"></audio></div>`:''}</div>`).join('')}</div></div>`;
 }
-async function renderAssignment(body){const w=week();body.innerHTML=weekHeader('이번 주 과제','말하기와 쓰기를 차근차근 연습해 보세요.');weeklyPicker();
+async function renderAssignment(body){const w=week();body.innerHTML=weekHeader('과제','말하기와 쓰기를 차근차근 연습해 보세요.');weeklyPicker();
   if(!w.assignment?.enabled){body.insertAdjacentHTML('beforeend',empty('이 주차의 과제는 아직 열리지 않았습니다','강사가 과제를 공개하면 여기서 제출할 수 있습니다.'));return}
-  body.insertAdjacentHTML('beforeend',`<div class="card stack"><div class="between"><div><span class="kicker">${esc(w.label)}</span><h2>${esc(w.assignment.title||'스페인어 과제')}</h2></div><span class="pill amber">TAREA</span></div><div class="subtle article" style="white-space:pre-wrap">${esc(w.assignment.instructions||'과제 내용을 확인해 주세요.')}</div>${w.assignment.dueAt?`<p class="hint">⏰ 제출 권장일: ${esc(w.assignment.dueAt.replace('T',' '))}</p>`:''}<div id="assignment-form-area" class="stack"><div class="loading">제출 기록 확인 중</div></div></div>`);
+  body.insertAdjacentHTML('beforeend',`<div class="card stack"><div class="between"><div><h2>${esc(w.assignment.title||'스페인어 과제')}</h2></div><span class="pill amber">TAREA</span></div><div class="subtle article" style="white-space:pre-wrap">${esc(w.assignment.instructions||'과제 내용을 확인해 주세요.')}</div>${w.assignment.dueAt?`<p class="hint">⏰ 제출 권장일: ${esc(w.assignment.dueAt.replace('T',' '))}</p>`:''}<div id="assignment-form-area" class="stack"><div class="loading">제출 기록 확인 중</div></div></div>`);
   const snap=await getDoc(doc(db,'classes',S.classId,'weeks',w.id,'submissions',S.user.uid));if(S.weekId!==w.id||S.tab!=='assignment')return;const data=snap.exists()?snap.data():null;S.assignmentFile=null;
   const area=$('#assignment-form-area');if(!area)return;
-  area.innerHTML=`${data?`<p class="notice">✅ 제출 기록이 있습니다 · ${fmt(data.submittedAt)} · 다시 제출하면 최신 내용으로 갱신됩니다.</p>`:''}${w.assignment.allowText!==false?`<div class="field"><label>작성 과제</label><textarea id="assignment-text" rows="8" maxlength="20000" placeholder="여기에 스페인어로 답안을 작성해 주세요.">${esc(data?.text||'')}</textarea></div>`:''}${w.assignment.allowAudio!==false?`<div class="field"><span class="field-label">말하기 과제</span><div id="student-audio-ui">${makeMediaUi('audio')}</div>${data?.audioPath?`<div><p class="hint">이전 녹음</p><audio controls data-media-path="${esc(data.audioPath)}"></audio></div>`:''}</div>`:''}<div class="between"><p id="assignment-progress" class="hint">답안은 본인과 강사만 열람할 수 있습니다.</p><button class="btn" id="submit-assignment">과제 제출하기 →</button></div>${feedbackMarkup(data)}`;
+  area.innerHTML=`${data?`<p class="notice">✅ 제출 기록이 있습니다 · ${fmt(data.submittedAt)} · 다시 제출하면 최신 내용으로 갱신됩니다.</p>`:''}${w.assignment.allowText!==false?`<div class="field"><label>작성 과제</label><textarea id="assignment-text" rows="8" maxlength="20000" placeholder="여기에 스페인어로 답안을 작성해 주세요.">${esc(data?.text||'')}</textarea></div>`:''}${w.assignment.allowAudio!==false?`<div class="field"><span class="field-label">말하기 과제</span><div id="student-audio-ui">${makeMediaUi('audio')}</div>${data?.audioPath?`<div><p class="hint">이전 녹음</p><audio controls data-media-path="${esc(data.audioPath)}"></audio></div>`:''}</div>`:''}<div class="between"><p id="assignment-progress" class="hint">답안은 본인과 강사만 열람할 수 있습니다.</p><button class="btn" id="submit-assignment">과제 제출하기 →</button></div><div id="student-assignment-feedback">${feedbackMarkup(data)}</div>`;
   if(w.assignment.allowAudio!==false)wireMediaUi($('#student-audio-ui'),f=>S.assignmentFile=f);useMediaPaths(area);
+  S.live.assignment=onSnapshot(doc(db,'classes',S.classId,'weeks',w.id,'submissions',S.user.uid),snapshot=>{
+    if(S.tab!=='assignment'||S.weekId!==w.id)return;
+    const el=$('#student-assignment-feedback');if(!el)return;
+    const html=feedbackMarkup(snapshot.exists()?snapshot.data():null);
+    if(el.dataset.rendered===html)return;
+    el.innerHTML=html;el.dataset.rendered=html;useMediaPaths(el);
+  },onLiveError);
+
   $('#submit-assignment').addEventListener('click',async e=>{const btn=e.currentTarget;const text=$('#assignment-text')?.value?.trim()||'';if(!text&&!S.assignmentFile&&!data?.audioPath){toast('텍스트나 음성 중 하나를 제출해 주세요.',true);return}btn.disabled=true;try{let path=data?.audioPath||'';if(S.assignmentFile){path=`classes/${S.classId}/submissions/${w.id}/${S.user.uid}/${makeId()}-${S.assignmentFile.name.replace(/[^\w.\-]/g,'_')}`;await uploadMedia(S.assignmentFile,path,'audio',$('#assignment-progress'))}await setDoc(doc(db,'classes',S.classId,'weeks',w.id,'submissions',S.user.uid),{userId:S.user.uid,studentName:((S.profile.displayName==='수강생'&&S.user.displayName)?S.user.displayName:S.profile.displayName)||S.user.email,email:S.user.email||'',text,audioPath:path,submittedAt:serverTimestamp()},{merge:true});toast('과제를 제출했습니다!');await renderAssignment(body)}catch(err){toast(ex(err),true)}finally{btn.disabled=false}})
 }
 // 이전 4지선다 문제도 자동으로 단일 정답형으로 처리합니다.
@@ -408,9 +485,17 @@ async function renderQuiz(body){const w=week();body.innerHTML=weekHeader('단어
   if(!w.quiz?.enabled||!w.quiz.questions?.length){body.insertAdjacentHTML('beforeend',empty('이 주차의 복습 퀴즈가 준비 중입니다'));return}
   const snap=await getDoc(doc(db,'classes',S.classId,'weeks',w.id,'quizResults',S.user.uid));if(S.weekId!==w.id||S.tab!=='quiz')return;
   const last=snap.exists()?snap.data():null;
-  body.insertAdjacentHTML('beforeend',`<div class="card" id="quiz-stage"><div class="between"><div><span class="kicker">${esc(w.label)}</span><h2>${esc(w.quiz.title||'이번 주 단어 퀴즈')}</h2></div><span class="pill green">${w.quiz.questions.length}문항</span></div>${last?`<p class="notice" style="margin-top:17px">최근 점수: ${last.score??0}/${last.total??0}점 (${fmt(last.submittedAt)}) · 다시 풀 수 있습니다.</p>${feedbackMarkup(last)}`:''}<div style="margin-top:19px" id="quiz-content"></div></div>`);
+  body.insertAdjacentHTML('beforeend',`<div class="card" id="quiz-stage"><div class="between"><div><h2>${esc(w.quiz.title||'이번 주 단어 퀴즈')}</h2></div><span class="pill green">${w.quiz.questions.length}문항</span></div><div id="quiz-last-status">${last?`<p class="notice" style="margin-top:17px">최근 점수: ${last.score??0}/${last.total??0}점 · 다시 풀 수 있습니다.</p>`:''}</div><div id="quiz-live-feedback">${feedbackMarkup(last)}</div><div style="margin-top:19px" id="quiz-content"></div></div>`);
   const qs=w.quiz.questions.map(normalizeQuestion);S.quiz={id:w.id,questions:qs,shuffled:qs.map(shuffleQuestion),answers:Array(qs.length).fill(null),index:0,last};
   useMediaPaths(body);showQuestion();
+  S.live.quiz=onSnapshot(doc(db,'classes',S.classId,'weeks',w.id,'quizResults',S.user.uid),snapshot=>{
+    if(S.tab!=='quiz'||S.weekId!==w.id)return;
+    const d=snapshot.exists()?snapshot.data():null;
+    const status=$('#quiz-last-status'),feedback=$('#quiz-live-feedback');
+    if(status)status.innerHTML=d?`<p class="notice" style="margin-top:17px">최근 점수 ${Number(d.score)||0}/${Number(d.total)||0} · 첫 응시 ${Number(d.firstAttempt?.score??d.score)||0}/${Number(d.firstAttempt?.total??d.total)||0}</p>`:'';
+    if(feedback){const html=feedbackMarkup(d);if(feedback.dataset.rendered!==html){feedback.innerHTML=html;feedback.dataset.rendered=html;useMediaPaths(feedback)}}
+  },onLiveError);
+
 }
 function showQuestion(){const z=S.quiz;if(!z)return;const node=$('#quiz-content');if(!node)return;
   const n=z.index,q=z.questions[n],multi=q.type==='multiple';const current=z.answers[n],selected=Array.isArray(current)?current:current===null?[]:[current];
@@ -431,7 +516,16 @@ function showQuestion(){const z=S.quiz;if(!z)return;const node=$('#quiz-content'
 async function finishQuiz(){const z=S.quiz;if(!z)return;
   const score=z.questions.filter((q,i)=>isCorrect(q,z.answers[i])).length,target=$('#quiz-content');loading(target);
   try{
-    await setDoc(doc(db,'classes',S.classId,'weeks',z.id,'quizResults',S.user.uid),{userId:S.user.uid,studentName:((S.profile.displayName==='수강생'&&S.user.displayName)?S.user.displayName:S.profile.displayName)||S.user.email,email:S.user.email||'',answers:z.answers,score,total:z.questions.length,submittedAt:serverTimestamp()},{merge:true});
+    const resultRef=doc(db,'classes',S.classId,'weeks',z.id,'quizResults',S.user.uid);
+    const attemptRef=doc(collection(db,'classes',S.classId,'weeks',z.id,'quizResults',S.user.uid,'attempts'));
+    await runTransaction(db,async tx=>{
+      const oldSnap=await tx.get(resultRef),old=oldSnap.exists()?oldSnap.data():null;
+      const first=old?.firstAttempt || (old?{score:Number(old.score)||0,total:Number(old.total)||0,submittedAt:old.submittedAt||null,answers:old.answers||[],legacy:true}:{score,total:z.questions.length,submittedAt:new Date().toISOString(),legacy:false});
+      const count=Math.max(0,Number(old?.attemptCount)|| (old?1:0))+1;
+      const name=((S.profile.displayName==='수강생'&&S.user.displayName)?S.user.displayName:S.profile.displayName)||S.user.email;
+      tx.set(attemptRef,{userId:S.user.uid,answers:z.answers,score,total:z.questions.length,attemptNumber:count,submittedAt:serverTimestamp()});
+      tx.set(resultRef,{userId:S.user.uid,studentName:name,email:S.user.email||'',answers:z.answers,score,total:z.questions.length,submittedAt:serverTimestamp(),firstAttempt:first,attemptCount:count},{merge:true});
+    });
     if(S.weekId!==z.id||S.tab!=='quiz')return;
     const pct=Math.round(score/z.questions.length*100);target.classList.remove('loading');
     target.innerHTML=`<div style="text-align:center"><div class="eyebrow">QUIZ COMPLETE ✨</div><h2>복습을 완료했어요!</h2><div class="score-ring" style="--angle:${pct}%"><div class="score-ring-inner"><div><strong>${score} / ${z.questions.length}</strong><br><span>정답 ${pct}%</span></div></div></div><p class="muted">복수정답은 정답을 모두 선택해야 1점입니다.</p></div><div class="separator"></div>${z.questions.map((q,i)=>{const good=isCorrect(q,z.answers[i]);return `<div class="review-line"><div class="between"><strong>${i+1}. ${esc(q.stem)}</strong><span class="pill ${good?'green':'red'}">${good?'정답':'오답'}</span></div><p class="hint" style="margin-top:7px">내 답: ${esc(answerLabel(q,z.answers[i]))} · 정답: ${esc(answerLabel(q,q.correctIndices))}</p>${q.explanation?`<p class="hint" style="margin-top:5px">💡 ${esc(q.explanation)}</p>`:''}</div>`}).join('')}${feedbackMarkup(z.last)}<button id="quiz-retry" class="btn secondary full" style="margin-top:20px">다시 풀기</button>`;
@@ -440,25 +534,57 @@ async function finishQuiz(){const z=S.quiz;if(!z)return;
 }
 async function renderPreview(body){const w=week();body.innerHTML=weekHeader('다음 차시 안내','수업 전에 미리 읽고, 보고, 생각해 보는 시간입니다.');weeklyPicker();const p=w.preview;
   if(!p?.enabled){body.insertAdjacentHTML('beforeend',empty('다음 차시 안내를 준비하고 있습니다'));return}
-  const mode=p.mode||'rich';body.insertAdjacentHTML('beforeend',`<div class="card stack"><div class="between"><div><span class="kicker">${esc(w.label)}</span><h2>${esc(p.title||'다음 시간에 만나요')}</h2></div><span class="pill green">PRÓXIMA CLASE</span></div>${mode==='image'?(p.imagePath?`<img class="article-image" alt="다음 차시 안내" data-media-path="${esc(p.imagePath)}">`:empty('안내 이미지가 없습니다')):`<div class="article">${sanitizeRich(p.richHtml||'<p>학습 내용을 곧 안내할 예정입니다.</p>')}</div>`}${(p.videos||[]).length?`<div class="separator"></div><h3>🎬 수업 영상</h3><p class="hint">앱 안에서 재생됩니다. 다운로드 메뉴는 숨겨져 있습니다.</p>${p.videos.map(v=>`<div class="stack"><strong style="font-size:13px">${esc(v.name||'수업 영상')}</strong><video controls controlslist="nodownload noremoteplayback" disablepictureinpicture disableremoteplayback playsinline preload="metadata" class="media-preview" data-media-path="${esc(v.path)}"></video></div>`).join('')}`:''}${(p.files||[]).length?`<div class="separator"></div><h3>📎 첨부 자료</h3><div class="media-list">${p.files.map(f=>`<a href="#" data-media-path="${esc(f.path)}" class="media-item">${esc(f.name||'첨부 파일')} ↗</a>`).join('')}</div>`:''}</div>`);useMediaPaths(body);
+  const mode=p.mode||'rich';body.insertAdjacentHTML('beforeend',`<div class="card stack"><div class="between"><div><h2>${esc(p.title||'다음 시간에 만나요')}</h2></div><span class="pill green">PRÓXIMA CLASE</span></div>${mode==='image'?(p.imagePath?`<img class="article-image" alt="다음 차시 안내" data-media-path="${esc(p.imagePath)}">`:empty('안내 이미지가 없습니다')):`<div class="article">${sanitizeRich(p.richHtml||'<p>학습 내용을 곧 안내할 예정입니다.</p>')}</div>`}${(p.videos||[]).length?`<div class="separator"></div><h3>🎬 수업 영상</h3><p class="hint">앱 안에서 재생됩니다. 다운로드 메뉴는 숨겨져 있습니다.</p>${p.videos.map(v=>`<div class="stack"><strong style="font-size:13px">${esc(v.name||'수업 영상')}</strong><video controls controlslist="nodownload noremoteplayback" disablepictureinpicture disableremoteplayback playsinline preload="metadata" class="media-preview" data-media-path="${esc(v.path)}"></video></div>`).join('')}`:''}${(p.files||[]).length?`<div class="separator"></div><h3>📎 첨부 자료</h3><div class="media-list">${p.files.map(f=>`<a href="#" data-media-path="${esc(f.path)}" class="media-item">${esc(f.name||'첨부 파일')} ↗</a>`).join('')}</div>`:''}</div>`);useMediaPaths(body);
 }
 async function renderMyPage(body){body.innerHTML=bodyHeader('마이페이지','내 학습 정보와 출석 기록을 한곳에서 확인하세요.');
-  body.insertAdjacentHTML('beforeend',`<div class="grid2"><div class="card"><h3>👋 프로필</h3><div class="separator"></div><dl class="info-grid"><dt>이름</dt><dd>${esc(S.profile.displayName)}</dd><dt>로그인 ID</dt><dd>${esc(S.user.email)}</dd><dt>현재 반</dt><dd>${esc(currentClass()?.name||'미등록')}</dd><dt>수강 시작</dt><dd>반별 등록 기록 기준</dd></dl><div class="separator"></div><form id="student-name-form" class="row" style="align-items:end"><div class="field" style="flex:1;min-width:160px"><label>표시 이름 변경</label><input name="displayName" maxlength="35" required value="${esc(S.profile.displayName||'')}" placeholder="수강생 이름"></div><button class="btn secondary small" type="submit">이름 저장</button></form><p class="hint">이름 변경 시 강사 화면에도 최신 이름이 표시됩니다.</p><div class="separator"></div><div class="field"><label>수강반 변경</label><select id="student-class-switch">${S.classes.map(c=>`<option value="${esc(c.id)}" ${c.id===S.classId?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div></div><div class="card"><h3>📋 출석 현황</h3><p class="hint" style="margin:6px 0 12px">공개된 주차 기준으로 표시됩니다.</p><div id="attendance-overview" class="loading">불러오는 중</div></div></div><div class="card" style="margin-top:17px"><h3 style="margin-bottom:10px">➕ 다른 반 참여</h3><p class="muted" style="font-size:13px;margin-bottom:16px">다른 수업도 수강하시나요? 강사가 알려준 코드만 입력하세요.</p><form id="join-form" class="stack" style="max-width:450px"><div class="field"><label>입장 코드</label><input name="code" required></div><div><button class="btn soft" type="submit">새 수강반 등록</button></div></form></div>`);
+  body.insertAdjacentHTML('beforeend',`<div class="grid2"><div class="card"><h3>👋 프로필</h3><div class="separator"></div><dl class="info-grid"><dt>이름</dt><dd>${esc(S.profile.displayName)}</dd><dt>로그인 ID</dt><dd>${esc(S.user.email)}</dd><dt>현재 반</dt><dd>${esc(currentClass()?.name||'미등록')}</dd><dt>수강 시작</dt><dd>반별 등록 기록 기준</dd></dl><div class="separator"></div><form id="student-name-form" class="row" style="align-items:end"><div class="field" style="flex:1;min-width:160px"><label>표시 이름 변경</label><input name="displayName" maxlength="35" required value="${esc(S.profile.displayName||'')}" placeholder="수강생 이름"></div><button class="btn secondary small" type="submit">이름 저장</button></form><p class="hint">이름 변경 시 강사 화면에도 최신 이름이 표시됩니다.</p><div class="quiet-note">반 변경이 필요하시면 강사에게 요청해 주세요.</div></div><div class="card"><h3>📋 출석 현황</h3><p class="hint" style="margin:6px 0 12px">공개된 주차 기준으로 표시됩니다.</p><div id="attendance-overview" class="loading">불러오는 중</div></div></div>`);
   $('#student-name-form')?.addEventListener('submit',async e=>{
     e.preventDefault();const form=e.currentTarget,name=String(new FormData(form).get('displayName')||'').trim();
     if(!name||name.length>35){toast('이름은 1~35자로 입력해 주세요.',true);return}
     const btn=$('button[type="submit"]',form);btn.disabled=true;
     try{await updateDoc(doc(db,'users',S.user.uid),{displayName:name,updatedAt:serverTimestamp()});
-      await updateProfile(S.user,{displayName:name});S.profile.displayName=name;
+      await updateProfile(S.user,{displayName:name});S.profile.displayName=name;try{await setDoc(doc(db,'classes',S.classId,'members',S.user.uid),{uid:S.user.uid,name,status:'active'},{merge:true})}catch(e){console.warn(e)}
       toast('이름을 저장했습니다.');frame();}
     catch(err){toast(ex(err),true)}finally{if(btn.isConnected)btn.disabled=false}
   });
-  $('#student-class-switch')?.addEventListener('change',async e=>{S.classId=e.target.value;localStorage.setItem('spanish-lms-class',S.classId);S.weekId='';await loadWeeks();renderBody()});wireJoin();
-  const statuses=await Promise.all(S.weeks.map(async w=>{try{const d=await getDoc(doc(db,'classes',S.classId,'weeks',w.id,'attendance',S.user.uid));return {label:w.label,status:d.exists()?d.data().status:'unchecked'}}catch(e){return {label:w.label,status:'unchecked'}}}));
+
+  const statuses=await Promise.all(S.weeks.map(async w=>{try{const d=await getDoc(doc(db,'classes',S.classId,'weeks',w.id,'attendance',S.user.uid));return {id:w.id,label:w.label,status:d.exists()?d.data().status:'unchecked'}}catch(e){return {id:w.id,label:w.label,status:'unchecked'}}}));
   const dict={present:['출석','green'],late:['지각','amber'],absent:['결석','red'],excused:['인정결석','gray'],unchecked:['미체크','gray']};
-  const spot=$('#attendance-overview');if(spot){spot.classList.remove('loading');spot.innerHTML=statuses.length?statuses.map(item=>`<div class="between" style="padding:10px 0;border-bottom:1px solid var(--line)"><span style="font-size:13px">${esc(item.label)}</span><span class="pill ${dict[item.status]?.[1]||'gray'}">${dict[item.status]?.[0]||'미체크'}</span></div>`).join(''):empty('아직 출석 기록이 없습니다');}
+  const spot=$('#attendance-overview');if(spot){spot.classList.remove('loading');spot.innerHTML=statuses.length?statuses.map(item=>`<div class="between" data-attendance-week="${esc(item.id)}" style="padding:10px 0;border-bottom:1px solid var(--line)"><span style="font-size:13px">${esc(item.label)}</span><span class="pill ${dict[item.status]?.[1]||'gray'}">${dict[item.status]?.[0]||'미체크'}</span></div>`).join(''):empty('아직 출석 기록이 없습니다');}
+  for(const w of S.weeks){S.live['attendance:'+w.id]=onSnapshot(doc(db,'classes',S.classId,'weeks',w.id,'attendance',S.user.uid),snap=>{
+    if(S.tab!=='mypage')return;const row=$(`[data-attendance-week="${w.id}"]`);if(!row)return;
+    const status=snap.exists()?snap.data().status:'unchecked';const tag=$('.pill',row);if(tag){tag.className='pill '+(dict[status]?.[1]||'gray');tag.textContent=dict[status]?.[0]||'미체크'}
+  },onLiveError)}
 }
-if(CONFIGURED){onAuthStateChanged(auth,async user=>{try{if(!user){S.user=null;mountAuth(root);return}S.user=user;root.innerHTML='<div class="loading" style="min-height:90vh">학습 정보를 준비하고 있습니다</div>';S.profile=await ensureProfile(user);if(S.profile.role==='admin'){root.innerHTML=`<div style="max-width:450px;margin:100px auto;padding:24px" class="card"><h2>강사 계정입니다</h2><p style="margin:15px 0">강사 관리 페이지를 이용해 주세요.</p><a class="btn" href="admin.html">강사 페이지로 이동 →</a></div>`;return}await loadStudent()}catch(e){console.error(e);root.innerHTML=`<div class="card" style="max-width:550px;margin:70px auto"><h3>불러오기 실패</h3><p class="error">${esc(ex(e))}</p><button class="btn secondary" id="retry-student">다시 시도</button></div>`;$('#retry-student').onclick=()=>location.reload()}})}else mountAuth(root);
+
+// 질문 · 답변: 질문은 본인과 강사만, 댓글은 질문 작성자와 강사만 볼 수 있습니다.
+function questionPath(qid){return ['classes',S.classId,'questions',qid]}
+function renderQuestions(body){
+  body.innerHTML=bodyHeader('질문하기','궁금한 점을 선생님께 남겨보세요. 답변은 실시간으로 표시됩니다.')+`<div class="grid2" style="align-items:start"><div class="card stack"><h3>새 질문</h3><form id="question-create" class="stack"><div class="field"><label>제목</label><input name="title" required maxlength="100" placeholder="예: 오늘 배운 표현이 궁금해요"></div><div class="field"><label>질문 내용</label><textarea name="content" required maxlength="8000" rows="6" placeholder="질문을 자세히 작성해 주세요."></textarea></div><button class="btn" type="submit">질문 보내기</button></form></div><div class="stack"><div class="between"><h3>내 질문</h3><span class="pill green" id="question-count">0건</span></div><div id="question-list" class="question-list"><div class="loading">질문 확인 중</div></div></div></div><div id="student-thread" style="margin-top:17px"></div>`;
+  $('#question-create').onsubmit=async e=>{e.preventDefault();const form=e.currentTarget,fd=new FormData(form);const title=String(fd.get('title')||'').trim(),content=String(fd.get('content')||'').trim();if(!title||!content)return;const btn=$('button[type="submit"]',form);btn.disabled=true;try{await addDoc(collection(db,'classes',S.classId,'questions'),{uid:S.user.uid,studentName:S.profile.displayName||'수강생',title,content,createdAt:serverTimestamp(),status:'open'});form.reset();toast('질문이 전송되었습니다.')}catch(err){toast(ex(err),true)}finally{btn.disabled=false}};
+  S.live.questions=onSnapshot(query(collection(db,'classes',S.classId,'questions'),where('uid','==',S.user.uid)),snap=>{
+    if(S.tab!=='questions')return;const list=$('#question-list');if(!list)return;
+    const docs=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+    $('#question-count').textContent=docs.length+'건';list.classList.remove('loading');
+    list.innerHTML=docs.map(q=>`<button class="question-thread ${S.activeQuestionId===q.id?'thread-open':''}" type="button" data-qid="${esc(q.id)}" style="text-align:left"><div class="between"><strong>${esc(q.title)}</strong><span class="pill ${q.status==='answered'?'green':'gray'}">${q.status==='answered'?'답변 완료':'답변 대기'}</span></div><p class="hint" style="margin-top:5px">${fmt(q.createdAt)}</p><p class="muted" style="font-size:13px;margin-top:7px">${esc(q.content.slice(0,110))}</p></button>`).join('')||empty('아직 질문이 없습니다','첫 질문을 남겨 보세요.');
+    $$('[data-qid]',list).forEach(el=>el.onclick=()=>{S.activeQuestionId=el.dataset.qid;$$('[data-qid]',list).forEach(b=>b.classList.toggle('thread-open',b===el));showStudentThread(docs.find(q=>q.id===S.activeQuestionId))});
+    if(S.activeQuestionId&&!docs.some(q=>q.id===S.activeQuestionId)){S.activeQuestionId='';stopLive('replies');$('#student-thread').innerHTML=''}
+    else if(S.activeQuestionId && !S.live.replies)showStudentThread(docs.find(q=>q.id===S.activeQuestionId));
+  },onLiveError);
+}
+function showStudentThread(q){if(!q)return;stopLive('replies');const holder=$('#student-thread');if(!holder)return;
+  holder.innerHTML=`<div class="card stack"><div class="between"><div><h3>${esc(q.title)}</h3><p class="hint">${fmt(q.createdAt)}</p></div><button class="btn ghost small" type="button" id="close-thread">닫기 ×</button></div><div class="subtle" style="white-space:pre-wrap">${esc(q.content)}</div><h3>대화</h3><div id="student-replies" class="stack"><div class="loading">답변 확인 중</div></div><form id="student-reply-form" class="stack"><div class="field"><label>추가 질문 또는 답장</label><textarea name="text" rows="3" required maxlength="8000" placeholder="선생님께 전할 말을 작성해 주세요."></textarea></div><button class="btn" type="submit">답장 보내기</button></form></div>`;
+  $('#close-thread').onclick=()=>{S.activeQuestionId='';stopLive('replies');holder.innerHTML='';$$('[data-qid]').forEach(b=>b.classList.remove('thread-open'))};
+  $('#student-reply-form').onsubmit=async e=>{e.preventDefault();const form=e.currentTarget,text=String(new FormData(form).get('text')||'').trim();if(!text)return;const btn=$('button[type="submit"]',form);btn.disabled=true;try{await addDoc(collection(db,...questionPath(q.id),'replies'),{uid:S.user.uid,role:'student',author:S.profile.displayName||'수강생',text,createdAt:serverTimestamp()});form.reset()}catch(err){toast(ex(err),true)}finally{btn.disabled=false}};
+  S.live.replies=onSnapshot(collection(db,...questionPath(q.id),'replies'),snap=>{if(S.activeQuestionId!==q.id)return;const list=$('#student-replies');if(!list)return;const replies=snap.docs.map(d=>d.data()).sort((a,b)=>(a.createdAt?.seconds||0)-(b.createdAt?.seconds||0));loaded(list,replies.map(r=>`<div class="reply-bubble ${r.role==='admin'?'teacher':'student'}"><p class="hint">${r.role==='admin'?'선생님':'나'} · ${fmt(r.createdAt)}</p><p style="white-space:pre-wrap">${esc(r.text)}</p></div>`).join('')||'<p class="hint">아직 댓글이 없습니다.</p>')},onLiveError);
+}
+function renderClassmates(body){body.innerHTML=bodyHeader('우리 반','함께 스페인어를 공부하는 친구들이에요.')+`<div class="card"><div class="between" style="margin-bottom:18px"><h3>${esc(currentClass()?.name||'수강반')}</h3><span class="pill green" id="classmate-count">—</span></div><div id="classmates-list" class="grid3"><div class="loading">수강생 확인 중</div></div><p class="hint" style="margin-top:17px">개인정보 보호를 위해 이름만 공개되며, 이메일이나 개별 학습 성적은 보이지 않습니다.</p></div>`;
+  S.live.classmates=onSnapshot(collection(db,'classes',S.classId,'members'),snap=>{
+    if(S.tab!=='classmates')return;const list=$('#classmates-list');if(!list)return;const members=snap.docs.map(d=>d.data()).filter(m=>m.status==='active').sort((a,b)=>(a.name||'').localeCompare(b.name||'','ko'));$('#classmate-count').textContent=members.length+'명';loaded(list,members.map(m=>`<div class="classmate-card"><span class="classmate-avatar">${esc((m.name||'?')[0])}</span><div><strong>${esc(m.name||'이름 미등록')}</strong>${m.uid===S.user.uid?'<p class="hint">나</p>':''}</div></div>`).join('')||empty('아직 반 명단이 없습니다','강사가 수강생 관리를 열면 기존 명단도 동기화됩니다.'));
+  },onLiveError);
+}
+
+if(CONFIGURED){onAuthStateChanged(auth,async user=>{try{if(!user){Object.keys(S.live).forEach(stopLive);S.user=null;mountAuth(root);return}S.user=user;root.innerHTML='<div class="loading" style="min-height:90vh">학습 정보를 준비하고 있습니다</div>';S.profile=await ensureProfile(user);if(S.profile.role==='admin'){root.innerHTML=`<div style="max-width:450px;margin:100px auto;padding:24px" class="card"><h2>강사 계정입니다</h2><p style="margin:15px 0">강사 관리 페이지를 이용해 주세요.</p><a class="btn" href="admin.html">강사 페이지로 이동 →</a></div>`;return}await loadStudent()}catch(e){console.error(e);root.innerHTML=`<div class="card" style="max-width:550px;margin:70px auto"><h3>불러오기 실패</h3><p class="error">${esc(ex(e))}</p><button class="btn secondary" id="retry-student">다시 시도</button></div>`;$('#retry-student').onclick=()=>location.reload()}})}else mountAuth(root);
 
 </script>
 </body>

@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#26785e">
+<meta name="theme-color" content="#a91e3c">
 <meta name="description" content="스페인어 교육 학습관리 시스템. 과제, 복습 퀴즈, 다음 수업 안내, 출석과 피드백을 한곳에서 관리하세요.">
-<title>Hola Class | 강사 관리공간</title>
+<title>쎄뇨라유 스페인어 | 강사 관리공간</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap');
 :root{--bg:#f7f7f3;--surface:#fff;--ink:#222927;--muted:#737d78;--line:#e6eae5;--primary:#26785e;--primary-deep:#15563f;--primary-light:#e8f4ed;--accent:#edab69;--danger:#bf5050;--shadow:0 12px 36px rgba(23,43,32,.055);--radius:19px}
@@ -13,7 +13,7 @@
 @media(max-width:980px){.auth-shell{grid-template-columns:1fr}.auth-hero{min-height:240px;padding:28px 35px}.auth-hero h1{font-size:34px}.auth-hero p{margin-top:12px}.auth-hero footer{display:none}.auth-right{padding:42px 20px}.admin-shell{grid-template-columns:1fr}.sidebar{position:relative;height:auto;gap:13px;padding:15px 20px}.sidebar .brand{padding:0}.side-nav{flex-direction:row;overflow:auto;padding-bottom:5px}.side-link{width:auto;white-space:nowrap;padding:9px 12px}.sidebar-footer{display:none}.admin-main{padding:25px 22px 50px}.admin-topbar{padding-bottom:19px}}
 @media(max-width:640px){.grid2,.grid3{grid-template-columns:1fr}.student-app{padding:0 15px 113px}.student-header{padding:16px 0;margin-bottom:24px}.student-header .brand small{font-size:9px}.student-header .brand strong{font-size:14px}.student-hero{padding:23px 20px}.student-hero .emoji{font-size:43px}.card{padding:19px}.section-title{gap:11px}h1{font-size:27px}h2{font-size:22px}.auth-hero{min-height:205px;padding:25px}.auth-hero h1{font-size:30px}.auth-hero p{font-size:12px;margin-top:10px}.admin-main{padding:22px 15px}.admin-topbar .field{min-width:100%;width:100%}.admin-topbar{align-items:stretch}.info-grid{grid-template-columns:110px 1fr}.tab{padding:9px 11px}}
 
-/* Hola Class — studio redesign v2: warm editorial design system */
+/* 쎄뇨라유 스페인어 — studio redesign v2: warm editorial design system */
 :root{
  --bg:#f5f6f7;--surface:#ffffff;--ink:#20303d;--muted:#71808b;
  --line:#e5eaf0;--primary:#c9604d;--primary-deep:#a94637;
@@ -175,7 +175,46 @@ a.media-item{background:#f7f9fa;border:1px solid #e8ecef;border-radius:11px;colo
 .quiz-ox-label{font-weight:800;font-size:21px;color:#235f48}
 .media-preview{aspect-ratio:16/9;object-fit:contain;background:#111b17}
 @media(max-width:600px){.quiz-editor-question{padding:15px}.quiz-choice-row{gap:7px;padding:7px}.quiz-choice-row .btn{padding:5px}}
+
+/* 쎄뇨라유 스페인어 · Brand System v4 */
+:root{--bg:#fdf8f6;--surface:#ffffff;--ink:#35262b;--muted:#806d72;--line:#f0dce0;--primary:#b4233b;--primary-deep:#84152d;--primary-light:#fff0f2;--accent:#e9a783;--danger:#b92a44;--shadow:0 9px 34px rgba(106,28,49,.055);--radius:18px}
+body{background:var(--bg);color:var(--ink)}
+.logo{background:#fff!important;border:1px solid #f1d5dc!important;box-shadow:0 4px 16px rgba(100,25,44,.10)!important;border-radius:13px!important;overflow:hidden;width:47px;height:47px;padding:6px}
+.logo img{display:block;width:100%;height:100%;object-fit:contain}
+.brand strong{font-weight:800;font-size:16px;letter-spacing:-.7px}.brand small{font-size:10px;letter-spacing:1.2px}
+.eyebrow,.kicker{color:var(--primary)}
+.btn{box-shadow:none}.btn:hover{box-shadow:0 5px 17px rgba(144,30,55,.13)}
+.btn.secondary:hover,.btn.ghost:hover{background:#fff5f6}.btn.soft:hover{background:#ffe3e8}
+.pill.green{background:#fce8ed;color:#9a1b32}.pill.amber{background:#fff2e5;color:#975725}
+.pill.gray{background:#f7eff1;color:#736069}.pill.red{background:#fff0f2;color:#a72742}
+.field>label,.field-label{color:#57383e}.field input,.field select,.field textarea,.input{border-color:#ead8dd}
+.field input:focus,.field select:focus,.field textarea:focus,.input:focus{border-color:#c74159;box-shadow:0 0 0 3px #ffe4e8}
+.card{border-color:#f0e3e5;box-shadow:var(--shadow)}.subtle,.mini-stat,.media-item{background:#fff9f9;border-color:#f1e3e5}
+.notice{background:#fff0f3;color:#8d2238}.notice.warn{background:#fff4ea;color:#8b5b36}
+.empty{background:#fffbfa;border-color:#eecdd4}.loading:before{border-color:#f1c2cc;border-top-color:var(--primary)}
+.auth-hero{background:linear-gradient(150deg,#66182c 0%,#a82040 65%,#be485e 100%)}.auth-hero .brand small{color:#f8dce3}.auth-hero p{color:#ffe4e9}.auth-hero footer{color:#f3ccd5}
+.auth-hero:before{opacity:.045}.auth-hero h1{font-family:'Noto Sans KR',system-ui,sans-serif;font-weight:800}
+.sidebar{background:#58182a!important}.sidebar .brand strong{font-size:13px!important;white-space:nowrap;letter-spacing:-.8px}.sidebar-footer{background:rgba(255,255,255,.065)!important;border:1px solid rgba(255,255,255,.13)!important}.side-link.active{background:#fff1f3!important;color:#8e1e36!important}.side-link:hover:not(.active){background:rgba(255,255,255,.10)}
+.sidebar .brand strong,.sidebar .brand small{color:#fff!important}.sidebar-footer{border-top-color:rgba(255,255,255,.13)!important}.sidebar-footer strong,.sidebar-footer .hint{color:#f4d8df!important}
+.admin-topbar{border-bottom:1px solid #f0e0e3}.side-emoji{font-size:17px}
+.student-header{margin-bottom:29px}.student-nav{border-top-color:#f0dce0;box-shadow:0 -5px 20px rgba(114,29,51,.05)}
+.student-nav-inner{width:min(100%,760px);grid-template-columns:repeat(6,minmax(0,1fr));gap:2px}
+.nav-item{min-width:0;padding:7px 2px!important;gap:1px}.nav-item>span:last-child{font-size:11px;white-space:nowrap;letter-spacing:-.5px}.nav-item>span:first-child{font-size:19px!important}
+.student-app{max-width:1040px}.student-feedback{border-color:#f0dce0;background:#fff9fa}.feedback{border-color:#f2dde1;background:#fffafb}
+.answer-option.selected{background:#fff0f3!important;border-color:#bc344f!important;color:#7c1a2c!important}.progress>div{background:var(--primary)}
+.name-avatar{background:#ffecf0!important;color:#9e2942!important}.roster-count{color:#a51e3c!important}.roster-summary{border-color:#f0dce0!important;background:#fff!important}
+.question-thread{border:1px solid var(--line);border-radius:14px;padding:17px;background:#fff;cursor:pointer;transition:border .15s,transform .15s}.question-thread:hover{border-color:#c95468;transform:translateY(-1px)}
+.thread-open{border-color:#d76b7d;background:#fff7f8}.reply-bubble{padding:13px 15px;border-radius:14px;border:1px solid #f0e2e5;background:#fff;max-width:94%;overflow-wrap:anywhere}
+.reply-bubble.teacher{background:#fff0f3;border-color:#f5d3dc;margin-left:auto}.reply-bubble.student{margin-right:auto}
+.reply-bubble .hint{margin-bottom:6px}.question-list{display:grid;gap:10px}.classmate-card{display:flex;align-items:center;gap:12px;border:1px solid #f0e2e5;padding:16px;border-radius:15px;background:#fff}
+.classmate-avatar{width:39px;height:39px;border-radius:12px;background:#ffe9ee;color:#922440;display:grid;place-items:center;font-weight:800}
+.focus-card{padding:27px;border-radius:19px;background:#fff;border:1px solid #efe0e3}.quiet-note{background:#fff3f5;padding:12px 15px;border-radius:12px;color:#7f3346;font-size:13px}
+.tabset{background:#f9e9ed}.tab.active{color:#9e1f3b}.data-table th{background:#fff6f7!important}
+@media(max-width:680px){.student-app{padding:0 15px 100px}.student-header{padding:15px 0;margin-bottom:21px}.brand strong{font-size:14px}.student-header .row{gap:4px}.student-header .row .pill{display:none}.student-nav{padding:6px 6px calc(6px + env(safe-area-inset-bottom))}.student-nav-inner{gap:0}.nav-item>span:last-child{font-size:10px}.card,.focus-card{padding:17px}.section-title{margin-bottom:15px}.question-thread{padding:13px}}
+@media(max-width:370px){.nav-item>span:last-child{font-size:9px}.nav-item>span:first-child{font-size:17px!important}}
+
 </style>
+<link rel="icon" type="image/png" href="senorayu-icon.png">
 </head>
 <body>
 <div id="root"></div>
@@ -183,7 +222,7 @@ a.media-item{background:#f7f9fa;border:1px solid #e8ecef;border-radius:11px;colo
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signOut, sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
-import { getFirestore, doc, getDoc, getDocs, collection, query, where, addDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, arrayUnion, writeBatch } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
+import { getFirestore, doc, getDoc, getDocs, collection, query, where, addDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, arrayUnion, onSnapshot, runTransaction, writeBatch } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
 import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-storage.js';
 
 // 두 HTML 파일에 동일한 Firebase 웹 앱 설정을 입력하세요. API key는 비밀 키가 아니며 보안은 Rules가 담당합니다.
@@ -212,7 +251,7 @@ function empty(title,detail=''){return `<div class="empty"><span class="symbol">
 function makeId(){return (globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2));}
 const enId = (uid,cid)=>`${uid}_${cid}`;
 const isMedia = (file,kind) => kind==='audio'?file.type.startsWith('audio/'):kind==='image'?file.type.startsWith('image/'):kind==='video'?file.type.startsWith('video/'):true;
-const sizeLimit={audio:15*1024*1024,image:8*1024*1024,video:200*1024*1024,file:20*1024*1024};
+const sizeLimit={audio:15*1024*1024,image:8*1024*1024,video:2*1024*1024*1024,file:20*1024*1024};
 async function uploadMedia(file,path,kind,progressEl){
   if(!file)throw Error('파일을 선택해 주세요.');
   if(!isMedia(file,kind))throw Error('선택한 파일 형식을 확인해 주세요.');
@@ -291,7 +330,7 @@ async function ensureProfile(user){
   await setDoc(r,data);
   return data;
 }
-function signedOut(){return `<div class="auth-shell"><div class="auth-hero"><div class="brand"><span class="logo">¡</span><div><strong>Hola Class</strong><small>ESPAÑOL · LEARNING SPACE</small></div></div><div><div class="eyebrow" style="color:#c5ead6">MI PEQUEÑO UNIVERSO</div><h1>오늘의 스페인어가<br>내일의 일상이 되도록.</h1><p>과제를 제출하고, 단어를 복습하고, 다음 수업을 준비하세요. 수업이 끝난 뒤에도 배움은 이어집니다.</p></div><footer>Aprender juntos, crecer juntos. ✨</footer></div><div class="auth-right"><div class="auth-card"><div class="eyebrow">WELCOME BACK</div><h2>반갑습니다 👋</h2><p>학습 공간에 로그인해 주세요.</p><div id="setup-note" class="setup-warning ${CONFIGURED?'hide':''}">Firebase 설정이 비어 있습니다. 두 HTML에 동일한 firebaseConfig를 입력해 주세요.</div><form id="login-form" class="stack"><div class="field"><label>이메일</label><input name="email" type="email" autocomplete="email" required placeholder="name@example.com"></div><div class="field"><label>비밀번호</label><input name="password" type="password" autocomplete="current-password" required placeholder="비밀번호"></div><button class="btn full" type="submit">로그인 →</button></form><div class="auth-links"><button id="auth-alt" class="linkbutton" type="button">회원가입</button><button id="forgot-password" class="linkbutton" type="button">비밀번호 재설정</button></div><div id="login-message" class="error" style="margin-top:15px"></div></div></div></div>`}
+function signedOut(){return `<div class="auth-shell"><div class="auth-hero"><div class="brand"><span class="logo"><img src="senorayu-icon.png" alt="쎄뇨라유 스페인어 로고"></span><div><strong>쎄뇨라유 스페인어</strong><small>ESPAÑOL · LEARNING SPACE</small></div></div><div><div class="eyebrow" style="color:#c5ead6">MI PEQUEÑO UNIVERSO</div><h1>오늘의 스페인어가<br>내일의 일상이 되도록.</h1><p>과제를 제출하고, 단어를 복습하고, 다음 수업을 준비하세요. 수업이 끝난 뒤에도 배움은 이어집니다.</p></div><footer>Aprender juntos, crecer juntos. ✨</footer></div><div class="auth-right"><div class="auth-card"><div class="eyebrow">WELCOME BACK</div><h2>반갑습니다 👋</h2><p>학습 공간에 로그인해 주세요.</p><div id="setup-note" class="setup-warning ${CONFIGURED?'hide':''}">Firebase 설정이 비어 있습니다. 두 HTML에 동일한 firebaseConfig를 입력해 주세요.</div><form id="login-form" class="stack"><div class="field"><label>이메일</label><input name="email" type="email" autocomplete="email" required placeholder="name@example.com"></div><div class="field"><label>비밀번호</label><input name="password" type="password" autocomplete="current-password" required placeholder="비밀번호"></div><button class="btn full" type="submit">로그인 →</button></form><div class="auth-links"><button id="auth-alt" class="linkbutton" type="button">회원가입</button><button id="forgot-password" class="linkbutton" type="button">비밀번호 재설정</button></div><div id="login-message" class="error" style="margin-top:15px"></div></div></div></div>`}
 function mountAuth(root,opts={signup:true}){
   root.innerHTML=signedOut(); const alt=$('#auth-alt');if(!opts.signup)alt.classList.add('hide');
   let mode='login';alt?.addEventListener('click',()=>{mode=mode==='login'?'signup':'login';const form=$('#login-form');form.innerHTML=mode==='login'?`<div class="field"><label>이메일</label><input name="email" type="email" required autocomplete="email"></div><div class="field"><label>비밀번호</label><input name="password" type="password" required autocomplete="current-password"></div><button class="btn full" type="submit">로그인 →</button>`:`<div class="field"><label>이름</label><input name="name" type="text" required maxlength="35" autocomplete="name" placeholder="실명 또는 강사에게 알린 이름"></div><div class="field"><label>이메일</label><input name="email" type="email" required autocomplete="email"></div><div class="field"><label>비밀번호 (6자 이상)</label><input name="password" type="password" required minlength="6" autocomplete="new-password"></div><button class="btn full" type="submit">수강생 계정 만들기</button>`;alt.textContent=mode==='login'?'회원가입':'로그인으로 돌아가기';$('#login-message').textContent='';});
@@ -316,10 +355,13 @@ function wireMediaUi(container,onFile){const status=$('[data-rec-status]',contai
 
 // ===== ADMIN PAGE =====
 const root=$('#root');
-const A={user:null,profile:null,classes:[],classId:'',weeks:[],weekId:'',page:'overview',weekTab:'assignment',feedbackTab:'submissions',preview:{},pendingDeletes:[],voiceDrafts:{}};
-const PAGES=[['overview','◈','대시보드'],['weeks','▤','주차 콘텐츠'],['feedback','◉','제출·피드백'],['attendance','✓','출석 관리'],['students','♙','수강생 관리'],['classes','▦','반 관리']];
+const A={user:null,profile:null,classes:[],classId:'',weeks:[],weekId:'',page:'overview',weekTab:'assignment',feedbackTab:'submissions',preview:{},pendingDeletes:[],voiceDrafts:{},live:{},activeQuestionId:''};
+const PAGES=[['overview','◈','대시보드'],['weeks','▤','주차 콘텐츠'],['feedback','◉','제출·피드백'],['attendance','✓','출석 관리'],['students','♙','수강생 관리'],['questions','♧','질문함'],['classes','▦','반 관리']];
 const activeClass=()=>A.classes.find(c=>c.id===A.classId);
 const activeWeek=()=>A.weeks.find(w=>w.id===A.weekId);
+function adminStopLive(key){if(A.live[key]){A.live[key]();delete A.live[key]}}
+function adminClearLive(){for(const key of Object.keys(A.live))adminStopLive(key)}
+function adminLiveError(err){console.error('실시간 연결 실패',err);toast('실시간 구독 오류: '+ex(err),true)}
 const classKey=(cid)=>`classes/${cid}`;
 const weekKey=(cid,wid)=>`classes/${cid}/weeks/${wid}`;
 const codeGen=()=>Array.from(crypto.getRandomValues(new Uint8Array(8))).map(n=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[n%32]).join('');
@@ -345,17 +387,17 @@ async function uniqueJoinCode(){
   throw Error('새 수강 코드를 발급하지 못했습니다. 다시 시도해 주세요.');
 }
 function frame(){
-  root.innerHTML=`<div class="admin-shell"><aside class="sidebar"><div class="brand"><div class="logo">¡</div><div><strong>Hola Class</strong><small>TEACHER STUDIO</small></div></div><div class="side-nav">${PAGES.map(([key,emoji,label])=>`<button type="button" data-page="${key}" class="side-link ${A.page===key?'active':''}"><span class="side-emoji">${emoji}</span>${label}</button>`).join('')}</div><div class="sidebar-footer"><strong style="font-size:13px">수업 운영 팁</strong><p class="hint">주차를 작성한 뒤 공개를 켜면 수강생에게 표시됩니다.</p></div></aside><div class="admin-main"><div class="admin-topbar"><div><p class="eyebrow">INSTRUCTOR WORKSPACE</p><div class="row"><strong style="font-size:17px">${esc(A.profile?.displayName||'강사')} 선생님</strong><span class="pill green">강사</span></div></div><div class="row"><div class="field"><label>운영 중인 반</label><select id="admin-class-switch">${A.classes.map(c=>`<option value="${esc(c.id)}" ${c.id===A.classId?'selected':''}>${esc(c.name)}${c.archived?' (보관)':''}</option>`).join('')||'<option value="">개설된 반이 없습니다</option>'}</select></div><button id="admin-logout" class="btn secondary small">로그아웃</button></div></div><main id="admin-body"></main></div></div>`;
+  root.innerHTML=`<div class="admin-shell"><aside class="sidebar"><div class="brand"><div class="logo"><img src="senorayu-icon.png" alt="쎄뇨라유 스페인어 로고"></div><div><strong>쎄뇨라유 스페인어</strong><small>TEACHER STUDIO</small></div></div><div class="side-nav">${PAGES.map(([key,emoji,label])=>`<button type="button" data-page="${key}" class="side-link ${A.page===key?'active':''}"><span class="side-emoji">${emoji}</span>${label}</button>`).join('')}</div><div class="sidebar-footer"><strong style="font-size:13px">수업 운영 팁</strong><p class="hint">주차를 작성한 뒤 공개를 켜면 수강생에게 표시됩니다.</p></div></aside><div class="admin-main"><div class="admin-topbar"><div><p class="eyebrow">INSTRUCTOR WORKSPACE</p><div class="row"><strong style="font-size:17px">${esc(A.profile?.displayName||'강사')}${String(A.profile?.displayName||'').includes('선생님')?'':' 선생님'}</strong><span class="pill green">강사</span></div></div><div class="row"><div class="field"><label>운영 중인 반</label><select id="admin-class-switch">${A.classes.map(c=>`<option value="${esc(c.id)}" ${c.id===A.classId?'selected':''}>${esc(c.name)}${c.archived?' (보관)':''}</option>`).join('')||'<option value="">개설된 반이 없습니다</option>'}</select></div><button id="admin-logout" class="btn secondary small">로그아웃</button></div></div><main id="admin-body"></main></div></div>`;
   $('#admin-logout').onclick=()=>signOut(auth);
-  $('#admin-class-switch')?.addEventListener('change',async e=>{A.classId=e.target.value;localStorage.setItem('spanish-lms-admin-class',A.classId);A.weekId='';if(A.classId)await loadWeeks();renderPage()});
+  $('#admin-class-switch')?.addEventListener('change',async e=>{adminClearLive();A.classId=e.target.value;localStorage.setItem('spanish-lms-admin-class',A.classId);A.weekId='';if(A.classId)await loadWeeks();renderPage()});
   $$('[data-page]').forEach(el=>el.onclick=()=>{A.page=el.dataset.page;renderPage()});renderPage();
 }
 function renderPage(){
-  $$('.side-link').forEach(el=>el.classList.toggle('active',el.dataset.page===A.page));const b=$('#admin-body');if(!b)return;
+  adminClearLive();$$('.side-link').forEach(el=>el.classList.toggle('active',el.dataset.page===A.page));const b=$('#admin-body');if(!b)return;
   if(!A.classId&&A.page!=='classes'){b.innerHTML=`<div class="section-title"><div><h1>첫 번째 반을 개설해 보세요</h1><p>학습자에게 전달할 수강 코드 하나를 발급합니다.</p></div></div>${empty('아직 생성한 반이 없습니다')}<button id="go-classes" class="btn" style="margin-top:17px">반 개설하기 →</button>`;$('#go-classes').onclick=()=>{A.page='classes';renderPage()};return}
-  if(A.page==='overview')showOverview(b);if(A.page==='classes')showClasses(b);if(A.page==='weeks')showWeeks(b);if(A.page==='feedback')showFeedback(b);if(A.page==='attendance')showAttendance(b);if(A.page==='students')showStudents(b);
+  if(A.page==='overview')showOverview(b);if(A.page==='classes')showClasses(b);if(A.page==='weeks')showWeeks(b);if(A.page==='feedback')showFeedback(b);if(A.page==='attendance')showAttendance(b);if(A.page==='students')showStudents(b);if(A.page==='questions')showAdminQuestions(b);
 }
-async function loadAdmin(preferred=''){const cs=await getDocs(collection(db,'classes'));A.classes=cs.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.name||'').localeCompare(b.name||'','ko'));await syncJoinCodes(A.classes);const choice=preferred||A.classId||localStorage.getItem('spanish-lms-admin-class');A.classId=A.classes.some(c=>c.id===choice)?choice:(A.classes.find(c=>!c.archived)?.id||A.classes[0]?.id||'');if(A.classId){localStorage.setItem('spanish-lms-admin-class',A.classId);await loadWeeks()}else{A.weeks=[];A.weekId=''}frame()}
+async function loadAdmin(preferred=''){const cs=await getDocs(collection(db,'classes'));A.classes=cs.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.name||'').localeCompare(b.name||'','ko'));await syncJoinCodes(A.classes);const choice=preferred||A.classId||localStorage.getItem('spanish-lms-admin-class');A.classId=A.classes.some(c=>c.id===choice)?choice:(A.classes.find(c=>!c.archived)?.id||A.classes[0]?.id||'');if(A.classId){localStorage.setItem('spanish-lms-admin-class',A.classId);await loadWeeks();await syncMemberDirectory().catch(e=>console.warn('명단 동기화 실패',e))}else{A.weeks=[];A.weekId=''}frame()}
 async function loadWeeks(){const snap=await getDocs(collection(db,'classes',A.classId,'weeks'));A.weeks=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.order||0)-(b.order||0));if(!A.weeks.some(w=>w.id===A.weekId))A.weekId=A.weeks.at(-1)?.id||'';}
 async function roster(){
   const snap=await getDocs(query(collection(db,'enrollments'),where('classId','==',A.classId)));
@@ -374,6 +416,14 @@ async function roster(){
     hasGenericName:(!profiles[i]?.displayName||profiles[i].displayName==='수강생') && (!m.studentName||m.studentName==='수강생')
   })).sort((a,b)=>(a.studentName||'').localeCompare(b.studentName||'','ko'));
 }
+async function syncMemberDirectory(){
+  if(!A.classId)return;
+  const members=await roster(),cid=A.classId;
+  const publicSnap=await getDocs(collection(db,'classes',cid,'members'));
+  const prev=new Map(publicSnap.docs.map(d=>[d.id,d.data()]));
+  const writes=members.filter(m=>m.uid && (prev.get(m.uid)?.name!==m.studentName||prev.get(m.uid)?.status!==m.status));
+  for(let i=0;i<writes.length;i+=350){const batch=writeBatch(db);for(const m of writes.slice(i,i+350)){batch.set(doc(db,'classes',cid,'members',m.uid),{uid:m.uid,name:m.studentName,status:m.status,joinedAt:m.joinedAt||serverTimestamp()},{merge:true})}await batch.commit()}
+}
 async function showOverview(b){b.innerHTML=`<div class="section-title"><div><div class="eyebrow">TU AULA</div><h1>좋은 수업의 시작, 여기서부터</h1><p>${esc(activeClass()?.name||'')} · 이번 주 학습 현황을 확인해 보세요.</p></div></div><div id="overview-grid" class="grid3"><div class="loading">집계 중</div></div><div class="card" style="margin-top:19px"><h3 style="margin-bottom:10px">빠른 시작</h3><div class="row"><button class="btn soft" data-shortcut="weeks">📚 수업 콘텐츠 작성</button><button class="btn secondary" data-shortcut="feedback">💬 제출물 확인</button><button class="btn secondary" data-shortcut="attendance">✅ 출석 체크</button></div><div class="separator"></div><div class="notice warn">수강생에게는 공개된 주차만 보입니다. 과제·복습·안내 자료를 각각 켜고 끌 수 있습니다.</div></div>`;
   $$('[data-shortcut]').forEach(x=>x.onclick=()=>{A.page=x.dataset.shortcut;renderPage()});
   try{const members=(await roster()).filter(x=>x.status==='active');const w=activeWeek();let subs=0,quizzes=0;if(w){const [ss,qq]=await Promise.all([getDocs(collection(db,weekKey(A.classId,w.id),'submissions')),getDocs(collection(db,weekKey(A.classId,w.id),'quizResults'))]);subs=ss.size;quizzes=qq.size}
@@ -383,7 +433,7 @@ function showClasses(b){b.innerHTML=`<div class="section-title"><div><div class=
   $('#class-form').onsubmit=async e=>{e.preventDefault();const form=e.currentTarget,fd=new FormData(form),name=String(fd.get('name')).trim();if(!name)return;const btn=$('button[type="submit"]',form);btn.disabled=true;try{const r=doc(collection(db,'classes')),code=await uniqueJoinCode(),batch=writeBatch(db);batch.set(r,{name,description:String(fd.get('description')||'').trim(),joinCode:code,archived:false,createdAt:serverTimestamp(),createdBy:A.user.uid});batch.set(doc(db,'joinCodes',code),{classId:r.id,createdBy:A.user.uid,updatedAt:serverTimestamp()});await batch.commit();toast('반을 개설했습니다. 수강생에게 코드를 전달하세요.');await loadAdmin(r.id)}catch(err){toast(ex(err),true)}finally{btn.disabled=false}};
   const list=$('#class-list');if(!list)return;
   list.innerHTML=A.classes.map(c=>`<div class="class-row"><div><strong>${esc(c.name)}</strong> <span class="pill ${c.archived?'gray':'green'}">${c.archived?'보관':'운영 중'}</span><p class="hint" title="강사 관리용 내부 식별자">관리 ID: <code>${esc(c.id)}</code></p><p class="hint">학생 전달 코드: <strong>${esc(c.joinCode)}</strong></p></div><div class="row"><button class="btn secondary small" data-copy-class="${esc(c.id)}">복사</button><button class="btn secondary small" data-edit-class="${esc(c.id)}">수정</button><button class="btn secondary small" data-rotate-class="${esc(c.id)}">코드 변경</button><button class="btn ${c.archived?'soft':'danger'} small" data-archive-class="${esc(c.id)}">${c.archived?'복원':'삭제(보관)'}</button></div></div>`).join('')||empty('등록된 반이 없습니다');
-  $$('[data-copy-class]',list).forEach(el=>el.onclick=async()=>{const c=A.classes.find(x=>x.id===el.dataset.copyClass);try{await navigator.clipboard.writeText(`Hola Class 수강 안내\n반: ${c.name}\n수강 코드: ${c.joinCode}\n회원가입 또는 로그인 후 코드만 입력해 주세요.`);toast('수강반 정보를 복사했습니다.')}catch(e){toast('클립보드 복사가 허용되지 않습니다.',true)}});
+  $$('[data-copy-class]',list).forEach(el=>el.onclick=async()=>{const c=A.classes.find(x=>x.id===el.dataset.copyClass);try{await navigator.clipboard.writeText(`쎄뇨라유 스페인어 수강 안내\n반: ${c.name}\n수강 코드: ${c.joinCode}\n회원가입 또는 로그인 후 코드만 입력해 주세요.`);toast('수강반 정보를 복사했습니다.')}catch(e){toast('클립보드 복사가 허용되지 않습니다.',true)}});
   $$('[data-edit-class]',list).forEach(el=>el.onclick=async()=>{const c=A.classes.find(x=>x.id===el.dataset.editClass);const name=prompt('반 이름을 수정해 주세요.',c.name);if(name===null)return;if(!name.trim())return toast('반 이름을 입력해 주세요.',true);try{await updateDoc(doc(db,'classes',c.id),{name:name.trim(),updatedAt:serverTimestamp()});toast('반 이름이 수정되었습니다.');await loadAdmin(c.id)}catch(e){toast(ex(e),true)}});
   $$('[data-rotate-class]',list).forEach(el=>el.onclick=async()=>{const c=A.classes.find(x=>x.id===el.dataset.rotateClass);if(!confirm(`${c.name} 입장 코드를 변경하시겠습니까? 기존 수강생은 계속 이용할 수 있습니다.`))return;try{const code=await uniqueJoinCode(),batch=writeBatch(db);batch.update(doc(db,'classes',c.id),{joinCode:code,updatedAt:serverTimestamp()});batch.set(doc(db,'joinCodes',code),{classId:c.id,createdBy:A.user.uid,updatedAt:serverTimestamp()});if(c.joinCode)batch.delete(doc(db,'joinCodes',c.joinCode));await batch.commit();toast('입장 코드가 변경되었습니다. 기존 코드는 사용할 수 없습니다.');await loadAdmin(c.id)}catch(e){toast(ex(e),true)}});
   $$('[data-archive-class]',list).forEach(el=>el.onclick=async()=>{const c=A.classes.find(x=>x.id===el.dataset.archiveClass);if(!confirm(c.archived?'해당 반을 복원하시겠습니까?':`${c.name} 반을 보관 처리하시겠습니까? 수강생에게 반이 표시되지 않습니다. 데이터는 보존됩니다.`))return;try{await updateDoc(doc(db,'classes',c.id),{archived:!c.archived});toast(c.archived?'반을 복원했습니다.':'반을 보관했습니다.');await loadAdmin(c.id)}catch(e){toast(ex(e),true)}});
@@ -444,7 +494,7 @@ function drawWeekEditor(){const host=$('#week-editor-host');if(!host)return;cons
   <section data-week-panel="preview" class="stack ${A.weekTab==='preview'?'':'hide'}"><div class="toggle-row"><label class="switch"><input id="preview-enabled" type="checkbox" ${A.preview.enabled?'checked':''}><span></span></label><div><strong>다음차시 안내 공개 ON / OFF</strong><small>콘텐츠는 주차 공개와 이 설정이 모두 켜져 있어야 표시됩니다.</small></div></div><div class="field"><label>안내 제목</label><input id="preview-title" maxlength="150" value="${esc(A.preview.title||'다음 차시')}" placeholder="다음 시간에 배울 내용"></div><div class="field"><label>내용작성 방식</label><select id="preview-mode"><option value="rich" ${A.preview.mode!=='image'?'selected':''}>텍스트 모드 (서식 편집)</option><option value="image" ${A.preview.mode==='image'?'selected':''}>이미지 모드 (완성한 이미지 업로드)</option></select></div>
   <div id="preview-rich" class="stack ${A.preview.mode==='image'?'hide':''}"><div class="editor-toolbar"><button type="button" data-format="bold" title="굵게"><b>B</b></button><button type="button" data-format="italic" title="기울임"><i>I</i></button><button type="button" data-format="underline" title="밑줄"><u>U</u></button><button type="button" data-format="insertUnorderedList" title="글머리표">• 목록</button><button type="button" data-format="justifyCenter" title="가운데 정렬">☷ 가운데</button><select id="format-size" title="글자 크기"><option value="3">보통</option><option value="4">크게</option><option value="5">더 크게</option><option value="6">제목</option></select><input id="format-color" type="color" title="글자 색" value="#265e48"></div><div id="preview-editor" class="rich-editor" contenteditable="true" role="textbox" aria-multiline="true">${sanitizeRich(A.preview.richHtml||'')}</div><p class="hint">글씨 크기, 색상, 굵게, 기울임, 목록, 정렬을 적용할 수 있습니다.</p></div>
   <div id="preview-image" class="stack ${A.preview.mode==='image'?'':'hide'}"><p class="notice">권장 이미지 너비는 <strong>1200px</strong>입니다. 세로 길이는 자유롭고, 모바일에서는 자동으로 축소됩니다. JPG/PNG/WEBP, 최대 8MB.</p><div class="field"><label>직접 만든 안내 이미지</label><input type="file" id="preview-image-file" accept="image/*"></div><div id="preview-image-display"></div></div>
-  <div class="separator" style="margin:0"></div><h3>🎬 동영상 업로드</h3><p class="hint">MP4(H.264/AAC) 권장 · 최대 200MB/개. 수강생 화면에서는 브라우저 안에서 재생하고 다운로드 버튼을 숨깁니다. 완전한 복제 차단은 불가능합니다.</p><div class="field"><label>강의 영상 추가 (여러 개 등록 가능)</label><input type="file" id="preview-video-file" accept="video/*"></div><div id="preview-videos-list" class="media-list"></div><div class="separator" style="margin:0"></div><h3>📎 파일 첨부</h3><div class="field"><label>PDF, 수업자료 등 최대 20MB/개</label><input type="file" id="preview-extra-file"></div><div id="preview-files-list" class="media-list"></div><p id="media-upload-status" class="hint"></p></section>
+  <div class="separator" style="margin:0"></div><h3>🎬 동영상 업로드</h3><p class="hint">MP4(H.264/AAC) 권장 · 최대 2GB/개. 수강생 화면에서는 브라우저 안에서 재생하고 다운로드 버튼을 숨깁니다. 완전한 복제 차단은 불가능합니다.</p><div class="field"><label>강의 영상 추가 (여러 개 등록 가능)</label><input type="file" id="preview-video-file" accept="video/*"></div><div id="preview-videos-list" class="media-list"></div><div class="separator" style="margin:0"></div><h3>📎 파일 첨부</h3><div class="field"><label>PDF, 수업자료 등 최대 20MB/개</label><input type="file" id="preview-extra-file"></div><div id="preview-files-list" class="media-list"></div><p id="media-upload-status" class="hint"></p></section>
   <div class="separator" style="margin:0"></div><div class="between"><button id="delete-week" class="btn danger small">주차 비공개 처리</button><div class="row"><span id="week-save-status" class="hint"></span><button id="save-week" class="btn">변경사항 저장하기 →</button></div></div></div>`;
   $$('[data-week-tab]',host).forEach(el=>el.onclick=()=>{A.weekTab=el.dataset.weekTab;$$('[data-week-tab]',host).forEach(x=>x.classList.toggle('active',x===el));$$('[data-week-panel]',host).forEach(x=>x.classList.toggle('hide',x.dataset.weekPanel!==A.weekTab))});
   $('#questions-list').addEventListener('click',e=>{
@@ -506,15 +556,51 @@ async function saveWeek(){const w=activeWeek();if(!w)return;const btn=$('#save-w
 function teacherComments(data){const lines=[...(data?.feedbacks||[])];if(data?.feedback?.text||data?.feedback?.audioPath)lines.unshift({...data.feedback,createdAt:data.feedback.updatedAt});return lines.length?`<div class="stack" style="margin-top:15px;gap:10px"><strong style="font-size:13px">💬 남긴 피드백 (${lines.length})</strong>${lines.map(f=>`<div class="feedback"><div class="hint">${esc(typeof f.createdAt==='string'?f.createdAt.slice(0,16).replace('T',' '):fmt(f.createdAt))}</div>${f.text?`<p style="white-space:pre-wrap">${esc(f.text)}</p>`:''}${f.audioPath?`<audio controls data-media-path="${esc(f.audioPath)}"></audio>`:''}</div>`).join('')}</div>`:''}
 async function showFeedback(b){b.innerHTML=`<div class="section-title"><div><div class="eyebrow">LEARNING FEEDBACK</div><h1>제출·피드백</h1><p>학생의 과제와 복습 기록을 확인하고 댓글을 남기세요.</p></div>${A.weeks.length?weekSelect():''}</div><div class="tabset" style="margin-bottom:18px"><button class="tab ${A.feedbackTab==='submissions'?'active':''}" data-feedback-tab="submissions">✍️ 과제 제출</button><button class="tab ${A.feedbackTab==='quizResults'?'active':''}" data-feedback-tab="quizResults">🧠 복습 결과</button></div><div id="feedback-list"></div>`;
   $('#admin-week-picker')?.addEventListener('change',e=>{A.weekId=e.target.value;showFeedback(b)});
-  $$('[data-feedback-tab]').forEach(el=>el.onclick=()=>{A.feedbackTab=el.dataset.feedbackTab;showFeedback(b)});await drawFeedbackList();
+  $$('[data-feedback-tab]').forEach(el=>el.onclick=()=>{A.feedbackTab=el.dataset.feedbackTab;showFeedback(b)});
+  await drawFeedbackList();
+  if(!A.weekId)return;const cid=A.classId,wid=A.weekId,kind=A.feedbackTab;let first=true;
+  A.live.feedback=onSnapshot(collection(db,weekKey(cid,wid),kind),()=>{
+    if(first){first=false;return}
+    if(A.page!=='feedback'||A.classId!==cid||A.weekId!==wid||A.feedbackTab!==kind)return;
+    if(document.activeElement?.matches('textarea,input')){toast('새 제출 또는 피드백이 도착했습니다. 메뉴를 다시 선택하면 갱신됩니다.');return}
+    drawFeedbackList();
+  },adminLiveError);
 }
 async function drawFeedbackList(){const out=$('#feedback-list');if(!out)return;const w=activeWeek();if(!w){out.innerHTML=empty('먼저 주차를 추가해 주세요');return}loading(out);const cid=A.classId,wid=w.id,kind=A.feedbackTab;
-  try{const [students,dataSnap]=await Promise.all([roster(),getDocs(collection(db,weekKey(cid,wid),kind))]);if(cid!==A.classId||wid!==A.weekId||kind!==A.feedbackTab)return;
+  try{const students=await roster();const dataSnap=await getDocs(collection(db,weekKey(cid,wid),kind));if(cid!==A.classId||wid!==A.weekId||kind!==A.feedbackTab)return;
   const map=new Map(dataSnap.docs.map(d=>[d.id,d.data()]));const active=students.filter(s=>s.status==='active');const done=active.filter(s=>map.has(s.uid)).length;
-  out.classList.remove('loading');out.innerHTML=`<div class="between" style="margin-bottom:15px"><span class="pill green">${done} / ${active.length} ${kind==='submissions'?'과제 제출':'복습 완료'}</span><span class="hint">${esc(w.label)} · 미제출자도 표시됩니다</span></div>${active.map(s=>{const d=map.get(s.uid);return `<div class="card" style="margin-bottom:13px"><div class="between"><div><h3>${esc(s.studentName)}</h3><p class="hint">${esc(s.email||'')} · ${d?'제출: '+fmt(d.submittedAt):'아직 제출하지 않았습니다'}</p></div><span class="pill ${d?'green':'gray'}">${d?'제출 완료':'미제출'}</span></div>${d?(kind==='submissions'?`<div class="subtle" style="margin-top:15px"><strong style="font-size:13px">학생 답안</strong>${d.text?`<p style="white-space:pre-wrap;margin-top:8px">${esc(d.text)}</p>`:'<p class="hint">텍스트 답안 없음</p>'}${d.audioPath?`<div style="margin-top:10px"><audio controls preload="none" data-media-path="${esc(d.audioPath)}"></audio></div>`:''}</div>`:`<div class="subtle" style="margin-top:15px"><strong>최근 점수: ${Number(d.score)||0} / ${Number(d.total)||0}</strong>${(w.quiz?.questions||[]).map((raw,i)=>{const q=normalizeQuestion(raw),a=d.answers?.[i],answer=Array.isArray(a)?a:a===null||a===undefined?[]:[a],correct=answer.length===q.correctIndices.length&&answer.every(x=>q.correctIndices.includes(Number(x)));const choices=arr=>arr.length?arr.map(x=>q.options[Number(x)]||'?').join(', '):'미응답';return `<p class="hint" style="margin-top:7px">${i+1}. ${esc(q.stem)} · 학생: ${esc(choices(answer))} · ${correct?'✓':'✗'} 정답: ${esc(choices(q.correctIndices))}</p>`}).join('')}</div>`)+teacherComments(d)+`<div class="separator"></div><div class="stack" style="gap:9px" data-comment-card="${esc(kind)}:${esc(s.uid)}"><div class="field"><label>새 피드백 댓글</label><textarea data-feedback-text rows="3" maxlength="10000" placeholder="좋았던 점과 다음에 개선할 점을 작성해 주세요."></textarea></div><div data-feedback-media>${makeMediaUi('audio','또는 피드백 음성 파일')}</div><div class="between"><span class="hint" data-feedback-status>댓글은 학생에게 즉시 공개됩니다.</span><button type="button" class="btn small" data-feedback-save>피드백 등록 →</button></div></div>`:''}</div>`}).join('')||empty('현재 반에 등록된 수강생이 없습니다')}`;
+  out.classList.remove('loading');out.innerHTML=`<div class="between" style="margin-bottom:15px"><span class="pill green">${done} / ${active.length} ${kind==='submissions'?'과제 제출':'복습 완료'}</span><span class="hint">미제출자도 함께 표시됩니다</span></div>${active.map(s=>{const d=map.get(s.uid);return `<div class="card" style="margin-bottom:13px"><div class="between"><div><h3>${esc(s.studentName)}</h3><p class="hint">${esc(s.email||'')} · ${d?'제출: '+fmt(d.submittedAt):'아직 제출하지 않았습니다'}</p></div><span class="pill ${d?'green':'gray'}">${d?'제출 완료':'미제출'}</span></div>${d?(kind==='submissions'?`<div class="subtle" style="margin-top:15px"><strong style="font-size:13px">학생 답안</strong>${d.text?`<p style="white-space:pre-wrap;margin-top:8px">${esc(d.text)}</p>`:'<p class="hint">텍스트 답안 없음</p>'}${d.audioPath?`<div style="margin-top:10px"><audio controls preload="none" data-media-path="${esc(d.audioPath)}"></audio></div>`:''}</div>`:`<div class="subtle" style="margin-top:15px"><div class="grid3" style="margin-bottom:13px"><div class="mini-stat"><strong>${Math.round((Number(d.firstAttempt?.score??d.score)||0)/Math.max(1,Number(d.firstAttempt?.total??d.total)||1)*100)}%</strong><span>첫 응시 정답률</span></div><div class="mini-stat"><strong>${Math.round((Number(d.score)||0)/Math.max(1,Number(d.total)||1)*100)}%</strong><span>최근 정답률</span></div><div class="mini-stat"><strong>${Number(d.attemptCount)||1}회</strong><span>총 응시 횟수</span></div></div><details data-attempt-history="${esc(s.uid)}"><summary style="cursor:pointer;font-weight:750;color:var(--primary)">전체 응시 기록 확인</summary><div class="hint" data-attempt-content style="margin-top:11px">펼치면 응시별 결과를 불러옵니다.</div></details></div>`)+teacherComments(d)+`<div class="separator"></div><div class="stack" style="gap:9px" data-comment-card="${esc(kind)}:${esc(s.uid)}"><div class="field"><label>새 피드백 댓글</label><textarea data-feedback-text rows="3" maxlength="10000" placeholder="좋았던 점과 다음에 개선할 점을 작성해 주세요."></textarea></div><div data-feedback-media>${makeMediaUi('audio','또는 피드백 음성 파일')}</div><div class="between"><span class="hint" data-feedback-status>댓글은 학생에게 즉시 공개됩니다.</span><button type="button" class="btn small" data-feedback-save>피드백 등록 →</button></div></div>`:''}</div>`}).join('')||empty('현재 반에 등록된 수강생이 없습니다')}`;
+  $$('[data-attempt-history]',out).forEach(detail=>{detail.ontoggle=async()=>{
+    if(!detail.open)return;
+    const uid=detail.dataset.attemptHistory,holder=$('[data-attempt-content]',detail);loading(holder);
+    try{const snap=await getDocs(collection(db,weekKey(cid,wid),'quizResults',uid,'attempts'));
+      const history=snap.docs.map(d=>d.data()).sort((a,b)=>(a.attemptNumber||0)-(b.attemptNumber||0));
+      const previous=map.get(uid);if(previous?.firstAttempt?.legacy&&!history.some(x=>x.attemptNumber===1)){history.unshift({...previous.firstAttempt,attemptNumber:1,legacy:true})}
+      loaded(holder,history.map(x=>`<details style="padding:9px 0;border-bottom:1px solid var(--line)"><summary class="between" style="cursor:pointer;list-style:none"><div><strong>${Number(x.attemptNumber)||1}회차</strong><p class="hint">${x.legacy?'이전 버전에서 제출된 기록':fmt(x.submittedAt)}</p></div><span class="pill ${x.attemptNumber===1?'amber':'green'}">${Number(x.score)||0}/${Number(x.total)||0} · ${Math.round((Number(x.score)||0)/Math.max(1,Number(x.total)||1)*100)}%</span></summary><div style="margin-top:10px">${(w.quiz?.questions||[]).map((raw,i)=>{const q=normalizeQuestion(raw),a=x.answers?.[i],answer=Array.isArray(a)?a:a===null||a===undefined?[]:[a],correct=answer.length===q.correctIndices.length&&answer.every(v=>q.correctIndices.includes(Number(v)));const display=arr=>arr.length?arr.map(v=>q.options[Number(v)]||'?').join(', '):'미응답';return `<p class="hint" style="padding:4px 0">${i+1}. ${esc(q.stem)} · 학생: ${esc(display(answer))} ${correct?'✓':'✗'} · 정답: ${esc(display(q.correctIndices))}</p>`}).join('')}<p class="hint" style="margin-top:8px">※ 퀴즈 문제를 수정했다면 과거 답안 해석이 현재 문제와 다를 수 있습니다.</p></div></details>`).join('')||'<p class="hint">저장된 응시 기록이 없습니다.</p>');
+    }catch(e){loaded(holder,`<p class="error">${esc(ex(e))}</p>`)}
+  }});
   $$('[data-comment-card]',out).forEach(card=>{const [type,uid]=card.dataset.commentCard.split(':');const key=type+':'+uid;wireMediaUi($('[data-feedback-media]',card),file=>A.voiceDrafts[key]=file);$('[data-feedback-save]',card).onclick=async e=>{const text=$('[data-feedback-text]',card).value.trim(),file=A.voiceDrafts[key];if(!text&&!file){toast('텍스트나 음성 피드백을 작성해 주세요.',true);return}const btn=e.currentTarget;btn.disabled=true;try{let audioPath='';if(file){audioPath=`classes/${cid}/feedback/${wid}/${uid}/${makeId()}-${file.name.replace(/[^\w.\-]/g,'_')}`;await uploadMedia(file,audioPath,'audio',$('[data-feedback-status]',card))}await updateDoc(doc(db,weekKey(cid,wid),type,uid),{feedbacks:arrayUnion({text,audioPath,createdAt:new Date().toISOString(),author:A.profile.displayName||'선생님'})});delete A.voiceDrafts[key];toast('피드백을 등록했습니다.');await drawFeedbackList()}catch(err){toast(ex(err),true)}finally{if(btn.isConnected)btn.disabled=false}}});useMediaPaths(out);
   }catch(err){loaded(out,`<div class="card"><p class="error">${esc(ex(err))}</p></div>`)}
 }
+
+
+function showAdminQuestions(body){
+  body.innerHTML=`<div class="section-title"><div><div class="eyebrow">PREGUNTAS · 질문</div><h1>수강생 질문함</h1><p>학생의 질문에 답변을 남기면 수강생 화면에 바로 표시됩니다.</p></div></div><div class="grid2" style="align-items:start"><div id="admin-questions-list" class="stack"><div class="loading">질문을 확인하고 있습니다</div></div><div id="admin-question-detail" class="card"><p class="muted">왼쪽에서 질문을 선택해 주세요.</p></div></div>`;
+  A.live.questions=onSnapshot(collection(db,'classes',A.classId,'questions'),snap=>{
+    if(A.page!=='questions')return;const list=$('#admin-questions-list');if(!list)return;
+    const questions=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+    loaded(list,questions.map(q=>`<button type="button" class="question-thread ${A.activeQuestionId===q.id?'thread-open':''}" data-admin-qid="${esc(q.id)}" style="text-align:left"><div class="between"><strong>${esc(q.title)}</strong><span class="pill ${q.status==='answered'?'green':'amber'}">${q.status==='answered'?'답변 완료':'새 질문'}</span></div><p class="hint">${esc(q.studentName||'수강생')} · ${fmt(q.createdAt)}</p><p class="muted" style="font-size:13px;margin-top:7px">${esc(q.content.slice(0,100))}</p></button>`).join('')||empty('아직 질문이 없습니다','학생이 질문을 등록하면 실시간으로 표시됩니다.'));
+    $$('[data-admin-qid]',list).forEach(el=>el.onclick=()=>{A.activeQuestionId=el.dataset.adminQid;showAdminQuestionThread(questions.find(q=>q.id===A.activeQuestionId))});
+    if(A.activeQuestionId&&!questions.some(q=>q.id===A.activeQuestionId)){A.activeQuestionId='';adminStopLive('replies');$('#admin-question-detail').innerHTML='질문을 선택해 주세요.'}
+  },adminLiveError);
+}
+function showAdminQuestionThread(q){if(!q)return;adminStopLive('replies');const el=$('#admin-question-detail');if(!el)return;
+  el.innerHTML=`<div class="stack"><div class="between"><div><h3>${esc(q.title)}</h3><p class="hint">${esc(q.studentName||'수강생')} · ${fmt(q.createdAt)}</p></div><span class="pill ${q.status==='answered'?'green':'amber'}">${q.status==='answered'?'답변 완료':'답변 대기'}</span></div><div class="subtle" style="white-space:pre-wrap">${esc(q.content)}</div><div id="admin-replies" class="stack"><div class="loading">답변 불러오는 중</div></div><form id="admin-reply-form" class="stack"><div class="field"><label>강사 답변</label><textarea name="text" rows="5" required maxlength="8000" placeholder="학생에게 전달할 답변을 작성해 주세요."></textarea></div><button class="btn" type="submit">답변 등록</button></form><button id="question-status" type="button" class="btn secondary small">${q.status==='answered'?'답변 대기로 변경':'답변 완료 표시'}</button></div>`;
+  $('#admin-reply-form').onsubmit=async e=>{e.preventDefault();const form=e.currentTarget,text=String(new FormData(form).get('text')||'').trim();if(!text)return;const btn=$('button[type="submit"]',form);btn.disabled=true;try{const batch=writeBatch(db);batch.set(doc(collection(db,'classes',A.classId,'questions',q.id,'replies')),{uid:A.user.uid,role:'admin',author:A.profile.displayName||'선생님',text,createdAt:serverTimestamp()});batch.update(doc(db,'classes',A.classId,'questions',q.id),{status:'answered',answeredAt:serverTimestamp()});await batch.commit();form.reset();toast('답변이 전달되었습니다.')}catch(err){toast(ex(err),true)}finally{btn.disabled=false}};
+  $('#question-status').onclick=async()=>{try{await updateDoc(doc(db,'classes',A.classId,'questions',q.id),{status:q.status==='answered'?'open':'answered'});q.status=q.status==='answered'?'open':'answered';$('#question-status').textContent=q.status==='answered'?'답변 대기로 변경':'답변 완료 표시';toast('상태를 변경했습니다.')}catch(e){toast(ex(e),true)}};
+  A.live.replies=onSnapshot(collection(db,'classes',A.classId,'questions',q.id,'replies'),snap=>{if(A.activeQuestionId!==q.id)return;const list=$('#admin-replies');if(!list)return;const replies=snap.docs.map(d=>d.data()).sort((a,b)=>(a.createdAt?.seconds||0)-(b.createdAt?.seconds||0));loaded(list,replies.map(r=>`<div class="reply-bubble ${r.role==='admin'?'teacher':'student'}"><p class="hint">${esc(r.author||'')} · ${fmt(r.createdAt)}</p><p style="white-space:pre-wrap">${esc(r.text)}</p></div>`).join('')||'<p class="hint">아직 댓글이 없습니다.</p>')},adminLiveError);
+}
+
 const attendanceOptions=[['unchecked','미체크'],['present','출석'],['late','지각'],['absent','결석'],['excused','인정결석']];
 async function showAttendance(b){b.innerHTML=`<div class="section-title"><div><div class="eyebrow">ATTENDANCE</div><h1>출석 관리</h1><p>수업 주차별 출결을 기록하면 수강생 마이페이지에 표시됩니다.</p></div>${A.weeks.length?weekSelect():''}</div><div class="card"><div class="between"><h3>이번 차시 출석부</h3><button class="btn" id="attendance-save">변경사항 저장</button></div><div id="attendance-list" style="margin-top:17px"></div></div>`;
   $('#admin-week-picker')?.addEventListener('change',e=>{A.weekId=e.target.value;showAttendance(b)});
@@ -525,6 +611,7 @@ async function showAttendance(b){b.innerHTML=`<div class="section-title"><div><d
   }catch(err){loaded($('#attendance-list'),`<p class="error">${esc(ex(err))}</p>`)}
 }
 async function showStudents(b){
+  adminStopLive('students');
   b.innerHTML=`<div class="section-title"><div><div class="eyebrow">STUDENT DIRECTORY · 수강생</div><h1>수강생 관리</h1><p>우리 반의 학습자를 한눈에 확인하고 이름과 수강 상태를 관리하세요.</p></div></div>
   <div class="roster-summary"><div class="roster-summary-left"><div id="roster-count" class="roster-count">—</div><div><strong id="roster-total">수강생 불러오는 중</strong><small>${esc(activeClass()?.name||'선택된 반')}</small></div></div><div class="roster-tools"><input id="roster-search" type="search" placeholder="이름 또는 이메일 검색" aria-label="수강생 검색"><select id="roster-status" aria-label="수강 상태 필터"><option value="all">전체 학생</option><option value="active">수강 중</option><option value="inactive">수강 중지</option></select></div></div>
   <div class="card roster-card"><div id="roster-list" class="roster-content loading">학생 목록 확인 중</div></div><p class="hint" style="margin-top:15px">※ 이름은 계정의 최신 프로필을 기준으로 표시합니다. 이름이 등록되지 않은 학생은 강사가 수정할 수 있습니다.</p>`;
@@ -542,7 +629,7 @@ async function showStudents(b){
         !queryText || (s.studentName||'').toLocaleLowerCase('ko').includes(queryText) || (s.email||'').toLocaleLowerCase('ko').includes(queryText)
       ));
       if(!filtered.length){loaded(list,`<div class="roster-empty">${empty(students.length?'조건에 맞는 수강생이 없습니다':'아직 등록된 수강생이 없습니다',students.length?'검색어나 필터를 변경해 주세요.':'강사가 발급한 수강 코드를 공유해 주세요.')}</div>`);return}
-      loaded(list,`<div class="data-table-wrap"><table class="data-table"><thead><tr><th>수강생</th><th>이메일 · 로그인 ID</th><th>수강 상태</th><th>등록일</th><th>관리</th></tr></thead><tbody>${filtered.map(s=>`<tr><td><div class="name-cell"><span class="name-avatar" aria-hidden="true">${esc((s.studentName||'?').slice(0,1))}</span><div><strong>${esc(s.studentName)}</strong>${s.hasGenericName?'<small>이름 확인 필요</small>':'<small>학습자 프로필</small>'}</div></div></td><td>${esc(s.email||'—')}</td><td><span class="pill ${s.status==='active'?'green':'gray'}">${s.status==='active'?'수강 중':'수강 중지'}</span></td><td>${fmt(s.joinedAt)}</td><td><div class="row-actions"><button type="button" class="btn secondary small" data-edit-name="${esc(s.uid)}">이름 수정</button><button type="button" class="btn ${s.status==='active'?'danger':'soft'} small" data-status-uid="${esc(s.uid)}">${s.status==='active'?'수강 중지':'재등록'}</button></div></td></tr>`).join('')}</tbody></table></div>`);
+      loaded(list,`<div class="data-table-wrap"><table class="data-table"><thead><tr><th>수강생</th><th>이메일 · 로그인 ID</th><th>수강 상태</th><th>등록일</th><th>관리</th></tr></thead><tbody>${filtered.map(s=>`<tr><td><div class="name-cell"><span class="name-avatar" aria-hidden="true">${esc((s.studentName||'?').slice(0,1))}</span><div><strong>${esc(s.studentName)}</strong>${s.hasGenericName?'<small>이름 확인 필요</small>':'<small>학습자 프로필</small>'}</div></div></td><td>${esc(s.email||'—')}</td><td><span class="pill ${s.status==='active'?'green':'gray'}">${s.status==='active'?'수강 중':s.status==='transferred'?'반 이동':'수강 중지'}</span></td><td>${fmt(s.joinedAt)}</td><td><div class="row-actions"><button type="button" class="btn secondary small" data-edit-name="${esc(s.uid)}">이름 수정</button><button type="button" class="btn soft small" data-move-student="${esc(s.uid)}">반 이동</button><button type="button" class="btn ${s.status==='active'?'danger':'soft'} small" data-status-uid="${esc(s.uid)}">${s.status==='active'?'수강 중지':'재등록'}</button></div></td></tr>`).join('')}</tbody></table></div>`);
       $$('[data-edit-name]',list).forEach(el=>el.onclick=async()=>{
         const student=students.find(x=>x.uid===el.dataset.editName);if(!student)return;
         const name=prompt('수강생의 표시 이름을 입력해 주세요.',student.studentName==='수강생'?'':student.studentName);
@@ -550,20 +637,43 @@ async function showStudents(b){
         const trimmed=name.trim();if(!trimmed||trimmed.length>35){toast('이름을 1~35자로 입력해 주세요.',true);return}
         try{
           await updateDoc(doc(db,'users',student.uid),{displayName:trimmed,updatedAt:serverTimestamp()});
-          await updateDoc(doc(db,'enrollments',student.id),{studentName:trimmed});
+          await updateDoc(doc(db,'enrollments',student.id),{studentName:trimmed});await setDoc(doc(db,'classes',cid,'members',student.uid),{uid:student.uid,name:trimmed,status:student.status},{merge:true});
           student.studentName=trimmed;student.hasGenericName=false;toast('이름을 수정했습니다.');renderRows();
         }catch(err){toast(ex(err),true)}
+      });
+      $$('[data-move-student]',list).forEach(el=>el.onclick=async()=>{
+        const student=students.find(x=>x.uid===el.dataset.moveStudent);if(!student)return;
+        const destinations=A.classes.filter(c=>!c.archived&&c.id!==cid);
+        if(!destinations.length){toast('이동할 다른 운영 반을 먼저 개설해 주세요.',true);return}
+        const choices=destinations.map((c,i)=>`${i+1}. ${c.name}`).join('\n');
+        const answer=prompt(`${student.studentName}님을 어느 반으로 이동할까요?\n번호를 입력해 주세요.\n${choices}`);if(answer===null)return;
+        const target=destinations[Number(answer)-1];if(!target){toast('반 번호를 확인해 주세요.',true);return}
+        if(!confirm(`${student.studentName}님을 ${target.name}(으)로 이동할까요?\n이전 반의 학습 기록은 보존되지만 새 반에 복사되지 않습니다.`))return;
+        try{const batch=writeBatch(db);const enrollment=doc(db,'enrollments',enId(student.uid,target.id));
+          batch.update(doc(db,'enrollments',student.id),{status:'transferred'});
+          batch.set(enrollment,{uid:student.uid,classId:target.id,studentName:student.studentName,email:student.email||'',joinCode:target.joinCode,status:'active',joinedAt:serverTimestamp()});
+          batch.set(doc(db,'classes',cid,'members',student.uid),{uid:student.uid,name:student.studentName,status:'transferred'},{merge:true});
+          batch.set(doc(db,'classes',target.id,'members',student.uid),{uid:student.uid,name:student.studentName,status:'active',joinedAt:serverTimestamp()},{merge:true});
+          batch.update(doc(db,'users',student.uid),{assignedClassId:target.id});await batch.commit();toast('수강생의 반 이동이 완료되었습니다.');await showStudents(b);
+        }catch(e){toast(ex(e),true)}
       });
       $$('[data-status-uid]',list).forEach(el=>el.onclick=async()=>{
         const student=students.find(x=>x.uid===el.dataset.statusUid);if(!student)return;
         if(!confirm(`${student.studentName}님의 수강 상태를 변경하시겠습니까?`))return;
-        try{const next=student.status==='active'?'inactive':'active';await updateDoc(doc(db,'enrollments',student.id),{status:next});student.status=next;$('#roster-count').textContent=students.filter(s=>s.status==='active').length;$('#roster-total').textContent=`${students.filter(s=>s.status==='active').length}명 수강 중 · 전체 ${students.length}명`;toast('수강 상태를 변경했습니다.');renderRows()}
+        try{const next=student.status==='active'?'inactive':'active';await updateDoc(doc(db,'enrollments',student.id),{status:next});await setDoc(doc(db,'classes',cid,'members',student.uid),{uid:student.uid,name:student.studentName,status:next},{merge:true});student.status=next;$('#roster-count').textContent=students.filter(s=>s.status==='active').length;$('#roster-total').textContent=`${students.filter(s=>s.status==='active').length}명 수강 중 · 전체 ${students.length}명`;toast('수강 상태를 변경했습니다.');renderRows()}
         catch(err){toast(ex(err),true)}
       });
     }
     $('#roster-search').addEventListener('input',renderRows);
     $('#roster-status').addEventListener('change',renderRows);
     renderRows();
+    let initial=true;
+    A.live.students=onSnapshot(query(collection(db,'enrollments'),where('classId','==',cid)),()=>{
+      if(initial){initial=false;return}
+      if(A.page!=='students'||A.classId!==cid)return;
+      if(document.activeElement?.matches('input,textarea,select')){toast('수강생 명단에 변경사항이 있습니다. 메뉴를 다시 열면 갱신됩니다.');return}
+      showStudents(b);
+    },adminLiveError);
   }catch(err){loaded(list,`<div class="roster-error error">${esc(ex(err))}</div>`)}
 }
 if(CONFIGURED){onAuthStateChanged(auth,async user=>{try{if(!user){A.user=null;mountAuth(root,{signup:false});return}root.innerHTML='<div class="loading" style="min-height:95vh">강사 권한을 확인하고 있습니다</div>';A.user=user;const snap=await getDoc(doc(db,'users',user.uid));if(!snap.exists()||snap.data().role!=='admin'){root.innerHTML=`<div class="card" style="max-width:620px;margin:8vh auto"><div class="eyebrow">ACCESS CONTROL</div><h2>강사 권한이 필요합니다</h2><p style="margin-top:12px">관리자 계정은 가입만으로 생성되지 않습니다. Firebase Authentication에 강사 계정을 만든 뒤, Firestore <code>users/${esc(user.uid)}</code> 문서의 <code>role</code> 필드를 <code>admin</code>으로 등록해 주세요.</p><div class="subtle" style="margin-top:18px"><strong>현재 로그인 UID</strong><p style="overflow-wrap:anywhere">${esc(user.uid)}</p></div><div class="row" style="margin-top:18px"><button class="btn secondary" id="admin-signout">다른 계정으로 로그인</button><a class="btn soft" href="index.html">수강생 페이지</a></div></div>`;$('#admin-signout').onclick=()=>signOut(auth);return}A.profile=snap.data();await loadAdmin()}catch(err){root.innerHTML=`<div class="card" style="max-width:570px;margin:60px auto"><h3>관리자 페이지 불러오기 실패</h3><p class="error">${esc(ex(err))}</p><button class="btn secondary" onclick="location.reload()">새로고침</button></div>`}})}else mountAuth(root,{signup:false});
