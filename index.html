@@ -417,7 +417,7 @@ const NAV=[['assignment','✍🏻','과제'],['quiz','✦','복습'],['preview',
 const week=()=>S.weeks.find(w=>w.id===S.weekId);
 const currentClass=()=>S.classes.find(c=>c.id===S.classId);
 function stopLive(key){if(S.live[key]){S.live[key]();delete S.live[key]}}
-function clearPageLive(){for(const k of Object.keys(S.live))if(!['enrollments','weeks'].includes(k))stopLive(k)}
+function clearPageLive(){for(const k of Object.keys(S.live))if(!['enrollments','weeks','classSchedule'].includes(k))stopLive(k)}
 function onLiveError(err){console.error('실시간 구독 실패',err);toast('실시간 연결을 확인해 주세요: '+ex(err),true)}
 function startWeekLive(){stopLive('weeks');if(!S.classId)return;
   S.live.weeks=onSnapshot(query(collection(db,'classes',S.classId,'weeks'),where('published','==',true)),snap=>{
@@ -428,14 +428,15 @@ function startWeekLive(){stopLive('weeks');if(!S.classId)return;
     if($('#student-body'))renderBody();
   },onLiveError);
 }
+function startClassScheduleLive(){stopLive('classSchedule');if(!S.classId)return;const cid=S.classId;S.live.classSchedule=onSnapshot(doc(db,'classes',cid),snap=>{if(!snap.exists()||S.classId!==cid)return;const prev=JSON.stringify(currentClass()?.schedule||[]);S.classes=[{id:cid,...snap.data()}];if(prev!==JSON.stringify(snap.data().schedule||[])&&S.tab==='mypage'&&$('#student-body')){if(!document.activeElement?.matches('input,textarea'))renderMyPage($('#student-body'));else toast('수업 일정이 변경되었습니다. 마이페이지를 다시 열면 반영됩니다.')}},onLiveError)}
 function startEnrollmentLive(){stopLive('enrollments');
   S.live.enrollments=onSnapshot(query(collection(db,'enrollments'),where('uid','==',S.user.uid)),async snap=>{
     const active=snap.docs.filter(d=>d.data().status==='active');
     const next=active[0]?.data().classId||'';
     if(next===S.classId)return;
-    stopLive('weeks');clearPageLive();
+    stopLive('weeks');stopLive('classSchedule');clearPageLive();
     S.classId=next;S.classes=[];S.weeks=[];S.weekId='';
-    if(next){try{const c=await getDoc(doc(db,'classes',next));if(c.exists()&&!c.data().archived){S.classes=[{id:c.id,...c.data()}];await loadWeeks();startWeekLive()}}catch(e){onLiveError(e)}}
+    if(next){try{const c=await getDoc(doc(db,'classes',next));if(c.exists()&&!c.data().archived){S.classes=[{id:c.id,...c.data()}];await loadWeeks();startWeekLive();startClassScheduleLive()}}catch(e){onLiveError(e)}}
     frame();toast(next?'강사가 지정한 반 정보가 반영되었습니다.':'수강 상태가 변경되었습니다.');
   },onLiveError);
 }
@@ -490,7 +491,7 @@ async function loadStudent(forcedClass){
   S.classes=[];S.classId='';
   if(selected){const c=await getDoc(doc(db,'classes',selected));if(c.exists()&&!c.data().archived){S.classId=selected;S.classes=[{id:c.id,...c.data()}];await loadWeeks()}}
   else{S.weeks=[];S.weekId=''}
-  frame();startWeekLive();startEnrollmentLive();
+  frame();startWeekLive();startEnrollmentLive();startClassScheduleLive();
 }
 async function loadWeeks(){const snap=await getDocs(query(collection(db,'classes',S.classId,'weeks'),where('published','==',true)));
   S.weeks=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.order??0)-(b.order??0));
@@ -597,7 +598,7 @@ async function renderPreview(body){const w=week();body.innerHTML=weekHeader('다
   const mode=p.mode||'rich';body.insertAdjacentHTML('beforeend',`<div class="card stack"><div class="between"><div><h2>${esc(p.title||'다음 시간에 만나요')}</h2></div><span class="pill green">PRÓXIMA CLASE</span></div>${mode==='image'?(p.imagePath?`<img class="article-image" alt="다음 차시 안내" data-media-path="${esc(p.imagePath)}">`:empty('안내 이미지가 없습니다')):`<div class="article">${sanitizeRich(p.richHtml||'<p>학습 내용을 곧 안내할 예정입니다.</p>')}</div>`}${(p.videos||[]).length?`<div class="separator"></div><h3>🎬 수업 영상</h3><p class="hint">앱 안에서 재생됩니다. 다운로드 메뉴는 숨겨져 있습니다.</p>${p.videos.map(v=>`<div class="stack"><strong style="font-size:13px">${esc(v.name||'수업 영상')}</strong><video controls controlslist="nodownload noremoteplayback" disablepictureinpicture disableremoteplayback playsinline preload="metadata" class="media-preview" data-media-path="${esc(v.path)}"></video></div>`).join('')}`:''}${(p.files||[]).length?`<div class="separator"></div><h3>📎 첨부 자료</h3><div class="media-list">${p.files.map(f=>`<a href="#" data-media-path="${esc(f.path)}" class="media-item">${esc(f.name||'첨부 파일')} ↗</a>`).join('')}</div>`:''}</div>`);useMediaPaths(body);
 }
 async function renderMyPage(body){body.innerHTML=bodyHeader('마이페이지','내 학습 정보와 출석 기록을 한곳에서 확인하세요.');
-  body.insertAdjacentHTML('beforeend',`<div class="grid2"><div class="card"><h3>👋 프로필</h3><div class="separator"></div><dl class="info-grid"><dt>이름</dt><dd>${esc(S.profile.displayName)}</dd><dt>로그인 ID</dt><dd>${esc(S.user.email)}</dd><dt>현재 반</dt><dd>${esc(currentClass()?.name||'미등록')}</dd><dt>수강 시작</dt><dd>반별 등록 기록 기준</dd></dl><div class="separator"></div><form id="student-name-form" class="row" style="align-items:end"><div class="field" style="flex:1;min-width:160px"><label>표시 이름 변경</label><input name="displayName" maxlength="35" required value="${esc(S.profile.displayName||'')}" placeholder="수강생 이름"></div><button class="btn secondary small" type="submit">이름 저장</button></form><p class="hint">이름 변경 시 강사 화면에도 최신 이름이 표시됩니다.</p><div class="quiet-note">반 변경이 필요하시면 강사에게 요청해 주세요.</div></div><div class="card"><h3>📋 출석 현황</h3><p class="hint" style="margin:6px 0 12px">공개된 주차 기준으로 표시됩니다.</p><div id="attendance-overview" class="loading">불러오는 중</div></div></div>`);
+  body.insertAdjacentHTML('beforeend',`<div class="grid2"><div class="card"><h3>👋 프로필</h3><div class="separator"></div><dl class="info-grid"><dt>이름</dt><dd>${esc(S.profile.displayName)}</dd><dt>로그인 ID</dt><dd>${esc(S.user.email)}</dd><dt>현재 반</dt><dd>${esc(currentClass()?.name||'미등록')}</dd><dt>수강 시작</dt><dd>${esc((currentClass()?.schedule||[]).map(x=>x.date).filter(Boolean).sort()[0]||'수업 날짜 미설정')}</dd></dl><div class="separator"></div><form id="student-name-form" class="row" style="align-items:end"><div class="field" style="flex:1;min-width:160px"><label>표시 이름 변경</label><input name="displayName" maxlength="35" required value="${esc(S.profile.displayName||'')}" placeholder="수강생 이름"></div><button class="btn secondary small" type="submit">이름 저장</button></form><p class="hint">이름 변경 시 강사 화면에도 최신 이름이 표시됩니다.</p><div class="quiet-note">반 변경이 필요하시면 강사에게 요청해 주세요.</div></div><div class="card"><h3>📋 출석 현황</h3><p class="hint" style="margin:6px 0 12px">등록된 차시별 수업 날짜와 출결을 표시합니다.</p><div id="attendance-overview" class="loading">불러오는 중</div></div></div>`);
   $('#student-name-form')?.addEventListener('submit',async e=>{
     e.preventDefault();const form=e.currentTarget,name=String(new FormData(form).get('displayName')||'').trim();
     if(!name||name.length>35){toast('이름은 1~35자로 입력해 주세요.',true);return}
@@ -608,10 +609,11 @@ async function renderMyPage(body){body.innerHTML=bodyHeader('마이페이지','�
     catch(err){toast(ex(err),true)}finally{if(btn.isConnected)btn.disabled=false}
   });
 
-  const statuses=await Promise.all(S.weeks.map(async w=>{try{const d=await getDoc(doc(db,'classes',S.classId,'weeks',w.id,'attendance',S.user.uid));return {id:w.id,label:w.label,status:d.exists()?d.data().status:'unchecked'}}catch(e){return {id:w.id,label:w.label,status:'unchecked'}}}));
+  const profileSessions=(currentClass()?.schedule?.length?currentClass().schedule.map(w=>({id:w.weekId,label:w.label,date:w.date||''})):S.weeks);
+  const statuses=await Promise.all(profileSessions.map(async w=>{try{const d=await getDoc(doc(db,'classes',S.classId,'weeks',w.id,'attendance',S.user.uid));return {id:w.id,label:w.label,date:w.date||'',status:d.exists()?d.data().status:'unchecked'}}catch(e){return {id:w.id,label:w.label,date:w.date||'',status:'unchecked'}}}));
   const dict={present:['출석','green'],late:['지각','amber'],absent:['결석','red'],excused:['인정결석','gray'],unchecked:['미체크','gray']};
-  const spot=$('#attendance-overview');if(spot){spot.classList.remove('loading');spot.innerHTML=statuses.length?statuses.map(item=>`<div class="between" data-attendance-week="${esc(item.id)}" style="padding:10px 0;border-bottom:1px solid var(--line)"><span style="font-size:13px">${esc(item.label)}</span><span class="pill ${dict[item.status]?.[1]||'gray'}">${dict[item.status]?.[0]||'미체크'}</span></div>`).join(''):empty('아직 출석 기록이 없습니다');}
-  for(const w of S.weeks){S.live['attendance:'+w.id]=onSnapshot(doc(db,'classes',S.classId,'weeks',w.id,'attendance',S.user.uid),snap=>{
+  const spot=$('#attendance-overview');if(spot){spot.classList.remove('loading');spot.innerHTML=statuses.length?statuses.map(item=>`<div class="between" data-attendance-week="${esc(item.id)}" style="padding:10px 0;border-bottom:1px solid var(--line)"><span style="font-size:13px">${esc(item.label)}${item.date?` <small style="color:var(--muted)">· ${esc(item.date)}</small>`:''}</span><span class="pill ${dict[item.status]?.[1]||'gray'}">${dict[item.status]?.[0]||'미체크'}</span></div>`).join(''):empty('아직 출석 기록이 없습니다');}
+  for(const w of profileSessions){S.live['attendance:'+w.id]=onSnapshot(doc(db,'classes',S.classId,'weeks',w.id,'attendance',S.user.uid),snap=>{
     if(S.tab!=='mypage')return;const row=$(`[data-attendance-week="${w.id}"]`);if(!row)return;
     const status=snap.exists()?snap.data().status:'unchecked';const tag=$('.pill',row);if(tag){tag.className='pill '+(dict[status]?.[1]||'gray');tag.textContent=dict[status]?.[0]||'미체크'}
   },onLiveError)}
