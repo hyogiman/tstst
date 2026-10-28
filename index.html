@@ -244,6 +244,23 @@ body{background:var(--bg);color:var(--ink)}
 
 .auth-hero .logo{background:#871b34!important}.student-header .logo{width:40px;height:48px}.auth-hero .brand .logo{width:56px;height:65px}
 
+
+/* v10 · 학생 첫 화면: 붉은 브랜드 톤과 의도적인 세 줄 타이포그래피 */
+.auth-hero{background:radial-gradient(ellipse at 85% 70%,rgba(255,189,161,.15),transparent 57%),linear-gradient(145deg,#a91e3c 0%,#c92843 55%,#8f1933 100%)!important;color:#fff!important}
+.auth-hero:before{content:'¡HOLA!';font-size:clamp(120px,18vw,260px);opacity:.075;top:23%;right:-10%;color:white}
+.auth-hero .brand strong,.auth-hero .brand small,.auth-hero footer{color:white!important}
+.auth-hero .logo{background:rgba(255,255,255,.11)!important}.auth-hero .logo img{width:26px;height:35px;object-fit:contain}
+.auth-hero .senorayu-opening{font-family:'Noto Sans KR',sans-serif;font-weight:800;font-size:clamp(33px,4.2vw,60px);line-height:1.36;letter-spacing:-2.2px;color:#fff!important;text-shadow:0 3px 17px rgba(90,10,30,.13)}
+.senorayu-opening span{display:block;color:#fff!important}
+.senorayu-opening-intro{font-weight:500!important;font-size:.76em;letter-spacing:-1.2px;opacity:.92;margin-bottom:.24em}
+.senorayu-opening-main{font-weight:900;color:#fff!important}
+.senorayu-opening-end{font-weight:900;color:#fff!important}
+.senorayu-opening .opening-dot{display:inline;color:#ffcfba!important}
+.auth-hero p{color:#ffede8!important;font-size:14px;line-height:1.95}
+.lesson-video-block{margin:7px 0 16px}.lesson-video-label{display:flex;align-items:center;gap:9px;color:#751c32;font-size:14px}
+.lesson-play-icon{display:grid;place-items:center;background:#fff0f2;color:#bb2546;border-radius:9px;width:30px;height:30px;font-size:11px}
+@media(max-width:980px){.auth-hero .senorayu-opening{font-size:clamp(28px,4.4vw,41px)}}
+@media(max-width:640px){.auth-hero{min-height:295px;padding:30px 26px}.auth-hero .senorayu-opening{font-size:clamp(28px,7vw,37px);letter-spacing:-1.6px}.auth-hero .senorayu-opening-intro{font-size:.76em}.auth-hero p{font-size:12px;line-height:1.7}}
 </style>
 <link rel="icon" type="image/png" href="senorayu-icon.png">
 <link rel="icon" type="image/svg+xml" href="senorayu-mark.svg">
@@ -361,15 +378,16 @@ async function ensureProfile(user){
     }
     return profile;
   }
-  const data={displayName:(user.displayName||'').trim()||'수강생',email:user.email||'',role:'student',createdAt:serverTimestamp()};
+  const firstName=(user.displayName||'').trim()||'수강생';
+  const data={displayName:firstName,realName:firstName,nickname:'',email:user.email||'',role:'student',createdAt:serverTimestamp()};
   await setDoc(r,data);
   return data;
 }
-function signedOut(){return `<div class="auth-shell"><div class="auth-hero"><div class="brand"><span class="logo"><img src="senorayu-mark.svg" alt="쎄뇨라유 스페인어 로고"></span><div><strong>쎄뇨라유 스페인어</strong><small>ESPAÑOL · LEARNING SPACE</small></div></div><div><div class="eyebrow" style="color:#c5ead6">MI PEQUEÑO UNIVERSO</div><h1>오늘의 스페인어가<br>내일의 일상이 되도록.</h1><p>과제를 제출하고, 단어를 복습하고, 다음 수업을 준비하세요. 수업이 끝난 뒤에도 배움은 이어집니다.</p></div><footer>Aprender juntos, crecer juntos. ✨</footer></div><div class="auth-right"><div class="auth-card"><div class="eyebrow">WELCOME BACK</div><h2>반갑습니다 👋</h2><p>학습 공간에 로그인해 주세요.</p><div id="setup-note" class="setup-warning ${CONFIGURED?'hide':''}">Firebase 설정이 비어 있습니다. 두 HTML에 동일한 firebaseConfig를 입력해 주세요.</div><form id="login-form" class="stack"><div class="field"><label>이메일</label><input name="email" type="email" autocomplete="email" required placeholder="name@example.com"></div><div class="field"><label>비밀번호</label><input name="password" type="password" autocomplete="current-password" required placeholder="비밀번호"></div><button class="btn full" type="submit">로그인 →</button></form><div class="auth-links"><button id="auth-alt" class="linkbutton" type="button">회원가입</button><button id="forgot-password" class="linkbutton" type="button">비밀번호 재설정</button></div><div id="login-message" class="error" style="margin-top:15px"></div></div></div></div>`}
+function signedOut(){return `<div class="auth-shell"><div class="auth-hero"><div class="brand"><span class="logo"><img src="senorayu-mark-white.svg" alt="쎄뇨라유 스페인어 로고"></span><div><strong>쎄뇨라유 스페인어</strong><small>ESPAÑOL · LEARNING SPACE</small></div></div><div><div class="eyebrow" style="color:#c5ead6">MI PEQUEÑO UNIVERSO</div><h1 class="senorayu-opening"><span class="senorayu-opening-intro">오늘의 스페인어가</span><span class="senorayu-opening-main">내일의 일상이</span><span class="senorayu-opening-end">되도록<span class="opening-dot">.</span></span></h1><p>과제를 제출하고, 단어를 복습하고, 다음 수업을 준비하세요. 수업이 끝난 뒤에도 배움은 이어집니다.</p></div><footer>Aprender juntos, crecer juntos. ✨</footer></div><div class="auth-right"><div class="auth-card"><div class="eyebrow">WELCOME BACK</div><h2>반갑습니다 👋</h2><p>학습 공간에 로그인해 주세요.</p><div id="setup-note" class="setup-warning ${CONFIGURED?'hide':''}">Firebase 설정이 비어 있습니다. 두 HTML에 동일한 firebaseConfig를 입력해 주세요.</div><form id="login-form" class="stack"><div class="field"><label>이메일</label><input name="email" type="email" autocomplete="email" required placeholder="name@example.com"></div><div class="field"><label>비밀번호</label><input name="password" type="password" autocomplete="current-password" required placeholder="비밀번호"></div><button class="btn full" type="submit">로그인 →</button></form><div class="auth-links"><button id="auth-alt" class="linkbutton" type="button">회원가입</button><button id="forgot-password" class="linkbutton" type="button">비밀번호 재설정</button></div><div id="login-message" class="error" style="margin-top:15px"></div></div></div></div>`}
 function mountAuth(root,opts={signup:true}){
   root.innerHTML=signedOut(); const alt=$('#auth-alt');if(!opts.signup)alt.classList.add('hide');
-  let mode='login';alt?.addEventListener('click',()=>{mode=mode==='login'?'signup':'login';const form=$('#login-form');form.innerHTML=mode==='login'?`<div class="field"><label>이메일</label><input name="email" type="email" required autocomplete="email"></div><div class="field"><label>비밀번호</label><input name="password" type="password" required autocomplete="current-password"></div><button class="btn full" type="submit">로그인 →</button>`:`<div class="field"><label>이름</label><input name="name" type="text" required maxlength="35" autocomplete="name" placeholder="실명 또는 강사에게 알린 이름"></div><div class="field"><label>이메일</label><input name="email" type="email" required autocomplete="email"></div><div class="field"><label>비밀번호 (6자 이상)</label><input name="password" type="password" required minlength="6" autocomplete="new-password"></div><button class="btn full" type="submit">수강생 계정 만들기</button>`;alt.textContent=mode==='login'?'회원가입':'로그인으로 돌아가기';$('#login-message').textContent='';});
-  $('#login-form').addEventListener('submit',async e=>{e.preventDefault();if(!CONFIGURED){toast('Firebase 설정을 먼저 입력해 주세요.',true);return} const form=e.currentTarget;const data=new FormData(form);const btn=$('button[type="submit"]',form);btn.disabled=true;try{if(mode==='login')await signInWithEmailAndPassword(auth,String(data.get('email')).trim(),String(data.get('password')));else{const cred=await createUserWithEmailAndPassword(auth,String(data.get('email')).trim(),String(data.get('password')));await updateProfile(cred.user,{displayName:String(data.get('name')).trim()});await ensureProfile(cred.user);await updateDoc(doc(db,'users',cred.user.uid),{displayName:String(data.get('name')).trim(),updatedAt:serverTimestamp()});} }catch(err){$('#login-message').textContent=ex(err)}finally{btn.disabled=false}});
+  let mode='login';alt?.addEventListener('click',()=>{mode=mode==='login'?'signup':'login';const form=$('#login-form');form.innerHTML=mode==='login'?`<div class="field"><label>이메일</label><input name="email" type="email" required autocomplete="email"></div><div class="field"><label>비밀번호</label><input name="password" type="password" required autocomplete="current-password"></div><button class="btn full" type="submit">로그인 →</button>`:`<div class="field"><label>이름</label><input name="name" type="text" required maxlength="35" autocomplete="name" placeholder="강사에게 알린 실제 이름"></div><div class="field"><label>이메일</label><input name="email" type="email" required autocomplete="email"></div><div class="field"><label>비밀번호 (6자 이상)</label><input name="password" type="password" required minlength="6" autocomplete="new-password"></div><button class="btn full" type="submit">수강생 계정 만들기</button>`;alt.textContent=mode==='login'?'회원가입':'로그인으로 돌아가기';$('#login-message').textContent='';});
+  $('#login-form').addEventListener('submit',async e=>{e.preventDefault();if(!CONFIGURED){toast('Firebase 설정을 먼저 입력해 주세요.',true);return} const form=e.currentTarget;const data=new FormData(form);const btn=$('button[type="submit"]',form);btn.disabled=true;try{if(mode==='login')await signInWithEmailAndPassword(auth,String(data.get('email')).trim(),String(data.get('password')));else{const cred=await createUserWithEmailAndPassword(auth,String(data.get('email')).trim(),String(data.get('password')));await updateProfile(cred.user,{displayName:String(data.get('name')).trim()});await ensureProfile(cred.user);await updateDoc(doc(db,'users',cred.user.uid),{displayName:String(data.get('name')).trim(),realName:String(data.get('name')).trim(),nickname:'',updatedAt:serverTimestamp()});} }catch(err){$('#login-message').textContent=ex(err)}finally{btn.disabled=false}});
   $('#forgot-password').addEventListener('click',async()=>{if(!CONFIGURED){toast('Firebase 설정이 필요합니다.',true);return}const email=$('input[name="email"]')?.value?.trim();if(!email){toast('먼저 이메일을 입력해 주세요.',true);return}try{await sendPasswordResetEmail(auth,email);toast('비밀번호 재설정 메일을 발송했습니다.')}catch(e){toast(ex(e),true)}});
 }
 // 한 번에 하나의 마이크 녹음만 활성화됩니다. 파일 선택 업로드를 대안으로 함께 제공합니다.
@@ -412,7 +430,7 @@ async function modalInput(message,value=''){return await modalDialog({title:'정
 
 // ===== INDEX PAGE =====
 const root=$('#root');
-const S={user:null,profile:null,classes:[],classId:'',weeks:[],weekId:'',tab:'assignment',assignmentFile:null,quiz:null,live:{},activeQuestionId:'',directory:[]};
+const S={user:null,profile:null,classes:[],classId:'',weeks:[],weekId:'',tab:'assignment',assignmentFile:null,quiz:null,live:{},activeQuestionId:'',directory:[],enrollmentRealName:''};
 const NAV=[['assignment','✍🏻','과제'],['quiz','✦','복습'],['preview','▤','다음차시'],['questions','💬','질문'],['classmates','♙','우리 반'],['mypage','◉','내 정보']];
 const week=()=>S.weeks.find(w=>w.id===S.weekId);
 const currentClass=()=>S.classes.find(c=>c.id===S.classId);
@@ -433,6 +451,7 @@ function startEnrollmentLive(){stopLive('enrollments');
   S.live.enrollments=onSnapshot(query(collection(db,'enrollments'),where('uid','==',S.user.uid)),async snap=>{
     const active=snap.docs.filter(d=>d.data().status==='active');
     const next=active[0]?.data().classId||'';
+    S.enrollmentRealName=String(active[0]?.data().studentName||'').trim();
     if(next===S.classId)return;
     stopLive('weeks');stopLive('classSchedule');clearPageLive();
     S.classId=next;S.classes=[];S.weeks=[];S.weekId='';
@@ -486,6 +505,7 @@ async function loadStudent(forcedClass){
   const snaps=await getDocs(query(collection(db,'enrollments'),where('uid','==',S.user.uid)));
   const active=snaps.docs.filter(d=>d.data().status==='active');
   S.hadEnrollment=snaps.docs.length>0;
+  S.enrollmentRealName=String(active[0]?.data().studentName||'').trim();
   const selected=active[0]?.data().classId||'';
   if(selected&&!S.profile?.assignedClassId){try{await updateDoc(doc(db,'users',S.user.uid),{assignedClassId:selected});S.profile.assignedClassId=selected}catch(e){console.warn('기존 수강생 소속반 갱신 실패',e)}}
   S.classes=[];S.classId='';
@@ -595,17 +615,26 @@ async function finishQuiz(){const z=S.quiz;if(!z)return;
 }
 async function renderPreview(body){const w=week();body.innerHTML=weekHeader('다음 차시 안내','수업 전에 미리 읽고, 보고, 생각해 보는 시간입니다.');weeklyPicker();const p=w.preview;
   if(!p?.enabled){body.insertAdjacentHTML('beforeend',empty('다음 차시 안내를 준비하고 있습니다'));return}
-  const mode=p.mode||'rich';body.insertAdjacentHTML('beforeend',`<div class="card stack"><div class="between"><div><h2>${esc(p.title||'다음 시간에 만나요')}</h2></div><span class="pill green">PRÓXIMA CLASE</span></div>${mode==='image'?(p.imagePath?`<img class="article-image" alt="다음 차시 안내" data-media-path="${esc(p.imagePath)}">`:empty('안내 이미지가 없습니다')):`<div class="article">${sanitizeRich(p.richHtml||'<p>학습 내용을 곧 안내할 예정입니다.</p>')}</div>`}${(p.videos||[]).length?`<div class="separator"></div><h3>🎬 수업 영상</h3><p class="hint">앱 안에서 재생됩니다. 다운로드 메뉴는 숨겨져 있습니다.</p>${p.videos.map(v=>`<div class="stack"><strong style="font-size:13px">${esc(v.name||'수업 영상')}</strong><video controls controlslist="nodownload noremoteplayback" disablepictureinpicture disableremoteplayback playsinline preload="metadata" class="media-preview" data-media-path="${esc(v.path)}"></video></div>`).join('')}`:''}${(p.files||[]).length?`<div class="separator"></div><h3>📎 첨부 자료</h3><div class="media-list">${p.files.map(f=>`<a href="#" data-media-path="${esc(f.path)}" class="media-item">${esc(f.name||'첨부 파일')} ↗</a>`).join('')}</div>`:''}</div>`);useMediaPaths(body);
+  const mode=p.mode||'rich';body.insertAdjacentHTML('beforeend',`<div class="card stack"><div class="between"><div><h2>${esc(p.title||'다음 시간에 만나요')}</h2></div><span class="pill green">PRÓXIMA CLASE</span></div>${mode==='image'?(p.imagePath?`<img class="article-image" alt="다음 차시 안내" data-media-path="${esc(p.imagePath)}">`:empty('안내 이미지가 없습니다')):`<div class="article">${sanitizeRich(p.richHtml||'<p>학습 내용을 곧 안내할 예정입니다.</p>')}</div>`}${(p.videos||[]).length?`<div class="separator"></div><h3>🎬 수업 영상</h3><p class="hint">앱 안에서 재생됩니다. 다운로드 메뉴는 숨겨져 있습니다.</p>${p.videos.map((v,i)=>`<div class="stack lesson-video-block"><div class="lesson-video-label"><span class="lesson-play-icon" aria-hidden="true">▶</span><strong>수업 영상 ${i+1}</strong></div><video controls controlslist="nodownload noremoteplayback" disablepictureinpicture disableremoteplayback playsinline preload="metadata" class="media-preview" data-media-path="${esc(v.path)}"></video></div>`).join('')}`:''}${(p.files||[]).length?`<div class="separator"></div><h3>📎 첨부 자료</h3><div class="media-list">${p.files.map(f=>`<a href="#" data-media-path="${esc(f.path)}" class="media-item">${esc(f.name||'첨부 파일')} ↗</a>`).join('')}</div>`:''}</div>`);useMediaPaths(body);
 }
-async function renderMyPage(body){body.innerHTML=bodyHeader('마이페이지','내 학습 정보와 출석 기록을 한곳에서 확인하세요.');
-  body.insertAdjacentHTML('beforeend',`<div class="grid2"><div class="card"><h3>👋 프로필</h3><div class="separator"></div><dl class="info-grid"><dt>이름</dt><dd>${esc(S.profile.displayName)}</dd><dt>로그인 ID</dt><dd>${esc(S.user.email)}</dd><dt>현재 반</dt><dd>${esc(currentClass()?.name||'미등록')}</dd><dt>수강 시작</dt><dd>${esc((currentClass()?.schedule||[]).map(x=>x.date).filter(Boolean).sort()[0]||'수업 날짜 미설정')}</dd></dl><div class="separator"></div><form id="student-name-form" class="row" style="align-items:end"><div class="field" style="flex:1;min-width:160px"><label>표시 이름 변경</label><input name="displayName" maxlength="35" required value="${esc(S.profile.displayName||'')}" placeholder="수강생 이름"></div><button class="btn secondary small" type="submit">이름 저장</button></form><p class="hint">이름 변경 시 강사 화면에도 최신 이름이 표시됩니다.</p><div class="quiet-note">반 변경이 필요하시면 강사에게 요청해 주세요.</div></div><div class="card"><h3>📋 출석 현황</h3><p class="hint" style="margin:6px 0 12px">등록된 차시별 수업 날짜와 출결을 표시합니다.</p><div id="attendance-overview" class="loading">불러오는 중</div></div></div>`);
+async function renderMyPage(body){
+  const realName=String(S.profile.realName||S.enrollmentRealName||S.profile.displayName||'').trim();
+  const preferred=String(S.profile.nickname||(S.profile.displayName!==realName?S.profile.displayName:'')||'').trim();
+  body.innerHTML=bodyHeader('마이페이지','내 학습 정보와 출석 기록을 한곳에서 확인하세요.');
+  body.insertAdjacentHTML('beforeend',`<div class="grid2"><div class="card"><h3>👋 프로필</h3><div class="separator"></div><dl class="info-grid"><dt>내 이름</dt><dd>${esc(realName)}</dd><dt>사용하는 별명</dt><dd>${esc(preferred||'미설정')}</dd><dt>로그인 ID</dt><dd>${esc(S.user.email)}</dd><dt>현재 반</dt><dd>${esc(currentClass()?.name||'미등록')}</dd><dt>수강 시작</dt><dd>${esc((currentClass()?.schedule||[]).map(x=>x.date).filter(Boolean).sort()[0]||'수업 날짜 미설정')}</dd></dl><div class="separator"></div><form id="student-name-form" class="row" style="align-items:end"><div class="field" style="flex:1;min-width:160px"><label>우리 반에 표시할 별명</label><input name="displayName" maxlength="35" value="${esc(preferred)}" placeholder="비우면 실제 이름으로 표시"></div><button class="btn secondary small" type="submit">별명 저장</button></form><p class="hint">우리 반 명단에는 별명만 표시됩니다. 강사에게는 별명과 실명이 함께 표시됩니다.</p><div class="quiet-note">반 변경이 필요하시면 강사에게 요청해 주세요.</div></div><div class="card"><h3>📋 출석 현황</h3><p class="hint" style="margin:6px 0 12px">등록된 차시별 수업 날짜와 출결을 표시합니다.</p><div id="attendance-overview" class="loading">불러오는 중</div></div></div>`);
   $('#student-name-form')?.addEventListener('submit',async e=>{
     e.preventDefault();const form=e.currentTarget,name=String(new FormData(form).get('displayName')||'').trim();
-    if(!name||name.length>35){toast('이름은 1~35자로 입력해 주세요.',true);return}
+    if(name.length>35){toast('별명은 35자 이내로 입력해 주세요.',true);return}
     const btn=$('button[type="submit"]',form);btn.disabled=true;
-    try{await updateDoc(doc(db,'users',S.user.uid),{displayName:name,updatedAt:serverTimestamp()});
-      await updateProfile(S.user,{displayName:name});S.profile.displayName=name;try{await setDoc(doc(db,'classes',S.classId,'members',S.user.uid),{uid:S.user.uid,name,status:'active'},{merge:true})}catch(e){console.warn(e)}
-      toast('이름을 저장했습니다.');frame();}
+    try{
+      const original=String(S.profile.realName||S.enrollmentRealName||S.profile.displayName||'').trim();
+      if(!original||original==='수강생')throw Error('실명 정보를 확인할 수 없습니다. 강사에게 실명 확인을 요청해 주세요.');
+      const nickname=name&&name!==original?name:'';
+      const publicName=nickname||original;
+      await updateDoc(doc(db,'users',S.user.uid),{realName:original,nickname,displayName:publicName,updatedAt:serverTimestamp()});
+      await updateProfile(S.user,{displayName:publicName});Object.assign(S.profile,{realName:original,nickname,displayName:publicName});
+      if(S.classId)await setDoc(doc(db,'classes',S.classId,'members',S.user.uid),{uid:S.user.uid,name:publicName,status:'active'},{merge:true});
+      toast('별명을 저장했습니다.');frame();}
     catch(err){toast(ex(err),true)}finally{if(btn.isConnected)btn.disabled=false}
   });
 
