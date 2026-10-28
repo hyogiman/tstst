@@ -26,12 +26,12 @@ import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL, ge
 
 // 두 HTML 파일에 동일한 Firebase 웹 앱 설정을 입력하세요. API key는 비밀 키가 아니며 보안은 Rules가 담당합니다.
 const firebaseConfig = {
-  apiKey: 'PASTE_API_KEY',
-  authDomain: 'PASTE_PROJECT_ID.firebaseapp.com',
-  projectId: 'PASTE_PROJECT_ID',
-  storageBucket: 'PASTE_PROJECT_ID.firebasestorage.app',
-  messagingSenderId: 'PASTE_MESSAGING_SENDER_ID',
-  appId: 'PASTE_APP_ID'
+  apiKey: "AIzaSyBVNCSbB4Bmrcc2lEgjvZirVNhJNce7r8E",
+  authDomain: "senora-c9b84.firebaseapp.com",
+  projectId: "senora-c9b84",
+  storageBucket: "senora-c9b84.firebasestorage.app",
+  messagingSenderId: "89833541051",
+  appId: "1:89833541051:web:db34c49bc76f536c32c89e"
 };
 const CONFIGURED = !firebaseConfig.apiKey.startsWith('PASTE_') && !firebaseConfig.projectId.startsWith('PASTE_');
 const app = CONFIGURED ? initializeApp(firebaseConfig) : null;
