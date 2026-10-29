@@ -150,6 +150,7 @@ export function canReadDoc(path, data) {
     if (!(rulesAt('v3') ? enrolledIn(cid) : memberOf(cid))) return false;
     if (s.length <= 2) return true;
     if (s[2] === 'teacherNotes') return false;
+    if (s[2] === 'studentGoals') return rulesAt('v3') && s[3] === u; // 배치 11: 본인 목표만
     if (s[2] === 'members') return true;
     if (s[2] === 'questions') {
       const q = state.docs.get(`classes/${cid}/questions/${s[3]}`);

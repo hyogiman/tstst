@@ -15,8 +15,8 @@
 <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;1,9..144,500&display=swap">
 <!-- 배포할 때 CSS를 바꾸면 ?v= 값을 함께 올려 브라우저 캐시를 갱신하세요 -->
-<link rel="stylesheet" href="common.css?v=20261029h">
-<link rel="stylesheet" href="student.css?v=20261029h">
+<link rel="stylesheet" href="common.css?v=20261029i">
+<link rel="stylesheet" href="student.css?v=20261029i">
 </head>
 <body>
 <div id="root"></div>
@@ -35,7 +35,7 @@ window.__appStarted=true; // 모듈(외부 SDK 포함)을 모두 불러와 앱�
 
 import { onAuthStateChanged, updateProfile, signOut } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import { doc, getDoc, getDocs, collection, query, where, addDoc, setDoc, updateDoc, serverTimestamp, onSnapshot, runTransaction, writeBatch } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
-import { CONFIGURED, auth, db, $, $$, esc, fmt, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, ensureProfile, mountAuth, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalConfirm, formatDateTime, statusPill, paintPill, needsReply, byLastActivity, feedbackItems, reviewState, toDate, todayKey, daysBetween, audioMarkup, parseAnswer, encodeAnswer, normalizeQuizQuestion, isCorrectAnswer, answersFor, attendanceValue, dateKeyOf, shortLabel, questionSessionTag, setErrorAudience, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded, sessionState, sessionDateText, youtubeEmbedUrl } from './common.js?v=20261029h';
+import { CONFIGURED, auth, db, $, $$, esc, fmt, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, ensureProfile, mountAuth, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalConfirm, formatDateTime, statusPill, paintPill, needsReply, byLastActivity, feedbackItems, reviewState, toDate, todayKey, daysBetween, audioMarkup, parseAnswer, encodeAnswer, normalizeQuizQuestion, isCorrectAnswer, answersFor, attendanceValue, dateKeyOf, shortLabel, questionSessionTag, setErrorAudience, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded, sessionState, sessionDateText, youtubeEmbedUrl } from './common.js?v=20261029i';
 
 
 // ===== INDEX PAGE =====
@@ -43,7 +43,7 @@ setErrorAudience('student'); // P1-08: 학생에게는 개발 용어 없는 오�
 installOfflineBanner();
 const root=$('#root');
 // 로그아웃하면 이 초기값으로 되돌립니다(P0-09).
-const studentInitialState=()=>({user:null,profile:null,classes:[],classId:'',weeks:[],weekId:'',tab:'home',news:newsState(),quiz:null,live:{},activeQuestionId:'',directory:[],enrollmentRealName:'',enrollments:[],hadEnrollment:false,audioDrafts:{},joining:false,pastClasses:[],past:null,seenMarked:{}});
+const studentInitialState=()=>({user:null,profile:null,classes:[],classId:'',weeks:[],weekId:'',tab:'home',news:newsState(),quiz:null,live:{},activeQuestionId:'',directory:[],enrollmentRealName:'',enrollments:[],hadEnrollment:false,audioDrafts:{},joining:false,pastClasses:[],past:null,seenMarked:{},homeGoal:null});
 const S=studentInitialState();
 // D6(B안): 홈 · 과제 · 복습 · 질문 · 내 정보. 예습은 홈과 각 차시 화면에서 열고, '우리 반'은 내 정보 안으로 옮겼습니다.
 // 지난 반(보관된 반)은 홈 대신 '수업 자료'(예습 자료, 강의 영상 제외)를 둡니다.
@@ -281,7 +281,16 @@ function previewExcerpt(p){
 function renderHome(body){
   const name=((S.profile?.displayName==='수강생'&&S.user?.displayName)?S.user.displayName:S.profile?.displayName)||'';
   body.innerHTML=`${bodyHeader(`¡Hola${name?', '+esc(name):''}!`,'오늘 할 일과 새 소식을 확인해 보세요.')}<div class="home-grid"><div class="stack home-main" id="home-main"></div><div class="stack home-side"><section class="card home-news" id="home-news" aria-labelledby="home-news-title"></section><section class="card home-attendance" id="home-attendance" aria-labelledby="home-attendance-title"><h3 id="home-attendance-title">출석</h3><div class="loading">출석 기록 확인 중</div></section></div></div>`;
-  drawHomeLive();drawHomeAttendance();
+  drawHomeLive();drawHomeAttendance();drawHomeGoal();
+}
+// 다음 학습 목표(배치 11): 선생님이 학생 상세에서 남긴 한 줄 목표. 없으면 카드를 그리지 않습니다.
+async function drawHomeGoal(){
+  const cid=S.classId;
+  try{
+    const snap=await getDoc(doc(db,'classes',cid,'studentGoals',S.user.uid));
+    S.homeGoal=snap.exists()&&String(snap.data().text||'').trim()?{classId:cid,text:snap.data().text,updatedAt:snap.data().updatedAt}:null;
+  }catch(e){S.homeGoal=null;if(e?.code!=='permission-denied')console.warn('학습 목표 조회 실패',e)} // 목표 규칙을 게시하기 전에는 조용히 건너뜁니다
+  if(S.tab==='home'&&S.classId===cid)drawHomeLive();
 }
 // 새 소식이 오면 다시 그리는 부분(다음 수업·할 일·예습·새 소식)
 function drawHomeLive(){
@@ -297,7 +306,8 @@ function drawHomeLive(){
   if(tw?.quiz?.enabled&&tw.quiz.questions?.length)rows.push(row('복습',tw,quizStatus(S.news.quizResults[tw.id]),'quiz'));
   const todo=`<section class="card home-todo" aria-labelledby="home-todo-title"><h3 id="home-todo-title">이번 차시 할 일</h3>${rows.length?`<ul class="todo-list">${rows.join('')}</ul>`:'<p class="hint">지금은 할 일이 없어요. 선생님이 과제나 복습을 열면 여기에 보여요.</p>'}</section>`;
   const preview=pw?.preview?.enabled?`<section class="card home-preview" aria-labelledby="home-preview-title"><p class="eyebrow">PREPARACIÓN · 예습</p><h3 id="home-preview-title">${esc(pw.preview.title&&pw.preview.title!=='다음 차시'?pw.preview.title:`${shortLabel(pw.label)} 예습`)}</h3>${previewExcerpt(pw.preview)?`<p class="home-preview-text">${esc(previewExcerpt(pw.preview))}</p>`:''}<p class="hint">${[(pw.preview.videos||[]).length?`영상 ${(pw.preview.videos||[]).length}개`:'',(pw.preview.files||[]).length?`첨부 자료 ${(pw.preview.files||[]).length}개`:''].filter(Boolean).join(' · ')||`${esc(shortLabel(pw.label))} 수업 전에 볼 자료`}</p><button type="button" class="btn small" data-home-go="preview" data-week="${esc(pw.id)}">예습 자료 보기 →</button></section>`:'';
-  main.innerHTML=nextCard+todo+preview;
+  const goal=S.homeGoal?.classId===S.classId?`<section class="card home-goal" aria-labelledby="home-goal-title"><p class="eyebrow">MI PRÓXIMO PASO · 다음 학습 목표</p><h3 id="home-goal-title">${esc(S.homeGoal.text)}</h3><p class="hint">선생님이 정해 준 다음 목표예요${S.homeGoal.updatedAt?` · ${esc(formatDateTime(S.homeGoal.updatedAt,{time:false}))}`:''}</p></section>`:'';
+  main.innerHTML=nextCard+goal+todo+preview;
   const items=newsItems();
   newsBox.innerHTML=`<h3 id="home-news-title">새 소식${items.length?` <small>${items.length}</small>`:''}</h3>${items.length?`<ul class="news-list">${items.map(i=>`<li><button type="button" class="news-item" data-home-go="${i.kind}" data-week="${esc(i.weekId||'')}" data-question="${esc(i.questionId||'')}"><span>${esc(i.text)}</span><span aria-hidden="true">→</span></button></li>`).join('')}</ul>`:'<p class="hint">새 소식이 없어요. 피드백이나 답변이 오면 여기에 보여요.</p>'}`;
   for(const el of $$('[data-home-go]',$('#student-body')))el.onclick=()=>goTab(el.dataset.homeGo,{weekId:el.dataset.week,questionId:el.dataset.question});

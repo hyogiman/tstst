@@ -1,7 +1,7 @@
-// 배치 10 규칙: 질문의 차시 연결(weekId·context)과 '틀린 문제만 다시 풀기' 응시 기록(mode:'wrongOnly'). 실행: cd tests/rules && npm test
+// 배치 10·11 규칙: 질문의 차시 연결(weekId·context), '틀린 문제만 다시 풀기' 응시 기록(mode:'wrongOnly'), 다음 학습 목표(studentGoals). 실행: cd tests/rules && npm test
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { doc, setDoc, addDoc, collection, writeBatch, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, getDocs, addDoc, deleteDoc, collection, writeBatch, serverTimestamp, Timestamp } from 'firebase/firestore';
 
 const env = await initializeTestEnvironment({
   projectId: 'demo-tstst',
@@ -57,6 +57,19 @@ await check('전체 응시: 요약 문서와 같은 일괄 쓰기면 저장', ()
   b.set(doc(db1, `${W}/quizResults/s1`), { answers: ['2', '0', '0'], answersById: { q1: [2], q2: [0], q3: [0] }, questionIds: ['q1', 'q2', 'q3'], quizVersion: 1, score: 2, total: 3, submittedAt: serverTimestamp(), attemptCount: 2, firstAttempt: { score: 1, total: 3, legacy: false } }, { merge: true });
   return b.commit();
 }, true);
+
+// --- 다음 학습 목표(배치 11): 강사가 쓰고 그 학생만 읽음. 강사 메모와 저장 위치가 다름 ---
+const adb = env.authenticatedContext('admin1').firestore();
+const G = 'classes/c1/studentGoals';
+await check('강사: 학생 목표 저장', () => setDoc(doc(adb, `${G}/s1`), { text: '연결 표현(pero, porque) 2개 써 보기', updatedAt: serverTimestamp(), updatedBy: 'admin1' }), true);
+await check('강사: 200자 넘는 목표 거부', () => setDoc(doc(adb, `${G}/s2`), { text: 'a'.repeat(201), updatedAt: serverTimestamp(), updatedBy: 'admin1' }), false);
+await check('강사: 허용하지 않은 필드 거부', () => setDoc(doc(adb, `${G}/s2`), { text: '목표', note: '메모를 섞음', updatedAt: serverTimestamp(), updatedBy: 'admin1' }), false);
+await check('학생: 내 목표 읽기', () => getDoc(doc(db1, `${G}/s1`)), true);
+await check('다른 학생: 목표 읽기 거부', () => getDoc(doc(db2, `${G}/s1`)), false);
+await check('학생: 목표 목록 조회 거부', () => getDocs(collection(db1, G)), false);
+await check('학생: 내 목표 쓰기 거부', () => setDoc(doc(db1, `${G}/s1`), { text: '스스로 바꿈', updatedAt: serverTimestamp(), updatedBy: 's1' }), false);
+await check('학생: 강사 메모 읽기 거부(목표와 분리)', () => getDoc(doc(db1, 'classes/c1/teacherNotes/s1')), false);
+await check('강사: 목표 지우기', () => deleteDoc(doc(adb, `${G}/s1`)), true);
 
 await env.cleanup();
 console.log(results.join('\n'));

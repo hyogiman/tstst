@@ -15,6 +15,7 @@
 .side-link{display:flex;align-items:center;gap:12px;width:100%;min-height:44px;padding:0 12px;border:0;border-radius:11px;background:transparent;color:var(--ink-2);font-size:14px;font-weight:650;text-align:left;transition:background .15s,color .15s}
 .side-link svg{width:20px;height:20px;flex-shrink:0;color:var(--subtle)}
 /* 배치 10: 처리할 일이 있는 메뉴 배지(숫자는 화면 읽기 도구용 문장과 함께) */
+.side-link{position:relative} /* 배지의 화면 읽기용 글자가 메뉴 밖으로 나가지 않게 */
 .side-badge{margin-left:auto;min-width:22px;height:22px;padding:0 7px;border-radius:var(--r-pill);background:var(--wine-600);color:#fff;font-size:12px;font-weight:800;line-height:22px;text-align:center;font-variant-numeric:tabular-nums}
 .side-link>span:nth-child(2){flex:1}
 .side-link:hover{background:var(--surface-2);color:var(--ink)}
@@ -209,7 +210,62 @@ button.dash-action:hover{border-color:var(--wine-200);box-shadow:var(--shadow-md
 .roster-tools select{min-width:130px;appearance:none;-webkit-appearance:none;padding-right:34px;background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%236f6266' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 12px center}
 .roster-tools input:focus,.roster-tools select:focus{outline:none;border-color:var(--wine-500);box-shadow:var(--focus-ring)}
 .roster-card{padding:0!important;overflow:hidden}
-.roster-card .data-table{min-width:960px}
+.roster-card .data-table{min-width:0}
+/* 수강생 관리 (배치 11): 이름 · 상태 · 최근 기호 4칸 · 메모 · ⋯ / 학생 상세 패널 */
+.students-workspace{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:start}
+.students-workspace.has-detail{grid-template-columns:minmax(0,1fr) minmax(340px,400px)}
+.roster-table th small{display:block;margin-top:2px;font-size:11px;font-weight:500;color:var(--subtle)}
+.roster-table td,.roster-table th{padding:12px 10px}
+.roster-table td:first-child,.roster-table th:first-child{padding-left:16px}
+.roster-table tr.is-selected td{background:var(--wine-50)}
+.sym-row{display:inline-flex;gap:4px}
+.sym{position:relative;display:inline-grid;place-items:center;width:24px;height:24px;border-radius:7px;background:var(--surface-2);font-size:13px;font-weight:800}
+.sym.is-good{color:var(--success)}.sym.is-bad{color:var(--danger)}.sym.is-none{color:var(--neutral)}
+.sym.is-blank{background:transparent;border:1px dashed var(--line-strong)}
+.sym.is-outside{color:var(--subtle);font-weight:500}
+.sym.is-estimated::after{content:"*";font-size:9px;color:var(--muted)}
+.memo-cell{width:56px;text-align:center}
+.memo-flag{position:relative;font-size:15px}
+.menu-cell{width:56px;text-align:right}
+.row-menu-button{width:38px;height:38px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink-2);font-size:18px;font-weight:800;line-height:1}
+.row-menu-button:hover,.row-menu-button[aria-expanded="true"]{border-color:var(--wine-200);background:var(--wine-50);color:var(--wine-700)}
+.row-menu{position:fixed;z-index:80;display:flex;flex-direction:column;min-width:190px;padding:6px;border-radius:12px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow-lg)}
+.row-menu-item{min-height:40px;padding:8px 12px;border:0;border-radius:8px;background:transparent;color:var(--ink);font-size:14px;font-weight:600;text-align:left}
+.row-menu-item:hover,.row-menu-item:focus{outline:none;background:var(--wine-50)}
+.row-menu-item:focus-visible{box-shadow:var(--focus-ring)}
+.row-menu-item.is-danger{color:var(--danger)}
+.roster-legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin:0;padding:10px 16px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+.roster-legend b{margin:0 2px 0 4px;font-weight:800}
+.roster-legend .is-good{color:var(--success)}.roster-legend .is-bad{color:var(--danger)}.roster-legend .is-none{color:var(--neutral)}
+.student-detail{position:sticky;top:16px;max-height:calc(100vh - 32px);overflow:auto;border-radius:var(--r-lg);background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow-md)}
+.detail-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--surface);border-bottom:1px solid var(--line)}
+.detail-title{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+.detail-title h2{font-size:18px;overflow-wrap:anywhere}
+.detail-title h2:focus{outline:none}
+.detail-back{display:none}
+.detail-section{padding:16px 18px;border-bottom:1px solid var(--line)}
+.detail-section:last-child{border-bottom:0}
+.detail-section h3{margin-bottom:10px;font-size:15px}
+.detail-section h3 small{margin-left:4px;font-size:12px;font-weight:600;color:var(--muted)}
+.detail-section .info-grid{margin:0}
+.detail-timeline{margin:12px 0 0;padding-left:18px;font-size:13px;color:var(--ink-2)}
+.detail-timeline li+li{margin-top:4px}
+.detail-timeline span{margin-right:6px;color:var(--muted)}
+.detail-list{display:flex;flex-direction:column;gap:12px;margin:0;padding:0;list-style:none}
+.detail-quote{margin:6px 0 4px;padding:8px 10px;border-left:3px solid var(--saffron-500);border-radius:0 8px 8px 0;background:var(--saffron-50);font-size:13px;color:var(--ink-2);overflow-wrap:anywhere}
+.detail-table{font-size:13px}
+.detail-table th,.detail-table td{padding:8px 10px}
+.detail-grid{font-size:12px}
+.detail-question{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:13px;text-align:left}
+.detail-question:hover{border-color:var(--wine-200);background:var(--wine-50)}
+.detail-more{margin:12px 18px}
+/* 강사 메모는 학생 공개 정보와 확실히 구분: 빗금 배경 + '강사만 볼 수 있어요' */
+.detail-private{background:repeating-linear-gradient(135deg,#fcf6ec 0 12px,#f8efe1 12px 24px)}
+.private-label,.public-label{padding:3px 9px;border-radius:var(--r-pill);font-size:11px;font-weight:800}
+.private-label{background:var(--warning-bg);color:var(--warning)}
+.public-label{background:var(--success-bg);color:var(--success)}
+.detail-private textarea,.detail-goal input{width:100%;margin:8px 0;padding:10px 12px;border:1px solid var(--line-strong);border-radius:10px;background:var(--surface);font-size:14px;line-height:1.6}
+.detail-goal{background:var(--olive-50)}
 .roster-content{min-height:0}
 .roster-empty{padding:28px 20px}
 .roster-error{padding:22px}
@@ -369,6 +425,27 @@ button.dash-action:hover{border-color:var(--wine-200);box-shadow:var(--shadow-md
 /* ---------- 반응형 ---------- */
 @media (max-width:1279px){.dash-panels{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:640px){.dash-kpis{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:900px){
+  .students-workspace.has-detail{grid-template-columns:minmax(0,1fr)}
+  .student-detail{position:fixed;inset:0;z-index:70;max-height:none;border:0;border-radius:0;box-shadow:none}
+  .detail-back{display:inline-flex}
+  .detail-x{display:none}
+  body.detail-open{overflow:hidden}
+}
+@media (max-width:640px){
+  /* 수강생 관리: 휴대폰에서는 표 대신 카드형 목록(이름 · 상태 · 최근 기호 + ⋯) */
+  .roster-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+  .roster-table,.roster-table tbody{display:block}
+  .roster-table tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+  .roster-table td{display:block;padding:0;border:0;white-space:normal}
+  .roster-table td.menu-cell{grid-column:2;grid-row:1;width:auto}
+  .roster-table td[data-label="상태"],.roster-table td[data-label="최근 출결"],.roster-table td[data-label="최근 과제"]{grid-column:1/-1}
+  .roster-table td[data-label="최근 출결"]::before,.roster-table td[data-label="최근 과제"]::before{content:attr(data-label);display:inline-block;min-width:68px;font-size:12px;color:var(--muted)}
+  .roster-table td.memo-cell{grid-column:1/-1;width:auto;text-align:left}
+  .roster-table td.memo-cell:empty{display:none}
+  .roster-table tr.is-selected td{background:transparent}
+  .roster-table tr.is-selected{background:var(--wine-50)}
+}
 @media (max-width:1000px){
   .feedback-workspace,.questions-workspace{grid-template-columns:minmax(0,1fr)}
   .feedback-inspector,.question-inspector{position:static;max-height:none}

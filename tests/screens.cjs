@@ -29,6 +29,7 @@ const scenes = [
   ['admin-modal', 'admin.html', 'admin1', async p => { await click(p, '[data-page="classes"]'); await click(p, '#create-class'); }],
   ['admin-classes', 'admin.html', 'admin1', async p => click(p, '[data-page="classes"]')],
   ['admin-students', 'admin.html', 'admin1', async p => { await click(p, '[data-page="classes"]'); await click(p, '[data-open-roster="c1"]'); }],
+  ['admin-student-detail', 'admin.html', 'admin1', async p => { await click(p, '[data-page="classes"]'); await click(p, '[data-open-roster="c1"]'); await pause(p, 600); await click(p, '[data-open-detail="s2"]'); await pause(p, 600); }],
   ['admin-weeks', 'admin.html', 'admin1', async p => click(p, '[data-page="weeks"]')],
   ['admin-weeks-quiz', 'admin.html', 'admin1', async p => { await click(p, '[data-page="weeks"]'); const w = await p.$('[data-week-open="w1"]'); if (w) await click(p, '[data-week-open="w1"]'); await click(p, '[data-week-tab="quiz"]'); }],
   ['admin-feedback', 'admin.html', 'admin1', async p => { await click(p, '[data-page="feedback"]'); await p.selectOption('#admin-week-picker', 'w1').catch(() => {}); await pause(p, 500); const s = await p.$('[data-feedback-uid="s1"]'); if (s) await click(p, '[data-feedback-uid="s1"]'); }],

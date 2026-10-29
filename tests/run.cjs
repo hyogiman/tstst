@@ -11,6 +11,8 @@ const test = (name, fn) => tests.push({ name, fn });
 const assert = (cond, msg) => { if (!cond) throw new Error(msg); };
 const dump = (page, path) => page.evaluate(p => window.__mock.dump(p), path);
 const ok = async page => { await page.click('.app-modal-ok'); await pause(page, 500); };
+// 배치 11: 수강생 관리의 행 동작은 ⋯ 메뉴 안에 있습니다.
+const rowAction = async (page, uid, attr) => { await page.click(`[data-row-menu="${uid}"]`); await pause(page, 150); await page.click(`[${attr}="${uid}"]`); };
 // 녹음 스트림을 기록해 마이크가 꺼졌는지 확인합니다.
 const trackStreams = page => page.addInitScript(() => {
   window.__streams = [];
@@ -125,7 +127,7 @@ test('B04 반 이동 학생 재등록: 활성 반은 1개만', async b => {
   const { page } = await openAs(b, 'admin.html', 'admin1');
   await page.click('[data-page="classes"]'); await pause(page, 400);
   await page.click('[data-open-roster="c2"]'); await pause(page, 900);
-  await page.click('[data-status-uid="s3"]'); await pause(page, 300);
+  await rowAction(page, 's3', 'data-status-uid'); await pause(page, 300);
   await ok(page); await pause(page, 600);
   const c1 = await dump(page, 'enrollments/s3_c1'), c2 = await dump(page, 'enrollments/s3_c2');
   assert(c2.status === 'active' && c1.status === 'transferred', `s3_c1=${c1.status}, s3_c2=${c2.status}`);
@@ -137,7 +139,7 @@ test('B04b 반 이동(강사가 새 반 등록 + 수강 기간 기록) — 이�
     const { page } = await openAs(b, 'admin.html', 'admin1', { rules });
     await page.click('[data-page="classes"]'); await pause(page, 400);
     await page.click('[data-open-roster="c1"]'); await pause(page, 900);
-    await page.click('[data-move-student="s1"]'); await pause(page, 300);
+    await rowAction(page, 's1', 'data-move-student'); await pause(page, 300);
     await page.selectOption('.app-modal-input', 'c2'); await ok(page); await ok(page); await pause(page, 600);
     const e = await dump(page, 'enrollments/s1_c2');
     if (rules !== 'v3') assert(!e && (await lastToast(page)).includes('firestore.rules'), rules + ' 규칙에서 안내 없이 실패/성공: ' + JSON.stringify(e) + ' ' + await lastToast(page));
@@ -315,7 +317,7 @@ test('F04 강사: 보관된 반의 등록은 활성 반 중복으로 보지 않�
   await page.click('[data-page="classes"]'); await pause(page, 400);
   await page.click('[data-open-roster="c1"]'); await pause(page, 900);
   assert(!(await page.$('[data-keep-class="s5"]')), '보관된 반 등록을 중복으로 경고함');
-  await page.click('[data-move-student="s5"]'); await pause(page, 300);
+  await rowAction(page, 's5', 'data-move-student'); await pause(page, 300);
   await page.selectOption('.app-modal-input', 'c2'); await ok(page); await ok(page); await pause(page, 600);
   assert((await dump(page, 'enrollments/s5_c2'))?.status === 'active', '반 이동 실패');
   assert((await dump(page, 'enrollments/s5_c1')).status === 'transferred', '이전 반이 반 이동 처리되지 않음');
@@ -410,7 +412,7 @@ test('B12 강사 메모: Enter는 줄바꿈, Ctrl+Enter는 저장', async b => {
   const { page } = await openAs(b, 'admin.html', 'admin1');
   await page.click('[data-page="classes"]'); await pause(page, 400);
   await page.click('[data-open-roster="c1"]'); await pause(page, 900);
-  await page.click('[data-student-memo="s1"]'); await pause(page, 500);
+  await rowAction(page, 's1', 'data-student-memo'); await pause(page, 500);
   await page.click('.app-modal-input');
   await page.keyboard.type('수업 전에 일찍 옴');
   await page.keyboard.press('Enter');
@@ -441,7 +443,7 @@ test('B13b 한글 조합 중 Enter는 저장하지 않음 (한 줄 입력 모달
   const { page } = await openAs(b, 'admin.html', 'admin1');
   await page.click('[data-page="classes"]'); await pause(page, 400);
   await page.click('[data-open-roster="c1"]'); await pause(page, 900);
-  await page.click('[data-edit-name="s1"]'); await pause(page, 400);
+  await rowAction(page, 's1', 'data-edit-name'); await pause(page, 400);
   await page.fill('.app-modal-input', '김민지');
   await page.$eval('.app-modal-input', el => el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true, cancelable: true })));
   await pause(page, 300);
@@ -567,8 +569,8 @@ test('D06 수강 중지·재등록 기록과 날짜별 수강 판정(wasActiveAt
   const { page } = await openAs(b, 'admin.html', 'admin1');
   await page.click('[data-page="classes"]'); await pause(page, 400);
   await page.click('[data-open-roster="c1"]'); await pause(page, 900);
-  await page.click('[data-status-uid="s2"]'); await ok(page); await pause(page, 700);
-  await page.click('[data-status-uid="s2"]'); await ok(page); await pause(page, 700);
+  await rowAction(page, 's2', 'data-status-uid'); await ok(page); await pause(page, 700);
+  await rowAction(page, 's2', 'data-status-uid'); await ok(page); await pause(page, 700);
   const types = await page.evaluate(() => window.__mock.list('enrollments/s2_c1/events/').map(p => window.__mock.dump(p).type));
   assert(JSON.stringify(types.sort()) === JSON.stringify(['resumed', 'stopped']), '기록: ' + types.join(','));
   const verdicts = await page.evaluate(async () => {
@@ -1005,8 +1007,8 @@ test('DB03 처리할 일 카드: 누르면 해당 화면·차시·필터가 적�
   await page.click('button.dash-action:has-text("출결 미입력")'); await pause(page, 900);
   eq(await page.inputValue('#quick-session'), 'w4', '출결 미입력 차시');
   await back();
-  await page.click('.dash-watch button:has-text("이준호")'); await pause(page, 900);
-  eq(await page.inputValue('#roster-search'), '이준호', '수강생 관리 검색어');
+  await page.click('.dash-watch button:has-text("이준호")'); await pause(page, 1200);
+  assert((await page.innerText('#student-detail h2')).includes('이준호'), '챙겨 볼 학생 → 학생 상세가 열리지 않음');
 });
 
 test('DB04 공개 누락: 3일 안에 수업인데 비공개·예습 꺼짐 → 차시별 학습자료의 그 차시 예습 탭', async b => {
@@ -1179,6 +1181,94 @@ test('ST08 강사 응시 기록: 틀린 문제 연습은 "틀린 문제 다시 �
   await page.click('[data-attempt-content] > details:nth-child(2) > summary'); await pause(page, 200);
   const lines = await page.$$eval('[data-attempt-content] > details:nth-child(2) p.hint', els => els.length);
   assert(lines === 3, '연습 문항 수(설명 1줄 + 문항 2줄): ' + lines);
+});
+
+// ----- 배치 11: 학생 상세 · 수강생 관리 -----
+const openRoster = async page => { await page.click('[data-page="classes"]'); await pause(page, 400); await page.click('[data-open-roster="c1"]'); await pause(page, 1100); };
+test('SP01 학생 상세: 이름을 누르면 패널이 열리고 기본 정보·최근 차시·과제·복습·질문·강사 메모가 가상 데이터와 일치', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  await openRoster(page);
+  await page.click('[data-open-detail="s2"]'); await pause(page, 1200);
+  const text = await page.innerText('#student-detail');
+  for (const want of ['이준호', 'junho@example.com', '스페인어 기초반 2기', '수강 중', '최근 4차시', '숫자 15와 50 발음이 헷갈려요', '답변 대기', '강사만 볼 수 있어요', '학생 홈에 보여요'])
+    assert(text.includes(want), `상세에 '${want}'이(가) 없음`);
+  // 최근 차시 기호: 출결 ● ● ○ · / 과제 ✓ ✕ ✕ ✕ / 복습 첫 응시 33% 미응시 …
+  const row = name => page.$$eval(`#student-detail .detail-grid tbody tr`, (trs, n) => { const tr = trs.find(t => t.querySelector('th').textContent === n); return [...tr.querySelectorAll('td')].map(td => td.innerText.trim().split('\n')[0]); }, name);
+  eq(await row('출결'), ['●', '●', '○', '·'], '출결 기호');
+  eq(await row('과제'), ['✓', '✕', '✕', '✕'], '과제 기호');
+  eq(await row('복습 첫 응시'), ['33%', '미응시', '미응시', '미응시'], '복습 첫 응시');
+  const quiz = await page.$$eval('#student-detail .detail-table tbody tr', trs => trs.map(t => t.innerText.replace(/\s+/g, ' ').trim()));
+  assert(quiz.includes('1차시 1/3 · 33% 1/3 · 33% 1회'), '복습 표: ' + quiz.join(' | '));
+  assert((await page.inputValue('#detail-memo-text')).includes('출장이 잦아'), '강사 메모 내용');
+  assert(await page.$eval('[data-roster-row="s2"]', tr => tr.classList.contains('is-selected')) && await page.$('[data-roster-row="s2"] .memo-flag'), '목록의 선택 표시·메모 표시');
+  // 제출 보기 → 과제·복습 관리의 그 차시·학생
+  await page.click('#student-detail [data-go-feedback="w1"]'); await pause(page, 1000);
+  eq([await page.inputValue('#admin-week-picker'), await page.$eval('[data-feedback-uid="s2"]', el => el.classList.contains('selected'))], ['w1', true], '제출 보기 이동');
+});
+
+test('SP02 강사 메모: 상세에서 고쳐 저장(Ctrl+Enter)하고, 학생 화면 어디에도 메모가 보이지 않음', async b => {
+  let r = await openAs(b, 'admin.html', 'admin1');
+  await openRoster(r.page);
+  await r.page.click('[data-open-detail="s1"]'); await pause(r.page, 1100);
+  assert(!(await r.page.$('[data-roster-row="s1"] .memo-flag')), '메모가 없는데 표시됨');
+  await r.page.fill('#detail-memo-text', '발음 연습을 좋아함. 비밀 메모 테스트');
+  await r.page.keyboard.press('Control+Enter'); await pause(r.page, 700);
+  eq((await dump(r.page, 'classes/c1/teacherNotes/s1'))?.text, '발음 연습을 좋아함. 비밀 메모 테스트', '저장된 메모');
+  assert(await r.page.$('[data-roster-row="s1"] .memo-flag'), '저장 뒤 목록에 메모 표시가 없음');
+  const note = await dump(r.page, 'classes/c1/teacherNotes/s1');
+  await r.context.close();
+  r = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 }, tab: 'home' });
+  await r.page.evaluate(d => window.__mock.remoteWrite('classes/c1/teacherNotes/s1', d, { merge: false }), note);
+  for (const tab of ['home', 'assignment', 'quiz', 'questions', 'mypage']) {
+    await r.page.click(`[data-tab="${tab}"]`); await pause(r.page, 700);
+    assert(!(await r.page.innerText('#student-body')).includes('비밀 메모'), `학생 ${tab} 화면에 강사 메모가 보임`);
+  }
+});
+
+test('SP03 ⋯ 메뉴: Enter로 열고 ↓↑로 이동, Esc로 닫으면 버튼으로 돌아감 · 메뉴의 출석현황은 기존 모달', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  await openRoster(page);
+  await page.focus('[data-row-menu="s1"]');
+  await page.keyboard.press('Enter'); await pause(page, 150);
+  assert(await page.$eval('[data-row-menu="s1"]', el => el.getAttribute('aria-expanded')) === 'true', '메뉴가 열리지 않음');
+  const focused = () => page.evaluate(() => document.activeElement?.textContent);
+  eq(await focused(), '학생 상세 보기', '첫 항목 포커스');
+  await page.keyboard.press('ArrowDown'); eq(await focused(), '출석현황', '↓');
+  await page.keyboard.press('ArrowUp'); await page.keyboard.press('ArrowUp'); eq(await focused(), '수강 중지', '↑ 처음에서 마지막으로');
+  await page.keyboard.press('Escape'); await pause(page, 100);
+  assert(!(await page.$('.row-menu')) && await page.evaluate(() => document.activeElement?.dataset.rowMenu) === 's1', 'Esc 뒤 메뉴 닫힘·포커스 복귀');
+  await rowAction(page, 's1', 'data-student-attendance'); await pause(page, 900);
+  assert((await page.innerText('.student-attendance-modal')).includes('김민지 · 출석현황'), '출석현황 모달');
+});
+
+test('SP04 다음 학습 목표: 강사가 상세에서 저장 → 그 학생 홈에 표시', async b => {
+  let r = await openAs(b, 'admin.html', 'admin1');
+  await openRoster(r.page);
+  await r.page.click('[data-open-detail="s2"]'); await pause(r.page, 1100);
+  await r.page.fill('#detail-goal-text', '다음 과제에서는 연결 표현(pero, porque)을 2개 써 보기');
+  await r.page.click('#detail-goal-save'); await pause(r.page, 600);
+  const goal = await dump(r.page, 'classes/c1/studentGoals/s2');
+  assert(goal?.text?.includes('pero, porque') && goal.updatedBy === 'admin1', '저장된 목표: ' + JSON.stringify(goal));
+  await r.context.close();
+  r = await openAs(b, 'index.html', 's2', { viewport: { width: 390, height: 844 }, tab: 'home' });
+  await r.page.evaluate(d => window.__mock.remoteWrite('classes/c1/studentGoals/s2', d, { merge: false }), goal);
+  await r.page.click('[data-tab="mypage"]'); await pause(r.page, 500);
+  await r.page.click('[data-tab="home"]'); await pause(r.page, 900);
+  assert((await r.page.innerText('.home-goal')).includes('pero, porque'), '학생 홈에 목표가 없음');
+});
+
+test('SP05 390px: 수강생 관리는 카드형 목록, 가로 넘침 없음, 상세는 전체 화면 + [← 목록]', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1', { viewport: { width: 390, height: 844 } });
+  const overflow = () => page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+  assert(await overflow() <= 0, '대시보드 가로 넘침: ' + await overflow());
+  await openRoster(page);
+  assert(await overflow() <= 0, '수강생 관리 가로 넘침: ' + await overflow());
+  assert(await page.$eval('.roster-table tr[data-roster-row]', tr => getComputedStyle(tr).display === 'grid'), '카드형 목록이 아님');
+  await page.click('[data-open-detail="s1"]'); await pause(page, 1100);
+  const box = await page.$eval('#student-detail', el => { const r = el.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.width)]; });
+  eq(box, [0, 0, 390], '상세가 전체 화면이 아님');
+  await page.click('#student-detail .detail-back'); await pause(page, 300);
+  assert(await page.$eval('#student-detail', el => el.hidden) && await page.evaluate(() => document.activeElement?.dataset.openDetail) === 's1', '[← 목록] 뒤 목록으로 돌아가지 않음');
 });
 
 test('기본: 학생 과제 텍스트 제출, 퀴즈 3/3, 강사 화면 주요 메뉴 오류 없음', async b => {

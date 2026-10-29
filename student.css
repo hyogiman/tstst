@@ -106,6 +106,10 @@
 .home-attendance-count{margin:8px 0 2px;font-size:15px}
 .home-attendance-count strong{font-family:var(--font-display);font-size:30px;font-weight:600;color:var(--ink)}
 .home-attendance .linkbutton{margin-top:10px}
+/* 다음 학습 목표(배치 11): 선생님이 학생 상세에서 남긴 한 줄 */
+.home-goal{background:var(--olive-50);border-color:var(--olive-100)}
+.home-goal .eyebrow{color:var(--olive-700)}
+.home-goal h3{font-size:18px;line-height:1.55;color:var(--olive-800)}
 
 /* 과제 (배치 10): 제출한 답안을 먼저, 편집 폼은 [수정해서 다시 제출]로 엽니다 */
 .submitted-text{padding:14px 16px;border-radius:var(--r-md);background:var(--surface-2);font-size:16px;line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere}
@@ -150,7 +154,7 @@
 @media (max-width:760px){
   .home-grid{display:flex;flex-direction:column;align-items:stretch}
   .home-main,.home-side{display:contents}
-  .home-next{order:1}.home-todo{order:2}.home-news{order:3}.home-preview{order:4}.home-attendance{order:5}
+  .home-next,.home-goal{order:1}.home-todo{order:2}.home-news{order:3}.home-preview{order:4}.home-attendance{order:5}
 }
 @media (max-width:420px){
   .todo-row{grid-template-columns:36px minmax(0,1fr);row-gap:8px}

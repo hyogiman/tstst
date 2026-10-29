@@ -38,6 +38,7 @@ classes/{cid}             name, description, joinCode, archived,
                           schedule[{weekId, label, date}], createdAt, createdBy
   members/{uid}           uid, name(공개 표시명), status, joinedAt       ← 같은 반 학생에게 공개
   teacherNotes/{uid}      text, studentUid, updatedAt, updatedBy         ← 강사 전용
+  studentGoals/{uid}      text(200자 이하), updatedAt, updatedBy          ← 배치 11: 다음 학습 목표. 강사가 쓰고 그 학생만 읽음(학생 홈에 표시)
   questions/{qid}         uid, studentName, title, content, status('open'|'answered'),
                           createdAt, answeredAt,
                           needsTeacherReply(bool), lastMessageAt, lastSenderRole('student'|'admin')  ← 배치 05

@@ -111,6 +111,14 @@ service cloud.firestore {
       match /teacherNotes/{uid} {
         allow get, list, create, update, delete: if admin();
       }
+      // 배치 11: 다음 학습 목표 — 강사가 쓰고, 그 학생 본인만 읽습니다(강사 메모와 저장 위치를 나눔).
+      match /studentGoals/{uid} {
+        allow get: if admin() || (signedIn() && request.auth.uid == uid && enrolled(cid));
+        allow list, delete: if admin();
+        allow create, update: if admin() &&
+          request.resource.data.keys().hasOnly(['text','updatedAt','updatedBy']) &&
+          request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 200;
+      }
 
       // 공개 반명단: 이메일/성적/과제는 넣지 않으며 같은 반 학생만 읽습니다.
       match /members/{uid} {

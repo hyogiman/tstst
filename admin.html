@@ -15,8 +15,8 @@
 <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;1,9..144,500&display=swap">
 <!-- 배포할 때 CSS를 바꾸면 ?v= 값을 함께 올려 브라우저 캐시를 갱신하세요 -->
-<link rel="stylesheet" href="common.css?v=20261029h">
-<link rel="stylesheet" href="admin.css?v=20261029h">
+<link rel="stylesheet" href="common.css?v=20261029i">
+<link rel="stylesheet" href="admin.css?v=20261029i">
 </head>
 <body>
 <div id="root"></div>
@@ -36,15 +36,15 @@ window.__appStarted=true; // 모듈(외부 SDK 포함)을 모두 불러와 앱�
 import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import { doc, getDoc, getDocs, collection, query, where, setDoc, updateDoc, deleteDoc, serverTimestamp, arrayUnion, onSnapshot, writeBatch, runTransaction, deleteField } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
 import { ref as storageRef, deleteObject } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-storage.js';
-import { CONFIGURED, auth, db, storage, $, $$, esc, fmt, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, mountAuth, formatDuration, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalDialog, modalConfirm, modalInput, formatDateTime, todayKey, statusPill, paintPill, needsReply, byLastActivity, feedbackItems, reviewState, REVIEW_LABEL, openModalLayer, toDate, quizContentKey, answersFor, audioMarkup, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded, modalChoice, sessionState, sessionDateText, parseYouTube, SIZE_LABEL, uploadsInProgress, wasActiveAt, daysBetween, partsInZone, attendanceValue, normalizeQuizQuestion, isCorrectAnswer, questionSessionTag } from './common.js?v=20261029h';
-import { computeDashboard, analyzeQuiz, feedbackQueue, WATCH_RULES, TREND_SESSIONS } from './dashboard.js?v=20261029h';
+import { CONFIGURED, auth, db, storage, $, $$, esc, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, mountAuth, formatDuration, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalDialog, modalConfirm, modalInput, formatDateTime, todayKey, statusPill, paintPill, needsReply, byLastActivity, feedbackItems, reviewState, REVIEW_LABEL, openModalLayer, toDate, quizContentKey, answersFor, audioMarkup, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded, modalChoice, sessionState, sessionDateText, parseYouTube, SIZE_LABEL, uploadsInProgress, wasActiveAt, daysBetween, partsInZone, attendanceValue, normalizeQuizQuestion, isCorrectAnswer, questionSessionTag, shortLabel, isComposingKey } from './common.js?v=20261029i';
+import { computeDashboard, analyzeQuiz, feedbackQueue, firstAttemptOf, WATCH_RULES, TREND_SESSIONS } from './dashboard.js?v=20261029i';
 
 
 // ===== ADMIN PAGE =====
 installOfflineBanner();
 const root=$('#root');
 // 로그아웃하면 이 초기값으로 되돌립니다(P0-09).
-const adminInitialState=()=>({user:null,profile:null,classes:[],classId:'',classFilter:'all',weeks:[],weekId:'',page:'overview',weekTab:'preview',feedbackTab:'submissions',preview:{},pendingDeletes:[],voiceDrafts:{},live:{},activeQuestionId:'',feedbackSelectedUid:'',feedbackSearch:'',feedbackFilter:'all',feedbackRenderToken:0,questionSearch:'',questionFilter:'all',studentSearch:'',questionNameMap:new Map(),questionCache:new Map(),attendanceWeekId:'',weekBaseline:null,unsavedUploads:[],feedbackDrafts:{}});
+const adminInitialState=()=>({user:null,profile:null,classes:[],classId:'',classFilter:'all',weeks:[],weekId:'',page:'overview',weekTab:'preview',feedbackTab:'submissions',preview:{},pendingDeletes:[],voiceDrafts:{},live:{},activeQuestionId:'',feedbackSelectedUid:'',feedbackSearch:'',feedbackFilter:'all',feedbackRenderToken:0,questionSearch:'',questionFilter:'all',studentSearch:'',studentDetailUid:'',questionNameMap:new Map(),questionCache:new Map(),attendanceWeekId:'',weekBaseline:null,unsavedUploads:[],feedbackDrafts:{}});
 const A=adminInitialState();
 // 계정마다 마지막으로 본 반을 따로 기억합니다.
 const classPrefKey=()=>'spanish-lms-admin-class:'+(A.user?.uid||'');
@@ -88,13 +88,16 @@ window.addEventListener('popstate',async e=>{if(!A.user||!document.querySelector
   // 브라우저 뒤로 가기도 차시 편집 중이면 먼저 묻습니다(취소하면 제자리).
   if(A.page==='weeks'&&isWeekEditorDirty()){history.pushState({senorayu:true,page:'weeks'},'','#weeks');if(!(await confirmLeaveWeekEditor()))return}
   A.page=e.state?.senorayu?e.state.page:'overview';renderPage()});
-// opts(대시보드의 처리할 일 등에서 이동할 때): weekId · weekTab · feedbackTab · feedbackFilter · questionFilter · attendanceWeekId · studentSearch
+// opts(대시보드의 처리할 일·학생 상세 등에서 이동할 때): weekId · weekTab · feedbackTab · feedbackFilter · feedbackSelectedUid · questionFilter · activeQuestionId · attendanceWeekId · studentSearch · studentUid
 async function navigateAdminPage(key,opts={}){
   if(A.page==='weeks'&&!(await confirmLeaveWeekEditor()))return;
   if(opts.weekId&&A.weeks.some(w=>w.id===opts.weekId))A.weekId=opts.weekId;
   if(opts.weekTab)A.weekTab=opts.weekTab;
   if(opts.feedbackTab){A.feedbackTab=opts.feedbackTab;A.feedbackSelectedUid=''}
   if(opts.feedbackFilter){A.feedbackFilter=opts.feedbackFilter;A.feedbackSearch=''}
+  if(opts.feedbackSelectedUid)A.feedbackSelectedUid=opts.feedbackSelectedUid;
+  if(opts.activeQuestionId)A.activeQuestionId=opts.activeQuestionId;
+  if(opts.studentUid!==undefined)A.studentDetailUid=opts.studentUid; // 학생 상세(배치 11)
   if(opts.questionFilter){A.questionFilter=opts.questionFilter;A.questionSearch=''}
   if(opts.attendanceWeekId)A.attendanceWeekId=opts.attendanceWeekId;
   if(opts.studentSearch!==undefined)A.studentSearch=opts.studentSearch;
@@ -369,16 +372,16 @@ function dashGridMarkup(d){
     const quiz=!q?blank():q==='none'?td('is-none','–','복습 없음',c):q==='missing'?td('is-none','미응시','복습 미응시',c):q.kind==='first'?td('is-score',Math.round(q.pct)+'%',`복습 첫 응시 ${Math.round(q.pct)}%`,c):td('is-score','응시','복습 응시(첫 응시를 알 수 없는 이전 기록)',c);
     return att+asg+quiz;
   };
-  return `<section class="dash-panel dash-section" aria-labelledby="dash-grid-title"><div class="dash-panel-head"><div><h3 id="dash-grid-title">학생 × 차시 진행표</h3><p>최근 완료 ${g.sessions.length}차시 · 이름을 누르면 수강생 관리로 이동해요</p></div></div>
+  return `<section class="dash-panel dash-section" aria-labelledby="dash-grid-title"><div class="dash-panel-head"><div><h3 id="dash-grid-title">학생 × 차시 진행표</h3><p>최근 완료 ${g.sessions.length}차시 · 이름을 누르면 학생 상세가 열려요</p></div></div>
    <div class="dash-grid-scroll" tabindex="0" aria-label="학생 × 차시 진행표 (가로로 스크롤)"><table class="dash-grid"><thead><tr><th scope="col" rowspan="2" class="dash-grid-name">학생</th>${g.sessions.map(s=>`<th scope="colgroup" colspan="3" class="dash-group-start" title="${esc(s.label)}">${esc(s.short)}<small>${esc(monthDay(s.date))}</small></th>`).join('')}</tr><tr>${g.sessions.map(()=>'<th scope="col" class="dash-sub dash-group-start">출결</th><th scope="col" class="dash-sub">과제</th><th scope="col" class="dash-sub">복습</th>').join('')}</tr></thead>
-   <tbody>${g.rows.map(r=>`<tr><th scope="row" class="dash-grid-name"><button type="button" data-student="${esc(r.name)}">${esc(r.name)}</button>${r.status!=='active'?`<small>${esc(ENROLL_STATUS_TEXT[r.status]||'수강 종료')}</small>`:''}</th>${r.cells.map(cells).join('')}</tr>`).join('')}</tbody></table></div>
+   <tbody>${g.rows.map(r=>`<tr><th scope="row" class="dash-grid-name"><button type="button" data-student-uid="${esc(r.uid)}">${esc(r.name)}</button>${r.status!=='active'?`<small>${esc(ENROLL_STATUS_TEXT[r.status]||'수강 종료')}</small>`:''}</th>${r.cells.map(cells).join('')}</tr>`).join('')}</tbody></table></div>
    <p class="dash-legend"><span>출결 <b class="is-good">●</b> 출석 <b class="is-bad">○</b> 불참 <b class="is-none">·</b> 미입력</span><span>과제 <b class="is-good">✓</b> 제출 <b class="is-bad">✕</b> 미제출 <b class="is-none">–</b> 과제 없음</span><span>복습 첫 응시 점수(%) · 미응시</span><span>빈칸 그 차시에 수강 중이 아님</span>${d.estimated?'<span>* 수강 기간 추정</span>':''}</p></section>`;
 }
 // 챙겨 볼 학생: 설명할 수 있는 규칙(dashboard.js WATCH_RULES)만 씁니다. 점수·순위·낙인 표현은 쓰지 않고, 강사에게만 보입니다.
 function dashWatchMarkup(d){
   if(!d.done.length)return '';
   const R=WATCH_RULES,rules=`최근 완료 ${R.absenceWindow}차시 중 불참 ${R.absenceMin}회 이상 · 공개된 과제 ${R.missedAssignments}회 연속 미제출 · 공개된 복습 ${R.missedQuizzes}회 연속 미응시`;
-  return `<section class="dash-panel dash-section" aria-labelledby="dash-watch-title"><div class="dash-panel-head"><div><h3 id="dash-watch-title">챙겨 볼 학생 <small>${d.watch.length}명</small></h3><p>규칙: ${esc(rules)} · 강사에게만 보여요</p></div></div>${d.watch.length?`<ul class="dash-watch">${d.watch.map(w=>`<li><button type="button" data-student="${esc(w.name)}"><strong>${esc(w.name)}</strong> — ${esc(w.reasons.map(r=>r.text).join(', '))}</button></li>`).join('')}</ul>`:'<p class="dash-unavailable">지금은 규칙에 해당하는 학생이 없어요.</p>'}</section>`;
+  return `<section class="dash-panel dash-section" aria-labelledby="dash-watch-title"><div class="dash-panel-head"><div><h3 id="dash-watch-title">챙겨 볼 학생 <small>${d.watch.length}명</small></h3><p>규칙: ${esc(rules)} · 강사에게만 보여요</p></div></div>${d.watch.length?`<ul class="dash-watch">${d.watch.map(w=>`<li><button type="button" data-student-uid="${esc(w.uid)}"><strong>${esc(w.name)}</strong> — ${esc(w.reasons.map(r=>r.text).join(', '))}</button></li>`).join('')}</ul>`:'<p class="dash-unavailable">지금은 규칙에 해당하는 학생이 없어요.</p>'}</section>`;
 }
 // 복습 문항 분석 틀(D5 · P4-01). 내용은 문제 버전 사본을 읽은 뒤 drawItems가 채웁니다.
 function dashItemsShell(d,selectedId){
@@ -447,7 +450,7 @@ async function showOverview(b){
   for(const kind of ui.openActions){const box=$(`details[data-action-kind="${kind}"]`,host);if(box)box.open=true}
   const grid=$('.dash-grid-scroll',host);if(grid)grid.scrollLeft=scrollLeft;
   $$('[data-go]',host).forEach(el=>el.onclick=()=>navigateAdminPage(el.dataset.go,JSON.parse(el.dataset.goOpts||'{}')));
-  $$('[data-student]',host).forEach(el=>el.onclick=()=>navigateAdminPage('students',{studentSearch:el.dataset.student}));
+  $$('[data-student-uid]',host).forEach(el=>el.onclick=()=>navigateAdminPage('students',{studentUid:el.dataset.studentUid}));
   $$('[data-kpi-info]',host).forEach(el=>el.onclick=()=>{const key=el.dataset.kpiInfo,def=$('#dash-def-'+key,host),open=def.hidden;def.hidden=!open;el.setAttribute('aria-expanded',String(open));if(open)ui.openDefs.add(key);else ui.openDefs.delete(key)});
   $$('details[data-action-kind]',host).forEach(el=>el.addEventListener('toggle',()=>{if(el.open)ui.openActions.add(el.dataset.actionKind);else ui.openActions.delete(el.dataset.actionKind)}));
   $('#dash-jump-items',host)?.addEventListener('click',()=>$('#dash-items')?.scrollIntoView({behavior:'smooth',block:'start'}));
@@ -971,7 +974,8 @@ async function drawFeedbackList(){
       if(!s){panel.innerHTML='<div class="inspector-empty"><div><strong>수강생을 선택해 주세요.</strong><p class="hint">왼쪽 목록에서 이름을 누르면 제출물과 피드백이 나타납니다.</p></div></div>';return}
       const d=map.get(s.uid);
       const content=d?(kind==='submissions'?`<div class="feedback-answer" data-answer-box>${answerView(d,(Number(d.revision)||1)>1?`${Number(d.revision)}차 제출 (최신)`:'학생 답안')}</div>${(Number(d.revision)||1)>1?'<div class="revision-bar" data-revision-bar><span class="hint">제출 이력 불러오는 중…</span></div>':''}`:`<div class="feedback-answer"><div class="grid3" style="margin-bottom:13px"><div class="mini-stat"><strong>${scorePct(d.firstAttempt?.score??d.score,d.firstAttempt?.total??d.total)}%</strong><span>첫 응시</span></div><div class="mini-stat"><strong>${scorePct(d.score,d.total)}%</strong><span>최근 응시</span></div><div class="mini-stat"><strong>${Number(d.attemptCount)||1}회</strong><span>총 응시</span></div></div><details data-attempt-history="${esc(s.uid)}"><summary style="cursor:pointer;font-weight:750;color:var(--primary)">전체 응시 기록 확인</summary><div class="hint" data-attempt-content style="margin-top:11px">펼치면 응시별 결과를 불러옵니다.</div></details></div>`):'<div class="feedback-answer"><p class="hint">아직 제출하거나 응시하지 않았습니다. 제출 후 피드백을 작성할 수 있습니다.</p></div>';
-      panel.innerHTML=`<div class="inspector-title"><div><div class="name">${esc(s.studentName)}</div><p class="hint">${esc(s.email||'')} ${d?'· '+esc(formatDateTime(d.latestSubmittedAt||d.submittedAt)) : ''}${d&&kind==='submissions'&&(Number(d.revision)||1)>1?` · ${Number(d.revision)}차 제출`:''}</p></div><div class="row">${d?statusPill('success',kind==='submissions'?'제출 완료':'응시 완료'):statusPill('neutral',kind==='submissions'?'미제출':'미응시')}${d?statusPill(...REVIEW_LABEL[stateOf(d)]):''}</div></div>${content}${d?teacherComments(d,s.uid,kind)+`<div class="separator"></div><div class="stack" style="gap:9px" data-comment-card="${esc(kind)}:${esc(s.uid)}"><div class="field"><label>새 피드백 댓글</label><textarea data-feedback-text rows="4" maxlength="10000" placeholder="좋았던 점과 다음에 개선할 점을 작성해 주세요."></textarea></div><div data-feedback-media>${makeMediaUi('audio','또는 피드백 음성 파일')}</div><p class="feedback-target" data-feedback-target></p><div class="between"><span class="hint" data-feedback-status>등록하면 학생에게 바로 공개됩니다.</span><button type="button" class="btn small" data-feedback-save>피드백 등록</button></div></div>`:''}`;
+      panel.innerHTML=`<div class="inspector-title"><div><div class="name">${esc(s.studentName)} <button type="button" class="linkbutton" data-open-student="${esc(s.uid)}">학생 상세 →</button></div><p class="hint">${esc(s.email||'')} ${d?'· '+esc(formatDateTime(d.latestSubmittedAt||d.submittedAt)) : ''}${d&&kind==='submissions'&&(Number(d.revision)||1)>1?` · ${Number(d.revision)}차 제출`:''}</p></div><div class="row">${d?statusPill('success',kind==='submissions'?'제출 완료':'응시 완료'):statusPill('neutral',kind==='submissions'?'미제출':'미응시')}${d?statusPill(...REVIEW_LABEL[stateOf(d)]):''}</div></div>${content}${d?teacherComments(d,s.uid,kind)+`<div class="separator"></div><div class="stack" style="gap:9px" data-comment-card="${esc(kind)}:${esc(s.uid)}"><div class="field"><label>새 피드백 댓글</label><textarea data-feedback-text rows="4" maxlength="10000" placeholder="좋았던 점과 다음에 개선할 점을 작성해 주세요."></textarea></div><div data-feedback-media>${makeMediaUi('audio','또는 피드백 음성 파일')}</div><p class="feedback-target" data-feedback-target></p><div class="between"><span class="hint" data-feedback-status>등록하면 학생에게 바로 공개됩니다.</span><button type="button" class="btn small" data-feedback-save>피드백 등록</button></div></div>`:''}`;
+      $('[data-open-student]',panel)?.addEventListener('click',e=>navigateAdminPage('students',{studentUid:e.currentTarget.dataset.openStudent}));
       const bar=$('[data-revision-bar]',panel);
       if(bar)wireRevisionBar(bar,$('[data-answer-box]',panel),cid,wid,s.uid);
       const attempt=$('[data-attempt-history]',panel);
@@ -1068,6 +1072,7 @@ function showAdminQuestions(body){
   }catch(err){console.warn('이름 동기화 실패',err)}};
   updateNames();
   A.live.questionNames=onSnapshot(collection(db,'classes',currentCid,'members'),()=>{updateNames()},adminLiveError);
+  let openedFromElsewhere=false;
   A.live.questions=onSnapshot(collection(db,'classes',currentCid,'questions'),snap=>{
     if(A.page!=='questions')return;
     const list=$('#admin-questions-list');if(!list)return;
@@ -1092,6 +1097,7 @@ function showAdminQuestions(body){
     $('#admin-question-filter').onchange=e=>{A.questionFilter=e.target.value;renderList()};
     renderList();
     if(A.activeQuestionId&&!questions.some(q=>q.id===A.activeQuestionId)){A.activeQuestionId='';adminStopLive('replies');$('#admin-question-detail').innerHTML='<p class="muted">학생을 선택해 주세요.</p>'}
+    else if(A.activeQuestionId&&!openedFromElsewhere&&!$('#admin-replies')){openedFromElsewhere=true;const q=A.questionCache.get(A.activeQuestionId);showAdminQuestionThread({...q,displayStudentName:liveDisplayName(q)})} // 학생 상세 등에서 고른 질문
     else if(A.activeQuestionId)paintQuestionHeader(A.questionCache.get(A.activeQuestionId)); // 열린 상세의 배지·버튼도 최신 상태로
   },adminLiveError);
 }
@@ -1111,8 +1117,9 @@ function showAdminQuestionThread(q){
   const el=$('#admin-question-detail');if(!el)return;
   const qid=q.id,cid=A.classId;
   const latest=()=>A.questionCache?.get(qid)||q;
-  el.innerHTML=`<div class="stack"><div class="between"><div><div class="question-student-title">${esc(q.displayStudentName||A.questionNameMap.get(q.uid)||q.studentName||'수강생')}</div><p class="hint">${esc(formatDateTime(q.createdAt))}</p></div><span class="pill" id="admin-question-badge"></span></div><div>${adminQuestionTag(q)?`<span class="question-session-tag">${esc(adminQuestionTag(q))}</span>`:''}<div class="question-subject">${esc(q.title||'제목 없음')}</div><div class="subtle question-body">${esc(q.content||'')}</div></div><div id="admin-replies" class="stack"><div class="loading">답변 불러오는 중</div></div><form id="admin-reply-form" class="stack"><div class="field"><label for="admin-reply-text">강사 답변</label><textarea id="admin-reply-text" name="text" rows="5" required maxlength="8000" placeholder="학생에게 전달할 답변을 작성해 주세요."></textarea></div><button class="btn" type="submit">답변 등록</button></form><button id="question-status" type="button" class="btn secondary small"></button></div>`;
+  el.innerHTML=`<div class="stack"><div class="between"><div><div class="question-student-title">${esc(q.displayStudentName||A.questionNameMap.get(q.uid)||q.studentName||'수강생')}</div><button type="button" class="linkbutton" data-open-student="${esc(q.uid||'')}">학생 상세 →</button><p class="hint">${esc(formatDateTime(q.createdAt))}</p></div><span class="pill" id="admin-question-badge"></span></div><div>${adminQuestionTag(q)?`<span class="question-session-tag">${esc(adminQuestionTag(q))}</span>`:''}<div class="question-subject">${esc(q.title||'제목 없음')}</div><div class="subtle question-body">${esc(q.content||'')}</div></div><div id="admin-replies" class="stack"><div class="loading">답변 불러오는 중</div></div><form id="admin-reply-form" class="stack"><div class="field"><label for="admin-reply-text">강사 답변</label><textarea id="admin-reply-text" name="text" rows="5" required maxlength="8000" placeholder="학생에게 전달할 답변을 작성해 주세요."></textarea></div><button class="btn" type="submit">답변 등록</button></form><button id="question-status" type="button" class="btn secondary small"></button></div>`;
   paintQuestionHeader(latest());
+  $('[data-open-student]',el)?.addEventListener('click',()=>navigateAdminPage('students',{studentUid:q.uid}));
   $('#admin-reply-form').onsubmit=async e=>{
     e.preventDefault();
     const form=e.currentTarget,text=String(new FormData(form).get('text')||'').trim();if(!text)return;
@@ -1267,22 +1274,89 @@ async function duplicateActiveStudents(){
     return new Set(Object.keys(count).filter(u=>count[u]>1));
   }catch(e){console.warn('중복 수강 확인 실패',e);return new Set()}
 }
+// ===== 수강생 관리 (배치 11 · P3-01, P3-02) =====
+// 표: 이름 · 상태 · 최근 출결 4칸 · 최근 과제 4칸 · 메모 표시 · ⋯(출석현황·메모·실명 수정·반 이동·수강 중지/재등록).
+// 이름을 누르면 학생 상세(PC는 오른쪽 패널, 모바일은 전체 화면)가 열립니다. 기호는 대시보드 진행표와 같습니다.
+const ROSTER_SESSIONS=4,DETAIL_SESSIONS=8;
+const EVENT_TEXT={joined:'입장',stopped:'수강 중지',resumed:'다시 수강',transferred_out:'다른 반으로 이동',transferred_in:'이 반으로 이동'};
+const statusPillOf=s=>s.status==='active'?statusPill('success','수강 중'):statusPill('neutral',s.status==='transferred'?'반 이동':'수강 중지');
+// 차시 문서 + 수업 날짜(정렬 번호 순)
+const datedWeeks=()=>[...A.weeks].sort((x,y)=>(Number(x.order)||0)-(Number(y.order)||0)).map(w=>({...w,date:sessionDateOf(w)}));
+// 수강 기간 기록: 읽지 못하면(이전 규칙) null → 등록일 기준 추정
+async function readEnrollmentEvents(list){
+  try{const out={};await Promise.all(list.map(async e=>{const snap=await getDocs(collection(db,'enrollments',e.id,'events'));out[e.id]=snap.docs.map(d=>d.data())}));return out}
+  catch(err){if(err?.code==='permission-denied')return null;throw err}
+}
+// 기호 칸(진행표와 같은 기호 · 색 · 화면 읽기용 글자)
+function symbolCell(kind,c,label){
+  const map=kind==='attendance'?GRID_ATT:GRID_ASG,v=c?.[kind];
+  if(!c||(!c.target&&!c.outside)||!v||!map[v])return `<span class="sym is-blank" title="${esc(label)} · 대상 아님"><span class="sr-only">${esc(label)} 대상 아님</span></span>`;
+  const [cls,symbol,text]=map[v];
+  return `<span class="sym ${cls}${c.outside?' is-outside':''}${c.estimated?' is-estimated':''}" title="${esc(label+' · '+text)}"><span aria-hidden="true">${symbol}</span><span class="sr-only">${esc(label)} ${esc(text)}</span></span>`;
+}
+// ⋯ 메뉴: Enter·Space·↓로 열고, ↑↓로 이동, Esc로 닫고 버튼으로 돌아갑니다.
+function openRowMenu(button,items){
+  closeRowMenu();
+  const menu=document.createElement('div');menu.className='row-menu';menu.setAttribute('role','menu');menu.id='row-menu';
+  menu.setAttribute('aria-label',button.getAttribute('aria-label')||'관리');
+  menu.innerHTML=items.map((it,i)=>`<button type="button" role="menuitem" tabindex="-1" class="row-menu-item${it.danger?' is-danger':''}" data-menu-index="${i}" ${it.attr||''}>${esc(it.label)}</button>`).join('');
+  document.body.append(menu);
+  const r=button.getBoundingClientRect(),w=menu.offsetWidth,h=menu.offsetHeight;
+  menu.style.left=Math.max(8,Math.min(r.right-w,innerWidth-w-8))+'px';
+  menu.style.top=(r.bottom+h+8>window.innerHeight?Math.max(8,r.top-h-4):r.bottom+4)+'px';
+  button.setAttribute('aria-expanded','true');
+  const entries=$$('[role="menuitem"]',menu),focusAt=i=>entries[(i+entries.length)%entries.length]?.focus();
+  const close=(restore=true)=>{closeRowMenu();if(restore)button.focus()};
+  menu.addEventListener('keydown',e=>{
+    const i=entries.indexOf(document.activeElement);
+    if(e.key==='ArrowDown'){e.preventDefault();focusAt(i+1)}
+    else if(e.key==='ArrowUp'){e.preventDefault();focusAt(i-1)}
+    else if(e.key==='Home'){e.preventDefault();focusAt(0)}
+    else if(e.key==='End'){e.preventDefault();focusAt(entries.length-1)}
+    else if(e.key==='Escape'){e.preventDefault();close()}
+    else if(e.key==='Tab')close(false);
+  });
+  entries.forEach((el,i)=>el.onclick=()=>{close(false);items[i].run()});
+  rowMenuState={menu,button,outside:e=>{if(!menu.contains(e.target)&&e.target!==button)close(false)},reflow:()=>close(false)};
+  setTimeout(()=>{if(rowMenuState?.menu!==menu)return;document.addEventListener('mousedown',rowMenuState.outside);addEventListener('resize',rowMenuState.reflow);addEventListener('scroll',rowMenuState.reflow,true)});
+  focusAt(0);
+}
+let rowMenuState=null;
+function closeRowMenu(){
+  if(!rowMenuState)return;
+  const {menu,button,outside,reflow}=rowMenuState;rowMenuState=null;
+  document.removeEventListener('mousedown',outside);removeEventListener('resize',reflow);removeEventListener('scroll',reflow,true);
+  menu.remove();button.setAttribute('aria-expanded','false');
+}
 async function showStudents(b){
-  adminStopLive('students');adminStopLive('studentsMembers');
-  b.innerHTML=`<div class="section-title"><div><div class="eyebrow">STUDENT DIRECTORY · 수강생</div><h1>수강생 관리 <span class="current-class">(${esc(activeClass()?.name||"선택된 반")})</span></h1><p>이름을 눌러 해당 수강생의 차시별 출결을 수정할 수 있습니다.</p></div><button id="students-back" class="btn secondary" type="button">← 클래스 목록</button></div>
+  adminStopLive('students');adminStopLive('studentsMembers');closeRowMenu();
+  b.innerHTML=`<div class="section-title"><div><div class="eyebrow">STUDENT DIRECTORY · 수강생</div><h1>수강생 관리 <span class="current-class">(${esc(activeClass()?.name||"선택된 반")})</span></h1><p>이름을 누르면 학생 한 명의 출결·과제·복습·질문·메모를 모아 봅니다. 다른 관리는 ⋯ 메뉴에 있어요.</p></div><button id="students-back" class="btn secondary" type="button">← 클래스 목록</button></div>
   <div class="roster-summary"><div class="roster-summary-left"><div id="roster-count" class="roster-count">—</div><div><strong id="roster-total">수강생 불러오는 중</strong><small>${esc(activeClass()?.name||'선택된 반')}</small></div></div><div class="roster-tools"><input id="roster-search" type="search" placeholder="이름 또는 이메일 검색" aria-label="수강생 검색"><select id="roster-status" aria-label="수강 상태 필터"><option value="all">전체 학생</option><option value="active">수강 중</option><option value="inactive">수강 중지</option><option value="transferred">반 이동</option></select></div></div>
-  <div class="card roster-card"><div id="roster-list" class="roster-content loading">학생 목록 확인 중</div></div><p class="hint" style="margin-top:15px">※ 이름은 계정의 최신 프로필을 기준으로 표시합니다. 이름이 등록되지 않은 학생은 강사가 수정할 수 있습니다.</p>`;
+  <div class="students-workspace" id="students-workspace"><div class="card roster-card"><div id="roster-list" class="roster-content loading">학생 목록 확인 중</div></div><section id="student-detail" class="student-detail" aria-label="학생 상세" hidden></section></div><p class="hint" style="margin-top:15px">※ 이름은 계정의 최신 프로필을 기준으로 표시합니다. 최근 출결·과제는 지난 수업 ${ROSTER_SESSIONS}차시이고, 빈칸은 그 차시에 수강 중이 아니었다는 뜻입니다.</p>`;
   $('#students-back').onclick=()=>{A.classFilter='all';navigateAdminPage('classes')};
   if(A.studentSearch){$('#roster-search').value=A.studentSearch;A.studentSearch=''} // 대시보드에서 학생 이름을 눌러 온 경우
-  const list=$('#roster-list');
+  const list=$('#roster-list'),cid=A.classId;
   try{
-    const cid=A.classId;let students=await roster();
+    let students=await roster();
     if(cid!==A.classId || !list.isConnected)return;
-    // D4: 다른 반에도 수강 중으로 남아 있는 학생(이전 버전 데이터)을 찾아 경고합니다.
-    const duplicateActive=await duplicateActiveStudents();
-    const active=students.filter(s=>s.status==='active');
-    $('#roster-count').textContent=active.length;
-    $('#roster-total').textContent=`${active.length}명 수강 중 · 전체 ${students.length}명`;
+    // 최근 지난 수업 4차시의 출결·과제(진행표와 같은 계산), 메모 있는 학생, 활성 반 중복(D4)
+    const recent=datedWeeks().filter(w=>sessionState(w)==='done').slice(-ROSTER_SESSIONS);
+    const [notesSnap,events,att,subs,duplicateActive]=await Promise.all([
+      getDocs(collection(db,'classes',cid,'teacherNotes')),
+      readEnrollmentEvents(students),
+      Promise.all(recent.map(w=>getDocs(collection(db,'classes',cid,'weeks',w.id,'attendance')))),
+      Promise.all(recent.map(w=>getDocs(collection(db,'classes',cid,'weeks',w.id,'submissions')))),
+      duplicateActiveStudents(),
+    ]);
+    if(cid!==A.classId || !list.isConnected)return;
+    const notes=new Set(notesSnap.docs.filter(d=>String(d.data().text||'').trim()).map(d=>d.id));
+    const toDocs=snap=>snap.docs.map(d=>({id:d.id,...d.data()}));
+    const grid=computeDashboard({sessions:recent,enrollments:students,events,names:{},attendance:Object.fromEntries(recent.map((w,i)=>[w.id,toDocs(att[i])])),submissions:Object.fromEntries(recent.map((w,i)=>[w.id,toDocs(subs[i])])),quizResults:{},questions:[]},todayKey(),DASH_DEPS).grid;
+    const cellsOf=new Map(grid.rows.map(r=>[r.uid,r.cells]));
+    const ctx={cid,students:()=>students,events,notes,rerender:()=>showStudents(b)};
+    const updateCounts=()=>{const n=students.filter(s=>s.status==='active').length;$('#roster-count').textContent=n;$('#roster-total').textContent=`${n}명 수강 중 · 전체 ${students.length}명`};
+    updateCounts();
+    const symbols=(s,kind,label)=>`<span class="sym-row" role="img" aria-label="${esc(label)} 최근 ${recent.length}차시">${recent.map((w,i)=>symbolCell(kind,cellsOf.get(s.uid)?.[i],kind==='attendance'?`${shortLabel(w.label)} 출결`:shortLabel(w.label))).join('')}</span>`;
     function renderRows(){
       const queryText=$('#roster-search')?.value.trim().toLocaleLowerCase('ko')||'';
       const filter=$('#roster-status')?.value||'all';
@@ -1290,63 +1364,20 @@ async function showStudents(b){
         !queryText || (s.studentName||'').toLocaleLowerCase('ko').includes(queryText) || (s.email||'').toLocaleLowerCase('ko').includes(queryText)
       ));
       if(!filtered.length){loaded(list,`<div class="roster-empty">${empty(students.length?'조건에 맞는 수강생이 없습니다':'아직 등록된 수강생이 없습니다',students.length?'검색어나 필터를 변경해 주세요.':'강사가 발급한 수강 코드를 공유해 주세요.')}</div>`);return}
-      loaded(list,`<div class="data-table-wrap"><table class="data-table"><thead><tr><th>수강생</th><th>이메일 · 로그인 ID</th><th>수강 상태</th><th>등록일</th><th>출석현황</th><th>강사 메모</th><th>관리</th></tr></thead><tbody>${filtered.map(s=>`<tr><td><div class="name-cell"><span class="name-avatar" aria-hidden="true">${esc((s.studentName||'?').slice(0,1))}</span><div><button class="student-name-link" data-student-attendance="${esc(s.uid)}">${esc(s.studentName)}</button>${s.hasGenericName?'<small>이름 확인 필요</small>':'<small>학습자 프로필</small>'}${duplicateActive.has(s.uid)?`<small class="dup-warning">활성 반 중복 · <button type="button" class="linkbutton" data-keep-class="${esc(s.uid)}">이 반만 남기기</button></small>`:''}</div></div></td><td>${esc(s.email||'—')}</td><td>${s.status==='active'?statusPill('success','수강 중'):statusPill('neutral',s.status==='transferred'?'반 이동':'수강 중지')}</td><td>${fmt(s.joinedAt)}</td><td><button type="button" class="btn secondary small" data-student-attendance="${esc(s.uid)}">출석현황</button></td><td><button type="button" class="btn btn-outline-red small" data-student-memo="${esc(s.uid)}">메모 입력</button></td><td><div class="row-actions"><button type="button" class="btn secondary small" data-edit-name="${esc(s.uid)}">실명 수정</button><button type="button" class="btn soft small" data-move-student="${esc(s.uid)}">반 이동</button><button type="button" class="btn ${s.status==='active'?'danger':'soft'} small" data-status-uid="${esc(s.uid)}">${s.status==='active'?'수강 중지':'재등록'}</button></div></td></tr>`).join('')}</tbody></table></div>`);
-      $$('[data-student-attendance]',list).forEach(el=>el.onclick=()=>{const student=students.find(s=>s.uid===el.dataset.studentAttendance);if(student)showStudentAttendance(student)});
-      $$('[data-student-memo]',list).forEach(el=>el.onclick=async()=>{
-        const student=students.find(x=>x.uid===el.dataset.studentMemo);if(!student)return;const ref=doc(db,'classes',cid,'teacherNotes',student.uid);
-        try{const existing=await getDoc(ref);const previous=existing.exists()?existing.data().text||'':'';
-          const content=await modalDialog({title:`${student.studentName} · 강사 메모`,message:'수업 중 특이사항을 입력해 주세요. 이 메모는 강사 페이지에서만 보이며 학생에게 공개되지 않습니다.',value:previous,multiline:true,maxLength:500,label:'강사 메모',allowEmpty:true,confirmText:'메모 저장'});
-          if(content===null)return;if(content.length>500){toast('메모는 500자 이내로 작성해 주세요.',true);return}
-          if(content.trim())await setDoc(ref,{text:content.trim(),studentUid:student.uid,updatedAt:serverTimestamp(),updatedBy:A.user.uid},{merge:true});else if(existing.exists())await deleteDoc(ref);
-          toast('강사 메모를 저장했습니다.');
-        }catch(e){toast(ex(e),true)}
-      });
-      $$('[data-edit-name]',list).forEach(el=>el.onclick=async()=>{
-        const student=students.find(x=>x.uid===el.dataset.editName);if(!student)return;
-        const name=await modalInput('수강생의 실명을 입력해 주세요. 학생의 별명은 그대로 유지됩니다.',student.realName||'',{title:'실명 수정',label:'실명',maxLength:35});
-        if(name===null)return;
-        const trimmed=name.trim();if(!trimmed||trimmed.length>35){toast('이름을 1~35자로 입력해 주세요.',true);return}
-        try{
-          const nickname=student.nickname&&student.nickname!==trimmed?student.nickname:'';
-          const publicName=nickname||trimmed;
-          await updateDoc(doc(db,'users',student.uid),{realName:trimmed,nickname,displayName:publicName,updatedAt:serverTimestamp()});
-          await updateDoc(doc(db,'enrollments',student.id),{studentName:trimmed});
-          await setDoc(doc(db,'classes',cid,'members',student.uid),{uid:student.uid,name:publicName,status:student.status},{merge:true});
-          Object.assign(student,{realName:trimmed,nickname,publicName,studentName:nickname?`${nickname}(${trimmed})`:trimmed,hasGenericName:false});
-          toast('실명을 수정했습니다.');renderRows();
-        }catch(err){toast(ex(err),true)}
-      });
-      $$('[data-move-student]',list).forEach(el=>el.onclick=async()=>{
-        const student=students.find(x=>x.uid===el.dataset.moveStudent);if(!student)return;
-        const destinations=A.classes.filter(c=>!c.archived&&c.id!==cid);
-        if(!destinations.length){toast('이동할 다른 운영 반을 먼저 개설해 주세요.',true);return}
-        const answer=await modalDialog({title:'반 이동',message:`${student.studentName}님이 이동할 반을 선택해 주세요.`,choices:destinations.map(c=>({value:c.id,label:c.name})),confirmText:'반 이동'});if(answer===null)return;
-        const target=destinations.find(c=>c.id===answer);if(!target){toast('반 번호를 확인해 주세요.',true);return}
-        if(!await modalConfirm(`${student.studentName}님을 ${target.name}(으)로 이동할까요?\n이전 반의 학습 기록은 보존되지만 새 반에 복사되지 않습니다.`,{title:'반 이동',confirmText:'이동하기'}))return;
-        try{await activateEnrollment(student,target.id);toast('수강생의 반 이동이 완료되었습니다.');await showStudents(b)}
-        catch(e){toast(ex(e),true)}
-      });
-      $$('[data-status-uid]',list).forEach(el=>el.onclick=async()=>{
-        const student=students.find(x=>x.uid===el.dataset.statusUid);if(!student)return;
-        try{
-          if(student.status==='active'){
-            if(!await modalConfirm(`${student.studentName}님을 수강 중지할까요?\n학습 기록은 그대로 보존됩니다.`,{title:'수강 상태 변경',confirmText:'수강 중지',danger:true}))return;
-            const batch=writeBatch(db);
-            batch.update(doc(db,'enrollments',student.id),{status:'inactive'});
-            batch.set(doc(db,'classes',cid,'members',student.uid),{uid:student.uid,name:student.publicName,status:'inactive'},{merge:true});
-            addEnrollmentEvent(batch,student.id,'stopped');
-            await batch.commit();
-            toast('수강을 중지했어요.');
-          }else{
-            // D4: 다른 반을 수강 중이면 그 반은 '반 이동'으로 바뀌고 이 반만 수강 중이 됩니다.
-            const others=await otherActiveClasses(student.uid,cid);
-            const message=others.length?`${student.studentName}님은 지금 ${others.map(c=>c.name).join(', ')}을(를) 수강 중이에요.\n이 반(${activeClass()?.name||''})으로 다시 옮길까요?`:`${student.studentName}님을 다시 수강 중으로 바꿀까요?`;
-            if(!await modalConfirm(message,{title:'수강 상태 변경',confirmText:'다시 수강 중으로'}))return;
-            await activateEnrollment(student,cid);
-            toast('다시 수강 중으로 바꿨어요.');
-          }
-          await showStudents(b);
-        }catch(err){toast(ex(err),true)}
+      const head=recent.length?recent.map(w=>shortLabel(w.label).replace('차시','')).join(' · ')+'차시':'지난 수업 없음';
+      loaded(list,`<div class="data-table-wrap"><table class="data-table roster-table"><thead><tr><th scope="col">수강생</th><th scope="col">상태</th><th scope="col">최근 출결 <small>${esc(head)}</small></th><th scope="col">최근 과제 <small>${esc(head)}</small></th><th scope="col"><span class="sr-only">강사 메모</span><span aria-hidden="true">메모</span></th><th scope="col"><span class="sr-only">관리</span></th></tr></thead><tbody>${filtered.map(s=>`<tr data-roster-row="${esc(s.uid)}" class="${A.studentDetailUid===s.uid?'is-selected':''}"><td data-label="수강생"><div class="name-cell"><span class="name-avatar" aria-hidden="true">${esc((s.studentName||'?').slice(0,1))}</span><div><button type="button" class="student-name-link" data-open-detail="${esc(s.uid)}" aria-controls="student-detail">${esc(s.studentName)}</button><small>${esc(s.email||'')}${s.hasGenericName?' · 이름 확인 필요':''}</small>${duplicateActive.has(s.uid)?`<small class="dup-warning">활성 반 중복 · <button type="button" class="linkbutton" data-keep-class="${esc(s.uid)}">이 반만 남기기</button></small>`:''}</div></div></td><td data-label="상태">${statusPillOf(s)}</td><td data-label="최근 출결">${symbols(s,'attendance','출결')}</td><td data-label="최근 과제">${symbols(s,'assignment','과제')}</td><td data-label="메모" class="memo-cell">${notes.has(s.uid)?`<span class="memo-flag" title="강사 메모 있음"><span aria-hidden="true">🔒</span><span class="sr-only">강사 메모 있음</span></span>`:''}</td><td class="menu-cell"><button type="button" class="row-menu-button" data-row-menu="${esc(s.uid)}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(s.studentName)} 관리">⋯</button></td></tr>`).join('')}</tbody></table></div><p class="roster-legend"><span>출결 <b class="is-good">●</b> 출석 <b class="is-bad">○</b> 불참 <b class="is-none">·</b> 미입력</span><span>과제 <b class="is-good">✓</b> 제출 <b class="is-bad">✕</b> 미제출 <b class="is-none">–</b> 과제 없음</span><span>빈칸 수강 전·후</span></p>`);
+      $$('[data-open-detail]',list).forEach(el=>el.onclick=()=>{const s=students.find(x=>x.uid===el.dataset.openDetail);if(s)openStudentDetail(s,ctx)});
+      $$('[data-row-menu]',list).forEach(el=>{
+        const open=()=>{const s=students.find(x=>x.uid===el.dataset.rowMenu);if(!s)return;openRowMenu(el,[
+          {label:'학생 상세 보기',run:()=>openStudentDetail(s,ctx)},
+          {label:'출석현황',attr:`data-student-attendance="${esc(s.uid)}"`,run:()=>showStudentAttendance(s)},
+          {label:notes.has(s.uid)?'강사 메모 수정':'강사 메모 쓰기',attr:`data-student-memo="${esc(s.uid)}"`,run:()=>editTeacherNote(s,ctx)},
+          {label:'실명 수정',attr:`data-edit-name="${esc(s.uid)}"`,run:()=>editRealName(s,ctx,renderRows)},
+          {label:'반 이동',attr:`data-move-student="${esc(s.uid)}"`,run:()=>moveStudent(s,ctx)},
+          {label:s.status==='active'?'수강 중지':'재등록',danger:s.status==='active',attr:`data-status-uid="${esc(s.uid)}"`,run:()=>toggleStudentStatus(s,ctx)},
+        ])};
+        el.onclick=()=>{if(rowMenuState?.button===el)closeRowMenu();else open()};
+        el.onkeydown=e=>{if(e.key==='ArrowDown'){e.preventDefault();open()}};
       });
       $$('[data-keep-class]',list).forEach(el=>el.onclick=async()=>{
         const student=students.find(x=>x.uid===el.dataset.keepClass);if(!student)return;
@@ -1357,26 +1388,166 @@ async function showStudents(b){
     $('#roster-search').addEventListener('input',renderRows);
     $('#roster-status').addEventListener('change',renderRows);
     renderRows();
+    // 대시보드·과제·질문함에서 학생을 골라 왔으면 상세를 엽니다.
+    const want=students.find(s=>s.uid===A.studentDetailUid);
+    if(want)openStudentDetail(want,ctx);else A.studentDetailUid='';
     let initialMemberEvent=true;
     A.live.studentsMembers=onSnapshot(collection(db,'classes',cid,'members'),async()=>{
       if(initialMemberEvent){initialMemberEvent=false;return}
       if(A.page!=='students'||A.classId!==cid||!list.isConnected)return;
-      if(document.activeElement?.matches('input,textarea,select'))return;
+      if(document.activeElement?.matches('input,textarea,select')||rowMenuState)return;
       students=await roster();
       if(A.page!=='students'||A.classId!==cid||!list.isConnected)return;
-      const activeCount=students.filter(x=>x.status==='active').length;
-      $('#roster-count').textContent=activeCount;
-      $('#roster-total').textContent=`${activeCount}명 수강 중 · 전체 ${students.length}명`;
-      renderRows();
+      updateCounts();renderRows();
     },adminLiveError);
     let initial=true;
     A.live.students=onSnapshot(query(collection(db,'enrollments'),where('classId','==',cid)),()=>{
       if(initial){initial=false;return}
       if(A.page!=='students'||A.classId!==cid)return;
-      if(document.activeElement?.matches('input,textarea,select')){toast('수강생 명단에 변경사항이 있습니다. 메뉴를 다시 열면 갱신됩니다.');return}
+      if(document.activeElement?.matches('input,textarea,select')||rowMenuState){toast('수강생 명단에 변경사항이 있습니다. 메뉴를 다시 열면 갱신됩니다.');return}
       showStudents(b);
     },adminLiveError);
   }catch(err){showLoadFailed(list,()=>showStudents(b),err)}
+}
+// ⋯ 메뉴 동작(이전 표의 버튼과 같은 결과)
+async function editTeacherNote(student,ctx){
+  const ref=doc(db,'classes',ctx.cid,'teacherNotes',student.uid);
+  try{const existing=await getDoc(ref);const previous=existing.exists()?existing.data().text||'':'';
+    const content=await modalDialog({title:`${student.studentName} · 강사 메모`,message:'수업 중 특이사항을 입력해 주세요. 이 메모는 강사 페이지에서만 보이며 학생에게 공개되지 않습니다.',value:previous,multiline:true,maxLength:500,label:'강사 메모',allowEmpty:true,confirmText:'메모 저장'});
+    if(content===null)return;if(content.length>500){toast('메모는 500자 이내로 작성해 주세요.',true);return}
+    await saveTeacherNote(ctx,student,content);
+    toast('강사 메모를 저장했습니다.');ctx.rerender();
+  }catch(e){toast(ex(e),true)}
+}
+async function saveTeacherNote(ctx,student,content){
+  const ref=doc(db,'classes',ctx.cid,'teacherNotes',student.uid),text=String(content||'').trim();
+  if(text)await setDoc(ref,{text,studentUid:student.uid,updatedAt:serverTimestamp(),updatedBy:A.user.uid},{merge:true});
+  else await deleteDoc(ref);
+  if(text)ctx.notes.add(student.uid);else ctx.notes.delete(student.uid);
+}
+async function editRealName(student,ctx,after){
+  const name=await modalInput('수강생의 실명을 입력해 주세요. 학생의 별명은 그대로 유지됩니다.',student.realName||'',{title:'실명 수정',label:'실명',maxLength:35});
+  if(name===null)return;
+  const trimmed=name.trim();if(!trimmed||trimmed.length>35){toast('이름을 1~35자로 입력해 주세요.',true);return}
+  try{
+    const nickname=student.nickname&&student.nickname!==trimmed?student.nickname:'';
+    const publicName=nickname||trimmed;
+    await updateDoc(doc(db,'users',student.uid),{realName:trimmed,nickname,displayName:publicName,updatedAt:serverTimestamp()});
+    await updateDoc(doc(db,'enrollments',student.id),{studentName:trimmed});
+    await setDoc(doc(db,'classes',ctx.cid,'members',student.uid),{uid:student.uid,name:publicName,status:student.status},{merge:true});
+    Object.assign(student,{realName:trimmed,nickname,publicName,studentName:nickname?`${nickname}(${trimmed})`:trimmed,hasGenericName:false});
+    toast('실명을 수정했습니다.');after();
+  }catch(err){toast(ex(err),true)}
+}
+async function moveStudent(student,ctx){
+  const destinations=A.classes.filter(c=>!c.archived&&c.id!==ctx.cid);
+  if(!destinations.length){toast('이동할 다른 운영 반을 먼저 개설해 주세요.',true);return}
+  const answer=await modalDialog({title:'반 이동',message:`${student.studentName}님이 이동할 반을 선택해 주세요.`,choices:destinations.map(c=>({value:c.id,label:c.name})),confirmText:'반 이동'});if(answer===null)return;
+  const target=destinations.find(c=>c.id===answer);if(!target){toast('반 번호를 확인해 주세요.',true);return}
+  if(!await modalConfirm(`${student.studentName}님을 ${target.name}(으)로 이동할까요?\n이전 반의 학습 기록은 보존되지만 새 반에 복사되지 않습니다.`,{title:'반 이동',confirmText:'이동하기'}))return;
+  try{await activateEnrollment(student,target.id);toast('수강생의 반 이동이 완료되었습니다.');await ctx.rerender()}
+  catch(e){toast(ex(e),true)}
+}
+async function toggleStudentStatus(student,ctx){
+  const cid=ctx.cid;
+  try{
+    if(student.status==='active'){
+      if(!await modalConfirm(`${student.studentName}님을 수강 중지할까요?\n학습 기록은 그대로 보존됩니다.`,{title:'수강 상태 변경',confirmText:'수강 중지',danger:true}))return;
+      const batch=writeBatch(db);
+      batch.update(doc(db,'enrollments',student.id),{status:'inactive'});
+      batch.set(doc(db,'classes',cid,'members',student.uid),{uid:student.uid,name:student.publicName,status:'inactive'},{merge:true});
+      addEnrollmentEvent(batch,student.id,'stopped');
+      await batch.commit();
+      toast('수강을 중지했어요.');
+    }else{
+      // D4: 다른 반을 수강 중이면 그 반은 '반 이동'으로 바뀌고 이 반만 수강 중이 됩니다.
+      const others=await otherActiveClasses(student.uid,cid);
+      const message=others.length?`${student.studentName}님은 지금 ${others.map(c=>c.name).join(', ')}을(를) 수강 중이에요.\n이 반(${activeClass()?.name||''})으로 다시 옮길까요?`:`${student.studentName}님을 다시 수강 중으로 바꿀까요?`;
+      if(!await modalConfirm(message,{title:'수강 상태 변경',confirmText:'다시 수강 중으로'}))return;
+      await activateEnrollment(student,cid);
+      toast('다시 수강 중으로 바꿨어요.');
+    }
+    await ctx.rerender();
+  }catch(err){toast(ex(err),true)}
+}
+
+// ===== 학생 상세 (배치 11 · P3-01) =====
+// 기본 정보 · 최근 차시 요약 · 과제 · 복습 · 질문 · 강사 메모(강사 전용) · 다음 학습 목표(학생에게 공개). 열 때 필요한 것만 읽고, 차시가 많으면 최근 8차시부터 보여 줍니다.
+async function openStudentDetail(student,ctx,{all=false}={}){
+  const panel=$('#student-detail'),ws=$('#students-workspace');if(!panel||!ws)return;
+  A.studentDetailUid=student.uid;
+  $$('[data-roster-row]').forEach(tr=>tr.classList.toggle('is-selected',tr.dataset.rosterRow===student.uid));
+  ws.classList.add('has-detail');panel.hidden=false;document.body.classList.add('detail-open');
+  const head=`<div class="detail-head"><button type="button" class="btn ghost small detail-back" data-detail-close>← 목록</button><div class="detail-title"><span class="name-avatar" aria-hidden="true">${esc((student.studentName||'?').slice(0,1))}</span><div><h2 id="student-detail-title" tabindex="-1">${esc(student.studentName)}</h2><p class="hint">${esc(student.email||'')}</p></div></div><button type="button" class="app-modal-x detail-x" data-detail-close aria-label="학생 상세 닫기">×</button></div>`;
+  panel.setAttribute('aria-labelledby','student-detail-title');
+  panel.innerHTML=head+'<div class="loading">학생 기록을 모으는 중입니다</div>';
+  const wire=()=>$$('[data-detail-close]',panel).forEach(el=>el.onclick=()=>closeStudentDetail());
+  wire();
+  if(matchMedia('(max-width:900px)').matches)window.scrollTo(0,0);
+  const cid=ctx.cid,uid=student.uid,today=todayKey();
+  const weeks=datedWeeks(),held=weeks.filter(w=>['done','today'].includes(sessionState(w,today)));
+  const shown=all?held:held.slice(-DETAIL_SESSIONS);
+  try{
+    const read=ref=>getDoc(ref).then(d=>d.exists()?d.data():null);
+    const [records,events,note,goal,questionsSnap]=await Promise.all([
+      Promise.all(shown.map(async w=>{const base=['classes',cid,'weeks',w.id];const [att,sub,quiz]=await Promise.all([read(doc(db,...base,'attendance',uid)),read(doc(db,...base,'submissions',uid)),read(doc(db,...base,'quizResults',uid))]);return {w,att,sub,quiz}})),
+      ctx.events?Promise.resolve(ctx.events[student.id]||[]):readEnrollmentEvents([student]).then(x=>x?x[student.id]:null),
+      read(doc(db,'classes',cid,'teacherNotes',uid)),
+      read(doc(db,'classes',cid,'studentGoals',uid)).catch(()=>null), // 학습 목표 규칙을 게시하기 전에는 비워 둡니다
+      getDocs(query(collection(db,'classes',cid,'questions'),where('uid','==',uid))),
+    ]);
+    if(A.studentDetailUid!==uid||!panel.isConnected)return;
+    const docsFor=key=>Object.fromEntries(records.map(r=>[r.w.id,r[key]?[{id:uid,...r[key]}]:[]]));
+    const d=computeDashboard({sessions:records.map(r=>r.w),enrollments:[student],events:events===null?null:{[student.id]:events||[]},names:{[uid]:student.studentName},attendance:docsFor('att'),submissions:docsFor('sub'),quizResults:docsFor('quiz'),questions:[]},today,DASH_DEPS);
+    const row=d.grid.rows[0],cells=row?.cells||[];
+    // 1. 기본 정보
+    const history=(events||[]).filter(e=>EVENT_TEXT[e.type]).sort((a,b)=>(toDate(a.at)?.getTime()||0)-(toDate(b.at)?.getTime()||0));
+    const className=id=>A.classes.find(c=>c.id===id)?.name||'다른 반';
+    const basic=`<section class="detail-section" aria-labelledby="detail-basic"><h3 id="detail-basic">기본 정보</h3><dl class="info-grid"><dt>실명</dt><dd>${esc(student.realName||'확인 필요')}</dd><dt>별명</dt><dd>${esc(student.nickname||'—')}</dd><dt>이메일</dt><dd>${esc(student.email||'—')}</dd><dt>반</dt><dd>${esc(activeClass()?.name||'')}</dd><dt>등록일</dt><dd>${esc(shortDate(student.joinedAt))}</dd><dt>수강 상태</dt><dd>${statusPillOf(student)}</dd></dl>${events===null?'<p class="hint">수강 기간 기록을 읽지 못했어요(보안 규칙 게시 후 표시).</p>':history.length?`<ol class="detail-timeline" aria-label="수강 기간 기록">${history.map(e=>`<li><span>${esc(formatDateTime(e.at,{time:false}))}</span>${esc(EVENT_TEXT[e.type])}${e.type==='transferred_out'&&e.toClassId?` · ${esc(className(e.toClassId))}`:''}${e.type==='transferred_in'&&e.fromClassId?` · ${esc(className(e.fromClassId))}에서`:''}</li>`).join('')}</ol>`:'<p class="hint">수강 기간 기록이 없어요(이전 데이터는 등록일 기준).</p>'}</section>`;
+    // 2. 최근 차시 요약(진행표와 같은 기호)
+    const gs=d.grid.sessions;
+    const quizText=c=>{const q=c?.quiz;if(!q||(!c.target&&!c.outside))return '';if(q==='none')return '–';if(q==='missing')return '미응시';return q.kind==='first'?Math.round(q.pct)+'%':'응시'};
+    const summary=gs.length?`<section class="detail-section" aria-labelledby="detail-summary"><h3 id="detail-summary">최근 ${gs.length}차시</h3><div class="dash-grid-scroll" tabindex="0" aria-label="최근 차시 요약 (가로로 스크롤)"><table class="dash-grid detail-grid"><thead><tr><th scope="col" class="dash-grid-name">항목</th>${gs.map(s=>`<th scope="col" title="${esc(s.label)}">${esc(s.short)}<small>${esc(monthDay(s.date))}</small></th>`).join('')}</tr></thead><tbody><tr><th scope="row" class="dash-grid-name">출결</th>${cells.map((c,i)=>`<td class="dash-cell">${symbolCell('attendance',c,gs[i].short+' 출결')}</td>`).join('')}</tr><tr><th scope="row" class="dash-grid-name">과제</th>${cells.map((c,i)=>`<td class="dash-cell">${symbolCell('assignment',c,gs[i].short)}</td>`).join('')}</tr><tr><th scope="row" class="dash-grid-name">복습 첫 응시</th>${cells.map(c=>`<td class="dash-cell is-score">${esc(quizText(c))}</td>`).join('')}</tr></tbody></table></div></section>`:'<section class="detail-section"><h3>최근 차시</h3><p class="hint">아직 지난 수업이 없어요.</p></section>';
+    // 3. 과제: 차시별 제출 회차, 최근 피드백, 제출 보기(회차 비교)
+    const latestFeedback=x=>[...feedbackItems(x)].sort((a,b)=>(toDate(b.createdAt)?.getTime()||0)-(toDate(a.createdAt)?.getTime()||0))[0];
+    const asgRows=records.filter(r=>r.w.assignment?.enabled||r.sub).reverse();
+    const assignment=`<section class="detail-section" aria-labelledby="detail-assignment"><h3 id="detail-assignment">과제</h3>${asgRows.length?`<ul class="detail-list">${asgRows.map(r=>{const s=r.sub,fb=s?latestFeedback(s):null,rev=Number(s?.revision)||1;return `<li><div class="between"><strong>${esc(shortLabel(r.w.label))}</strong>${s?statusPill(...REVIEW_LABEL[reviewState(s)]):statusPill('neutral','미제출')}</div>${s?`<p class="hint">${rev>1?`${rev}차 제출 · `:''}${esc(formatDateTime(s.latestSubmittedAt||s.submittedAt))}</p>`:''}${fb?`<p class="detail-quote">${esc(String(fb.text||'음성 피드백').slice(0,90))}${String(fb.text||'').length>90?'…':''}</p>`:''}${s?`<button type="button" class="linkbutton" data-go-feedback="${esc(r.w.id)}">${rev>1?'제출 비교 보기 →':'제출 보기 →'}</button>`:''}</li>`}).join('')}</ul>`:'<p class="hint">과제가 열린 차시가 없어요.</p>'}</section>`;
+    // 4. 복습: 첫 응시 → 최근 응시(n 표시). 첫 응시를 알 수 없는 이전 기록은 따로 표시
+    const quizRows=records.filter(r=>(r.w.quiz?.enabled&&r.w.quiz.questions?.length)||r.quiz).reverse();
+    const pctOf=(sc,t)=>`${Number(sc)||0}/${Number(t)||0} · ${Math.round(100*(Number(sc)||0)/Math.max(1,Number(t)||1))}%`;
+    const quiz=`<section class="detail-section" aria-labelledby="detail-quiz"><h3 id="detail-quiz">복습</h3>${quizRows.length?`<table class="data-table detail-table"><thead><tr><th scope="col">차시</th><th scope="col">첫 응시</th><th scope="col">최근 응시</th><th scope="col">응시</th></tr></thead><tbody>${quizRows.map(r=>{const q=r.quiz,first=q?firstAttemptOf(q):null;return `<tr><th scope="row">${esc(shortLabel(r.w.label))}</th><td>${!q?'<span class="hint">미응시</span>':first.kind==='first'?esc(pctOf(q.firstAttempt.score,q.firstAttempt.total)):'<span class="hint" title="첫 응시를 알 수 없는 이전 기록">미상(이전 기록)</span>'}</td><td>${q?esc(pctOf(q.score,q.total)):'—'}</td><td>${q?`${Number(q.attemptCount)||1}회`:'—'}</td></tr>`}).join('')}</tbody></table>`:'<p class="hint">복습이 열린 차시가 없어요.</p>'}</section>`;
+    // 5. 질문
+    const questions=questionsSnap.docs.map(x=>({id:x.id,...x.data()})).sort(byLastActivity).slice(0,5);
+    const qs=`<section class="detail-section" aria-labelledby="detail-questions"><h3 id="detail-questions">질문 <small>${questionsSnap.size}건</small></h3>${questions.length?`<ul class="detail-list">${questions.map(q=>`<li><button type="button" class="detail-question" data-go-question="${esc(q.id)}"><span>${adminQuestionTag(q)?`<span class="question-session-tag">${esc(adminQuestionTag(q))}</span>`:''}${esc(q.title||'제목 없음')}</span>${needsReply(q)?statusPill('warning','답변 대기'):statusPill('success','답변 완료')}</button></li>`).join('')}</ul>`:'<p class="hint">아직 질문이 없어요.</p>'}</section>`;
+    // 6. 강사 메모(강사 전용) · 7. 다음 학습 목표(학생 홈에 공개)
+    const memo=`<section class="detail-section detail-private" aria-labelledby="detail-memo"><div class="between"><h3 id="detail-memo"><span aria-hidden="true">🔒</span> 강사 메모</h3><span class="private-label">강사만 볼 수 있어요</span></div><label class="sr-only" for="detail-memo-text">강사 메모</label><textarea id="detail-memo-text" rows="4" maxlength="500" placeholder="수업 중 특이사항(학생에게 보이지 않아요)">${esc(note?.text||'')}</textarea><div class="between"><span class="hint">${note?.updatedAt?`마지막 저장 ${esc(formatDateTime(note.updatedAt))}`:'Ctrl+Enter(Mac은 ⌘+Enter)로 저장'}</span><button type="button" class="btn small" id="detail-memo-save">메모 저장</button></div></section>`;
+    const goalSection=`<section class="detail-section detail-goal" aria-labelledby="detail-goal-title"><div class="between"><h3 id="detail-goal-title">다음 학습 목표</h3><span class="public-label">학생 홈에 보여요</span></div><label class="sr-only" for="detail-goal-text">다음 학습 목표</label><input id="detail-goal-text" maxlength="200" value="${esc(goal?.text||'')}" placeholder="예: 다음 과제에서는 연결 표현(pero, porque)을 2개 써 보기"><div class="between"><span class="hint">한 줄로, 다음에 해 볼 구체적인 행동을 적어 주세요.</span><div class="row"><button type="button" class="btn ghost small" id="detail-goal-clear" ${goal?.text?'':'disabled'}>지우기</button><button type="button" class="btn small" id="detail-goal-save">목표 저장</button></div></div></section>`;
+    const more=!all&&held.length>shown.length?`<button type="button" class="btn secondary small detail-more" id="detail-more">이전 차시 ${held.length-shown.length}개 더 보기</button>`:'';
+    panel.innerHTML=head+`<div class="detail-body">${basic}${summary}${assignment}${quiz}${more}${qs}${memo}${goalSection}</div>`;
+    wire();
+    $('#detail-more',panel)?.addEventListener('click',()=>openStudentDetail(student,ctx,{all:true}));
+    $$('[data-go-feedback]',panel).forEach(el=>el.onclick=()=>navigateAdminPage('feedback',{weekId:el.dataset.goFeedback,feedbackTab:'submissions',feedbackFilter:'all',feedbackSelectedUid:uid}));
+    $$('[data-go-question]',panel).forEach(el=>el.onclick=()=>navigateAdminPage('questions',{questionFilter:'all',activeQuestionId:el.dataset.goQuestion}));
+    const memoText=$('#detail-memo-text',panel),memoSave=$('#detail-memo-save',panel);
+    const saveMemo=async()=>{memoSave.disabled=true;try{await saveTeacherNote(ctx,student,memoText.value);toast('강사 메모를 저장했습니다.');const flag=$(`[data-roster-row="${CSS.escape(uid)}"] .memo-cell`);if(flag)flag.innerHTML=ctx.notes.has(uid)?'<span class="memo-flag" title="강사 메모 있음"><span aria-hidden="true">🔒</span><span class="sr-only">강사 메모 있음</span></span>':''}catch(e){toast(ex(e),true)}finally{memoSave.disabled=false}};
+    memoSave.onclick=saveMemo;
+    memoText.addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)&&!isComposingKey(e)){e.preventDefault();saveMemo()}});
+    const goalInput=$('#detail-goal-text',panel),goalSave=$('#detail-goal-save',panel),goalClear=$('#detail-goal-clear',panel);
+    const saveGoal=async text=>{goalSave.disabled=true;try{const ref=doc(db,'classes',cid,'studentGoals',uid);if(text)await setDoc(ref,{text,updatedAt:serverTimestamp(),updatedBy:A.user.uid});else await deleteDoc(ref);goalInput.value=text;goalClear.disabled=!text;toast(text?'학습 목표를 저장했어요. 학생 홈에 보여요.':'학습 목표를 지웠어요.')}catch(e){toast(ex(e),true)}finally{goalSave.disabled=false}};
+    goalSave.onclick=()=>saveGoal(goalInput.value.trim());
+    goalClear.onclick=()=>saveGoal('');
+    goalInput.addEventListener('keydown',e=>{if(e.key==='Enter'&&!isComposingKey(e)){e.preventDefault();saveGoal(goalInput.value.trim())}});
+    useMediaPaths(panel);
+    $('#student-detail-title',panel)?.focus({preventScroll:true});
+  }catch(err){if(panel.isConnected){panel.innerHTML=head;wire();panel.insertAdjacentHTML('beforeend','<div data-detail-error></div>');showLoadFailed($('[data-detail-error]',panel),()=>openStudentDetail(student,ctx,{all}),err)}}
+}
+function closeStudentDetail(){
+  const panel=$('#student-detail'),ws=$('#students-workspace'),uid=A.studentDetailUid;
+  A.studentDetailUid='';document.body.classList.remove('detail-open');
+  if(panel){panel.hidden=true;panel.innerHTML=''}
+  ws?.classList.remove('has-detail');
+  $$('[data-roster-row]').forEach(tr=>tr.classList.remove('is-selected'));
+  if(uid)$(`[data-open-detail="${CSS.escape(uid)}"]`)?.focus();
 }
 if(CONFIGURED){onAuthStateChanged(auth,async user=>{try{if(!user){resetAdminSession();mountAuth(root,{signup:false,variant:'admin'});return}root.innerHTML='<div class="loading" style="min-height:95vh">강사 권한을 확인하고 있습니다</div>';A.user=user;const snap=await getDoc(doc(db,'users',user.uid));if(!snap.exists()||snap.data().role!=='admin'){root.innerHTML=`<div class="card" style="max-width:620px;margin:8vh auto"><div class="eyebrow">ACCESS CONTROL</div><h2>강사 권한이 필요합니다</h2><p style="margin-top:12px">관리자 계정은 가입만으로 생성되지 않습니다. Firebase Authentication에 강사 계정을 만든 뒤, Firestore <code>users/${esc(user.uid)}</code> 문서의 <code>role</code> 필드를 <code>admin</code>으로 등록해 주세요.</p><div class="subtle" style="margin-top:18px"><strong>현재 로그인 UID</strong><p style="overflow-wrap:anywhere">${esc(user.uid)}</p></div><div class="row" style="margin-top:18px"><button class="btn secondary" id="admin-signout">다른 계정으로 로그인</button><a class="btn soft" href="index.html">수강생 페이지</a></div></div>`;$('#admin-signout').onclick=()=>{resetAdminSession();signOut(auth)};return}A.profile=snap.data();await loadAdmin()}catch(err){root.innerHTML=`<div class="card" style="max-width:570px;margin:60px auto"><h3>관리자 페이지 불러오기 실패</h3><p class="error">${esc(ex(err))}</p><button class="btn secondary" onclick="location.reload()">새로고침</button></div>`}})}else mountAuth(root,{signup:false});
 
