@@ -1546,6 +1546,16 @@ test('NT05 공지사항: 공지 규칙을 게시하기 전(v3)에도 학생 홈�
   assert((await r.page.innerText('#notice-admin-list')).includes('보안 규칙'), '강사 화면 권한 안내: ' + await r.page.innerText('#notice-admin-list'));
 });
 
+test('CP01 수강 코드 복사: 안내문 없이 코드만 복사하고, 버튼 이름에 코드와 동작을 밝힘', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  await page.click('[data-page="classes"]'); await pause(page, 500);
+  await page.evaluate(() => { window.__copied = []; navigator.clipboard.writeText = t => { window.__copied.push(t); return Promise.resolve(); }; });
+  assert((await page.getAttribute('[data-copy-class="c1"]', 'aria-label')) === '수강 코드 HOLA2026 복사', '버튼 이름: ' + await page.getAttribute('[data-copy-class="c1"]', 'aria-label'));
+  await page.click('[data-copy-class="c1"]'); await pause(page, 300);
+  eq(await page.evaluate(() => window.__copied), ['HOLA2026'], '복사한 글자');
+  assert((await lastToast(page)).includes('HOLA2026'), '복사 안내: ' + await lastToast(page));
+});
+
 test('기본: 학생 과제 텍스트 제출, 퀴즈 3/3, 강사 화면 주요 메뉴 오류 없음', async b => {
   const r = await openAs(b, 'index.html', 's2', { viewport: { width: 390, height: 844 } });
   await r.page.selectOption('#student-week-picker', 'w4'); await pause(r.page, 700);
