@@ -1,3 +1,5 @@
 tests/.cache/
 tests/screenshots/
 tests/node_modules/
+tests/rules/node_modules/
+tests/rules/*.log
