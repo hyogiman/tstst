@@ -15,8 +15,8 @@
 <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;1,9..144,500&display=swap">
 <!-- 배포할 때 CSS를 바꾸면 ?v= 값을 함께 올려 브라우저 캐시를 갱신하세요 -->
-<link rel="stylesheet" href="common.css?v=20261029l">
-<link rel="stylesheet" href="admin.css?v=20261029l">
+<link rel="stylesheet" href="common.css?v=20261029m">
+<link rel="stylesheet" href="admin.css?v=20261029m">
 </head>
 <body>
 <div id="root"></div>
@@ -36,8 +36,8 @@ window.__appStarted=true; // 모듈(외부 SDK 포함)을 모두 불러와 앱�
 import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import { doc, getDoc, getDocs, collection, query, where, setDoc, updateDoc, deleteDoc, serverTimestamp, arrayUnion, onSnapshot, writeBatch, runTransaction, deleteField } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
 import { ref as storageRef, deleteObject } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-storage.js';
-import { CONFIGURED, auth, db, storage, $, $$, esc, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, mountAuth, formatDuration, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalDialog, modalConfirm, modalInput, formatDateTime, todayKey, statusPill, paintPill, needsReply, linkifyText, sortNotices, IS_MAC, byLastActivity, feedbackItems, reviewState, REVIEW_LABEL, openModalLayer, toDate, quizContentKey, answersFor, audioMarkup, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded, modalChoice, sessionState, sessionDateText, parseYouTube, SIZE_LABEL, uploadsInProgress, filePicker, wireFilePickers, wasActiveAt, daysBetween, partsInZone, attendanceValue, normalizeQuizQuestion, isCorrectAnswer, questionSessionTag, shortLabel, isComposingKey } from './common.js?v=20261029l';
-import { computeDashboard, analyzeQuiz, feedbackQueue, firstAttemptOf, WATCH_RULES, TREND_SESSIONS } from './dashboard.js?v=20261029l';
+import { CONFIGURED, auth, db, storage, $, $$, esc, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, mountAuth, formatDuration, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalDialog, modalConfirm, modalInput, formatDateTime, todayKey, statusPill, paintPill, needsReply, linkifyText, sortNotices, IS_MAC, byLastActivity, feedbackItems, reviewState, REVIEW_LABEL, openModalLayer, toDate, quizContentKey, answersFor, audioMarkup, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded, modalChoice, sessionState, sessionDateText, parseYouTube, SIZE_LABEL, uploadsInProgress, filePicker, wireFilePickers, wasActiveAt, daysBetween, partsInZone, attendanceValue, normalizeQuizQuestion, isCorrectAnswer, questionSessionTag, shortLabel, isComposingKey } from './common.js?v=20261029m';
+import { computeDashboard, analyzeQuiz, feedbackQueue, firstAttemptOf, WATCH_RULES, TREND_SESSIONS } from './dashboard.js?v=20261029m';
 
 
 // ===== ADMIN PAGE =====

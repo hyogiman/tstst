@@ -450,7 +450,7 @@ button.dash-action:hover{border-color:var(--wine-200);box-shadow:var(--shadow-md
   .admin-shell{display:block}
   .sidebar{position:relative;height:auto;flex-direction:row;align-items:center;gap:6px;border-right:0;border-bottom:1px solid var(--line);overflow:visible}
   .sidebar-identity{margin:10px 0 10px 12px;padding:10px 12px;flex-shrink:0;column-gap:9px}
-  .sidebar-identity img{width:22px;height:30px}
+  .sidebar-identity img{width:22px;height:30px;grid-row:auto} /* 위 줄 글자를 숨기므로 그림도 한 줄만 차지해야 글자가 세로 가운데에 옵니다 */
   .sidebar-identity span{display:none}
   .sidebar-identity strong{font-size:16px}
   .side-nav{flex-direction:row;overflow-x:auto;padding:8px 12px 8px 4px;scrollbar-width:none}
