@@ -310,3 +310,11 @@ a.media-item:hover{border-color:var(--wine-200);background:var(--wine-50);color:
   .live-notice{top:auto;bottom:100px;font-size:13px}
 }
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important}}
+
+/* ---------- 시작 실패 · 오프라인 · 불러오기 실패 · 임시 저장 (P1-07, P1-08) ---------- */
+.boot-error{max-width:520px;margin:12vh auto;padding:28px 24px;border-radius:var(--r-lg);background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow-md);text-align:center}
+.boot-error h2{margin-bottom:10px}
+.boot-error p{color:var(--ink-2);margin-bottom:18px}
+.offline-banner{position:fixed;top:0;left:0;right:0;z-index:90;padding:10px 16px;background:var(--warning-bg);color:var(--warning);border-bottom:1px solid #f5ddb4;font-size:14px;font-weight:700;text-align:center}
+.load-failed{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 16px;border-radius:12px;background:var(--danger-bg);border:1px solid #f6cfcb;color:var(--danger);font-size:14px;font-weight:600}
+.draft-notice{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}

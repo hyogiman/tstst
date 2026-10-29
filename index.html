@@ -15,20 +15,32 @@
 <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;1,9..144,500&display=swap">
 <!-- 배포할 때 CSS를 바꾸면 ?v= 값을 함께 올려 브라우저 캐시를 갱신하세요 -->
-<link rel="stylesheet" href="common.css?v=20261029d">
-<link rel="stylesheet" href="student.css?v=20261029d">
+<link rel="stylesheet" href="common.css?v=20261029e">
+<link rel="stylesheet" href="student.css?v=20261029e">
 </head>
 <body>
 <div id="root"></div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
+<!-- P1-08: Firebase 등 외부 스크립트를 불러오지 못하면(회사·학교 네트워크 차단 등) 백지 대신 안내를 보여 줍니다. -->
+<noscript><div class="boot-error" role="alert"><h2>자바스크립트가 꺼져 있어요</h2><p>이 학습 공간은 자바스크립트가 필요합니다. 브라우저 설정에서 자바스크립트를 켠 뒤 새로고침해 주세요.</p></div></noscript>
+<script>
+setTimeout(function(){
+  if(window.__appStarted)return;
+  var root=document.getElementById('root');if(!root)return;
+  root.innerHTML='<div class="boot-error" role="alert"><h2>화면을 불러오지 못했어요</h2><p>네트워크를 확인하고 새로고침해 주세요. 회사·학교 네트워크라면 다른 네트워크(휴대폰 데이터 등)로 시도해 보세요.</p><button type="button" class="btn" onclick="location.reload()">새로고침</button></div>';
+},window.__BOOT_TIMEOUT_MS||8000);
+</script>
 <script type="module">
+window.__appStarted=true; // 모듈(외부 SDK 포함)을 모두 불러와 앱이 시작되었다는 신호
 
 import { onAuthStateChanged, updateProfile, signOut } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import { doc, getDoc, getDocs, collection, query, where, addDoc, setDoc, updateDoc, serverTimestamp, onSnapshot, runTransaction, writeBatch } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
-import { CONFIGURED, auth, db, $, $$, esc, fmt, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, ensureProfile, mountAuth, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalConfirm, formatDateTime, statusPill, paintPill, needsReply, byLastActivity, feedbackItems, reviewState, toDate, todayKey, daysBetween, audioMarkup, parseAnswer, encodeAnswer, questionKey } from './common.js?v=20261029d';
+import { CONFIGURED, auth, db, $, $$, esc, fmt, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, ensureProfile, mountAuth, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalConfirm, formatDateTime, statusPill, paintPill, needsReply, byLastActivity, feedbackItems, reviewState, toDate, todayKey, daysBetween, audioMarkup, parseAnswer, encodeAnswer, questionKey, setErrorAudience, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded } from './common.js?v=20261029e';
 
 
 // ===== INDEX PAGE =====
+setErrorAudience('student'); // P1-08: 학생에게는 개발 용어 없는 오류 문구
+installOfflineBanner();
 const root=$('#root');
 // 로그아웃하면 이 초기값으로 되돌립니다(P0-09).
 const studentInitialState=()=>({user:null,profile:null,classes:[],classId:'',weeks:[],weekId:'',tab:'assignment',quiz:null,live:{},activeQuestionId:'',directory:[],enrollmentRealName:'',enrollments:[],hadEnrollment:false,audioDrafts:{},joining:false,pastClasses:[],past:null,seenMarked:{}});
@@ -152,7 +164,13 @@ window.addEventListener('popstate',e=>{if(!S.user||!document.querySelector('.stu
 function frame(){
   enterStudentHistory();
   root.innerHTML=`<div class="student-app"><header class="student-header"><div class="brand"><div class="logo"><img src="senorayu-mark.svg" alt="쎄뇨라유 스페인어 로고"></div><div><strong>쎄뇨라유 스페인어</strong><small>MI ESPACIO DE ESPAÑOL</small></div></div><div class="row"><span class="pill user-pill">${esc(((S.profile?.displayName==='수강생'&&S.user?.displayName)?S.user.displayName:S.profile?.displayName)||S.user?.displayName||'수강생')} 님</span><button id="student-logout" class="btn ghost small">로그아웃</button></div></header>${S.past?`<div class="past-banner" role="note"><div><strong>지난 반 · ${esc(currentClass()?.name||'')}</strong><span>수업이 끝난 반이에요. 기록은 읽기만 할 수 있고, 강의 영상은 볼 수 없어요.</span></div><button type="button" class="btn secondary small" id="past-exit">돌아가기</button></div>`:''}<main id="student-body"></main></div><nav class="student-nav ${S.past?'is-past':''}" aria-label="하단 메뉴"><div class="student-nav-inner">${(S.past?NAV.filter(([key])=>key!=='classmates'):NAV).map(([key,icon,label])=>`<button type="button" class="nav-item ${S.tab===key?'active':''}" data-tab="${key}" aria-label="${label}"><span class="nav-icon">${navIcon(icon)}</span><span>${label}</span></button>`).join('')}</div></nav>`;
-  $('#student-logout').addEventListener('click',()=>{resetStudentSession();signOut(auth)}); // P0-09: 구독을 먼저 끊고 로그아웃
+  $('#student-logout').addEventListener('click',async()=>{
+    // P1-07: 공용 PC에서 다음 사람이 보지 않도록 이 기기의 임시 저장 답안을 지웁니다.
+    flushAssignmentDraft();
+    if(drafts.countFor(S.user.uid)&&!(await modalConfirm('로그아웃하면 이 기기에 임시 저장된 답안이 지워져요. 로그아웃할까요?',{title:'로그아웃',confirmText:'로그아웃'})))return;
+    drafts.clearUser(S.user.uid);
+    resetStudentSession();signOut(auth); // P0-09: 구독을 먼저 끊고 로그아웃
+  });
   $('#past-exit')?.addEventListener('click',closePastClass);
   $$('[data-tab]').forEach(b=>b.addEventListener('click',()=>{S.tab=b.dataset.tab;history.pushState({senorayuStudent:true,tab:S.tab},'','#'+S.tab);S.quiz=null;renderBody()}));
   renderBody();
@@ -161,6 +179,7 @@ function bodyHeader(title,description){return `<div class="page-head"><div class
 function weekHeader(title,description){return `<div class="section-title"><div>${bodyHeader(title,description)}</div>${S.weeks.length?wselect():''}</div>`}
 function weeklyPicker(){ $('#student-week-picker')?.addEventListener('change',e=>{S.weekId=e.target.value;S.quiz=null;renderBody()}) }
 function renderBody(){
+  flushAssignmentDraft(); // P1-07: 화면을 옮기기 전에 작성 중인 답안을 임시 저장
   stopRecordingForNavigation(); // P0-02: 화면을 옮기면 녹음을 멈춥니다.
   clearPageLive();$$('.nav-item').forEach(el=>el.classList.toggle('active',el.dataset.tab===S.tab));const body=$('#student-body');if(!body)return;
   if(!S.classes.length){renderJoin(body);return}
@@ -235,7 +254,7 @@ function resetStudentSession(){
   for(const k of Object.keys(S.live))stopLive(k);
   Object.assign(S,studentInitialState());
 }
-window.addEventListener('beforeunload',e=>{if(S.user&&studentHasUnsavedWork()){e.preventDefault();e.returnValue=''}});
+window.addEventListener('beforeunload',e=>{flushAssignmentDraft();if(S.user&&studentHasUnsavedWork()){e.preventDefault();e.returnValue=''}});
 // 지난 반 자료 보기: 그 반의 공개 차시를 읽기 전용으로 보여 줍니다. 강의 영상은 보여 주지 않습니다.
 async function openPastClass(cid){
   const cls=S.pastClasses.find(c=>c.id===cid);if(!cls)return;
@@ -299,6 +318,24 @@ function wireRevisionHistory(container,wid,latest){
     }catch(e){console.error('이전 제출 조회 실패',e);loaded(list,'<p class="error">이전 제출을 불러오지 못했어요.</p>')}
   });
 }
+// P1-07: 작성 중인 답안을 이 기기에 임시 저장(입력 후 0.5초)하고, 다시 열면 복원합니다. 제출하면 지웁니다.
+// 키에 학생 uid가 들어가 다른 계정에는 보이지 않습니다.
+let pendingDraft=null;
+function flushAssignmentDraft(){if(!pendingDraft)return;clearTimeout(pendingDraft.timer);drafts.set(pendingDraft.key,pendingDraft.value);pendingDraft=null}
+const assignmentStoreKey=wid=>draftKey(S.user.uid,S.classId,wid,'assignment');
+function wireAssignmentDraft(area,wid,saved){
+  const text=$('#assignment-text',area);if(!text)return;
+  const key=assignmentStoreKey(wid),stored=drafts.get(key);
+  if(stored&&stored!==saved){
+    text.value=stored;
+    text.closest('.field').insertAdjacentHTML('beforebegin','<p class="notice draft-notice" data-draft-notice><span>이 기기에 임시 저장된 답안을 불러왔어요.</span><button type="button" class="btn ghost small" data-clear-draft>임시 저장본 지우기</button></p>');
+    $('[data-clear-draft]',area).onclick=()=>{drafts.remove(key);if(pendingDraft?.key===key){clearTimeout(pendingDraft.timer);pendingDraft=null}text.value=saved;$('[data-draft-notice]',area)?.remove();toast('임시 저장본을 지웠어요.')};
+  }else if(stored)drafts.remove(key);
+  text.addEventListener('input',()=>{
+    if(pendingDraft)clearTimeout(pendingDraft.timer);
+    pendingDraft={key,value:text.value===saved?'':text.value,timer:setTimeout(flushAssignmentDraft,500)};
+  });
+}
 // 피드백을 본 시각(P1-05): 마지막으로 본 뒤 새 피드백이 있을 때만 한 번 기록합니다(새 소식 배지의 기준).
 async function markFeedbackSeen(kind,wid,data){
   if(S.past||!data)return;
@@ -315,7 +352,10 @@ async function renderAssignment(body){
   body.innerHTML=weekHeader('과제',S.past?'제출한 답안과 선생님의 피드백을 다시 볼 수 있어요.':'말하기와 쓰기를 차근차근 연습해 보세요.');weeklyPicker();
   if(!w.assignment?.enabled){body.insertAdjacentHTML('beforeend',empty('이 주차의 과제는 아직 열리지 않았습니다','강사가 과제를 공개하면 여기서 제출할 수 있습니다.'));return}
   body.insertAdjacentHTML('beforeend',`<div class="card stack"><div class="between"><div><h2>${esc(w.assignment.title||'스페인어 과제')}</h2></div><span class="pill brand">TAREA</span></div><div class="subtle article" style="white-space:pre-wrap">${esc(w.assignment.instructions||'과제 내용을 확인해 주세요.')}</div>${dueLine(w.assignment)}<div id="assignment-form-area" class="stack"><div class="loading">제출 기록 확인 중</div></div></div>`);
-  const snap=await getDoc(doc(db,'classes',S.classId,'weeks',w.id,'submissions',S.user.uid));if(S.weekId!==w.id||S.tab!=='assignment')return;const data=snap.exists()?snap.data():null;const draftKey=assignmentDraftKey(w.id);
+  let snap;
+  try{snap=await getDoc(doc(db,'classes',S.classId,'weeks',w.id,'submissions',S.user.uid))}
+  catch(e){if(S.weekId===w.id&&S.tab==='assignment')showLoadFailed($('#assignment-form-area'),()=>renderAssignment(body),e);return} // '미제출'로 보이지 않게(P1-08)
+  if(S.weekId!==w.id||S.tab!=='assignment')return;const data=snap.exists()?snap.data():null;const draftKey=assignmentDraftKey(w.id);
   const area=$('#assignment-form-area');if(!area)return;
   const revision=Number(data?.revision)||1;
   if(S.past){
@@ -326,6 +366,7 @@ async function renderAssignment(body){
     area.innerHTML=`${data?(waiting?`<p class="notice warn">✏️ 수정본을 제출했어요 · 선생님 확인 대기 · ${revision}차 제출 · ${esc(formatDateTime(data.latestSubmittedAt||data.submittedAt))}</p>`:`<p class="notice">✅ 제출 기록이 있습니다 · ${revision>1?`${revision}차 제출 · `:''}${esc(formatDateTime(data.latestSubmittedAt||data.submittedAt))} · 다시 제출하면 수정본으로 기록되고, 이전 답안도 남아요.</p>`):''}${w.assignment.allowText!==false?`<div class="field"><label for="assignment-text">작성 과제</label><textarea id="assignment-text" rows="8" maxlength="20000" placeholder="여기에 스페인어로 답안을 작성해 주세요." data-saved="${esc(data?.text||'')}">${esc(data?.text||'')}</textarea></div>`:''}${w.assignment.allowAudio!==false?`<div class="field"><span class="field-label">말하기 과제</span><div id="student-audio-ui">${makeMediaUi('audio')}</div>${data?.audioPath?`<div><p class="hint">지금 제출된 녹음</p>${audioMarkup(data.audioPath,data.audioDuration)}</div>`:''}</div>`:''}<div class="between"><p id="assignment-progress" class="hint">답안은 본인과 강사만 열람할 수 있습니다.</p><button class="btn" id="submit-assignment">과제 제출하기 →</button></div>${revisionHistoryMarkup(data)}<div id="student-assignment-feedback">${feedbackMarkup(data)}</div>`;
     // P0-02: 음성 초안은 이 차시에만 붙습니다(반·차시·학생 키).
     if(w.assignment.allowAudio!==false)wireMediaUi($('#student-audio-ui'),f=>{if(f)S.audioDrafts[draftKey]=f;else delete S.audioDrafts[draftKey]},{label:`${w.label} 과제`,initialFile:S.audioDrafts[draftKey]});
+    wireAssignmentDraft(area,w.id,data?.text||'');
   }
   useMediaPaths(area);wireRevisionHistory(area,w.id,revision);markFeedbackSeen('submissions',w.id,data);
   S.live.assignment=onSnapshot(doc(db,'classes',S.classId,'weeks',w.id,'submissions',S.user.uid),snapshot=>{
@@ -346,10 +387,13 @@ async function renderAssignment(body){
     btn.disabled=true;
     try{
       // 새 음성을 올리지 않으면 지금 제출된 녹음을 그대로 유지합니다(이전 파일은 이력으로 남김).
-      let path=data?.audioPath||'',duration=data?.audioDuration??null;
-      if(file){path=`classes/${S.classId}/submissions/${w.id}/${S.user.uid}/${makeId()}-${file.name.replace(/[^\w.\-]/g,'_')}`;await uploadMedia(file,path,'audio',$('#assignment-progress'));duration=file.durationSec??null}
-      await saveSubmission(w.id,{text,audioPath:path,audioDuration:duration});
-      delete S.audioDrafts[draftKey];toast('과제를 제출했습니다!');await renderAssignment(body);
+      let path=data?.audioPath||'',duration=data?.audioDuration??null,uploaded='';
+      if(file){path=`classes/${S.classId}/submissions/${w.id}/${S.user.uid}/${makeId()}-${file.name.replace(/[^\w.\-]/g,'_')}`;await uploadMedia(file,path,'audio',$('#assignment-progress'));uploaded=path;duration=file.durationSec??null}
+      try{await saveSubmission(w.id,{text,audioPath:path,audioDuration:duration})}
+      catch(err){await removeUploaded(uploaded);throw err} // P1-09: 제출이 저장되지 않았으면 방금 올린 음성을 지웁니다.
+      delete S.audioDrafts[draftKey];
+      const storeKey=assignmentStoreKey(w.id);if(pendingDraft?.key===storeKey){clearTimeout(pendingDraft.timer);pendingDraft=null}drafts.remove(storeKey);
+      toast('과제를 제출했습니다!');await renderAssignment(body);
     }catch(err){toast(ex(err),true)}finally{btn.disabled=false}
   });
 }
@@ -398,12 +442,24 @@ function shuffleQuestion(q){
 }
 async function renderQuiz(body){const w=week();body.innerHTML=weekHeader('단어 복습',S.past?'연습 모드예요. 다시 풀어 볼 수 있지만 결과는 저장되지 않아요.':'한 문제씩 풀고 마지막에 결과를 확인하세요.');weeklyPicker();
   if(!w.quiz?.enabled||!w.quiz.questions?.length){body.insertAdjacentHTML('beforeend',empty('이 주차의 복습 퀴즈가 준비 중입니다'));return}
-  const snap=await getDoc(doc(db,'classes',S.classId,'weeks',w.id,'quizResults',S.user.uid));if(S.weekId!==w.id||S.tab!=='quiz')return;
+  let snap;
+  try{snap=await getDoc(doc(db,'classes',S.classId,'weeks',w.id,'quizResults',S.user.uid))}
+  catch(e){if(S.weekId===w.id&&S.tab==='quiz'){body.insertAdjacentHTML('beforeend','<div class="card" id="quiz-stage"></div>');showLoadFailed($('#quiz-stage'),()=>renderQuiz(body),e)}return} // P1-08
+  if(S.weekId!==w.id||S.tab!=='quiz')return;
   const last=snap.exists()?snap.data():null;
   body.insertAdjacentHTML('beforeend',`<div class="card" id="quiz-stage"><div class="between"><div><h2>${esc(w.quiz.title||'이번 주 단어 퀴즈')}</h2></div><span class="pill brand">${w.quiz.questions.length}문항</span></div><div id="quiz-last-status">${last?`<p class="notice" style="margin-top:17px">최근 점수: ${last.score??0}/${last.total??0}점 · 다시 풀 수 있습니다.</p>`:''}</div><div id="quiz-live-feedback">${feedbackMarkup(last)}</div><div style="margin-top:19px" id="quiz-content"></div></div>`);
   // P1-02: 응시를 시작할 때의 문항과 버전을 고정합니다. 풀던 중 강사가 퀴즈를 바꿔도 시작한 버전으로 채점·저장합니다.
-  const qs=w.quiz.questions.map(normalizeQuestion);S.quiz={id:w.id,version:Number(w.quiz.version)||null,questions:qs,shuffled:qs.map(shuffleQuestion),answers:Array(qs.length).fill(null),index:0,last};
-  useMediaPaths(body);showQuestion();markFeedbackSeen('quizResults',w.id,last);
+  const qs=w.quiz.questions.map(normalizeQuestion);
+  const progressKey=S.past?'':draftKey(S.user.uid,S.classId,w.id,'quiz',Number(w.quiz.version)||0);
+  S.quiz={id:w.id,version:Number(w.quiz.version)||null,questions:qs,shuffled:qs.map(shuffleQuestion),answers:Array(qs.length).fill(null),index:0,last,progressKey};
+  useMediaPaths(body);markFeedbackSeen('quizResults',w.id,last);
+  // P1-07: 같은 탭에서 풀던 문제가 있으면(다른 탭에 다녀오거나 새로고침) 이어서 풀지 묻습니다.
+  const saved=readQuizProgress(progressKey,qs);
+  if(saved){
+    $('#quiz-content').innerHTML=`<div class="resume-card"><p><strong>풀던 문제가 있어요</strong> · ${saved.index+1} / ${qs.length}번 문항까지 진행</p><div class="row"><button type="button" class="btn" data-resume>이어서 풀기</button><button type="button" class="btn secondary" data-restart>처음부터</button></div></div>`;
+    $('[data-resume]').onclick=()=>{Object.assign(S.quiz,saved);showQuestion()};
+    $('[data-restart]').onclick=()=>{drafts.remove(progressKey,'session');showQuestion()};
+  }else showQuestion();
   S.live.quiz=onSnapshot(doc(db,'classes',S.classId,'weeks',w.id,'quizResults',S.user.uid),snapshot=>{
     if(S.tab!=='quiz'||S.weekId!==w.id)return;
     const d=snapshot.exists()?snapshot.data():null;
@@ -414,7 +470,23 @@ async function renderQuiz(body){const w=week();body.innerHTML=weekHeader('단어
   },onLiveError);
 
 }
-function showQuestion(){const z=S.quiz;if(!z)return;const node=$('#quiz-content');if(!node)return;
+// 풀이 진행(답·현재 문항·보기 섞인 순서)을 이 탭에 보관합니다. 키에 퀴즈 버전이 들어가 문제가 바뀌면 이어 풀지 않습니다.
+function saveQuizProgress(){
+  const z=S.quiz;if(!z?.progressKey)return;
+  const started=z.answers.some(a=>Array.isArray(a)?a.length:a!==null);
+  drafts.set(z.progressKey,started?JSON.stringify({answers:z.answers,index:z.index,order:z.shuffled.map(list=>list.map(c=>c.index))}):'','session');
+}
+function readQuizProgress(key,qs){
+  if(!key)return null;
+  try{
+    const raw=JSON.parse(drafts.get(key,'session')||'null');
+    if(!raw||raw.answers?.length!==qs.length||!(raw.index>=0&&raw.index<qs.length))return null;
+    const shuffled=raw.order.map((idxs,qi)=>idxs.map(i=>({text:qs[qi].options[i],index:i})));
+    if(shuffled.some((list,qi)=>list.length!==qs[qi].options.length))return null;
+    return {answers:raw.answers,index:raw.index,shuffled};
+  }catch(e){return null}
+}
+function showQuestion(){const z=S.quiz;if(!z)return;const node=$('#quiz-content');if(!node)return;saveQuizProgress();
   const n=z.index,q=z.questions[n],multi=q.type==='multiple';const current=z.answers[n],selected=Array.isArray(current)?current:current===null?[]:[current];
   node.innerHTML=`<div class="question-count">QUESTION ${n+1} / ${z.questions.length} <span class="pill brand" style="margin-left:7px">${multi?'복수정답':q.type==='ox'?'O / X':'객관식'}</span></div>
   <div class="progress"><div style="width:${((n+1)/z.questions.length)*100}%"></div></div>
@@ -453,7 +525,7 @@ async function finishQuiz(){const z=S.quiz;if(!z)return;
       tx.set(attemptRef,{userId:S.user.uid,...record,score,total:z.questions.length,attemptNumber:count,submittedAt:serverTimestamp()});
       tx.set(resultRef,{userId:S.user.uid,studentName:name,email:S.user.email||'',...record,score,total:z.questions.length,submittedAt:serverTimestamp(),firstAttempt:first,attemptCount:count},{merge:true});
     });
-    z.finished=true;
+    z.finished=true;drafts.remove(z.progressKey,'session');
     if(S.weekId!==z.id||S.tab!=='quiz')return;
     showQuizResult(target,z,score);toast('복습 결과가 저장되었습니다.');
   }catch(e){target.classList.remove('loading');toast(ex(e),true);showQuestion()}
@@ -498,10 +570,10 @@ async function renderMyPage(body){
 }
 async function drawAttendanceOverview(){
   const profileSessions=(currentClass()?.schedule?.length?currentClass().schedule.map(w=>({id:w.weekId,label:w.label,date:w.date||''})):S.weeks);
-  const statuses=await Promise.all(profileSessions.map(async w=>{try{const d=await getDoc(doc(db,'classes',S.classId,'weeks',w.id,'attendance',S.user.uid));return {id:w.id,label:w.label,date:w.date||'',status:d.exists()?d.data().status:'unchecked'}}catch(e){return {id:w.id,label:w.label,date:w.date||'',status:'unchecked'}}}));
+  const statuses=await Promise.all(profileSessions.map(async w=>{try{const d=await getDoc(doc(db,'classes',S.classId,'weeks',w.id,'attendance',S.user.uid));return {id:w.id,label:w.label,date:w.date||'',status:d.exists()?d.data().status:'unchecked'}}catch(e){console.error('출석 기록 조회 실패',w.id,e);return {id:w.id,label:w.label,date:w.date||'',status:'failed'}}}));
   // D2: 출석은 '출석'·'불참' 두 가지입니다. 이전 형식의 지각은 출석, 인정결석은 불참으로 보여 줍니다.
-  const dict={present:['success','출석'],late:['success','출석'],absent:['danger','불참'],excused:['danger','불참'],unchecked:['neutral','미입력']};
-  const spot=$('#attendance-overview');if(spot){spot.classList.remove('loading');spot.innerHTML=statuses.length?statuses.map(item=>`<div class="between" data-attendance-week="${esc(item.id)}" style="padding:10px 0;border-bottom:1px solid var(--line)"><span style="font-size:13px">${esc(item.label)}${item.date?` <small style="color:var(--muted)">· ${esc(item.date)}</small>`:''}</span>${statusPill(...(dict[item.status]||dict.unchecked))}</div>`).join(''):empty('아직 출석 기록이 없습니다');}
+  const dict={present:['success','출석'],late:['success','출석'],absent:['danger','불참'],excused:['danger','불참'],unchecked:['neutral','미입력'],failed:['warning','불러오지 못함']};
+  const spot=$('#attendance-overview');if(spot){spot.classList.remove('loading');spot.innerHTML=statuses.length?statuses.map(item=>`<div class="between" data-attendance-week="${esc(item.id)}" style="padding:10px 0;border-bottom:1px solid var(--line)"><span style="font-size:13px">${esc(item.label)}${item.date?` <small style="color:var(--muted)">· ${esc(item.date)}</small>`:''}</span>${statusPill(...(dict[item.status]||dict.unchecked))}</div>`).join('')+(statuses.some(x=>x.status==='failed')?'<div class="load-failed" role="alert" style="margin-top:12px"><span>일부 출석 기록을 불러오지 못했어요.</span><button type="button" class="btn secondary small" data-retry-attendance>다시 시도</button></div>':''):empty('아직 출석 기록이 없습니다');$('[data-retry-attendance]',spot)?.addEventListener('click',()=>renderBody());}
   for(const w of profileSessions){S.live['attendance:'+w.id]=onSnapshot(doc(db,'classes',S.classId,'weeks',w.id,'attendance',S.user.uid),snap=>{
     if(S.tab!=='mypage')return;const row=$(`[data-attendance-week="${w.id}"]`);if(!row)return;
     const status=snap.exists()?snap.data().status:'unchecked';paintPill($('.pill',row),...(dict[status]||dict.unchecked))
@@ -524,7 +596,7 @@ function renderQuestions(body){
     if(S.activeQuestionId)markQuestionSeen(docs.find(q=>q.id===S.activeQuestionId)); // 대화를 연 채로 새 답변이 오면 확인한 것으로
     if(S.activeQuestionId&&!docs.some(q=>q.id===S.activeQuestionId)){S.activeQuestionId='';stopLive('replies');$('#student-thread').innerHTML=''}
     else if(S.activeQuestionId && !S.live.replies)showStudentThread(docs.find(q=>q.id===S.activeQuestionId));
-  },onLiveError);
+  },err=>{showLoadFailed($('#question-list'),()=>renderBody(),err);onLiveError(err)});
 }
 // 학생 목록 배지: 선생님이 마지막으로 답했으면 '답변 도착', 학생이 마지막이면 '답변 대기'(P0-03)
 function studentQuestionBadge(q){
@@ -553,7 +625,7 @@ function showStudentThread(q){if(!q)return;stopLive('replies');const holder=$('#
 function renderClassmates(body){body.innerHTML=bodyHeader('우리 반','함께 스페인어를 공부하는 친구들이에요.')+`<div class="card"><div class="between" style="margin-bottom:18px"><h3>${esc(currentClass()?.name||'수강반')}</h3><span class="pill brand" id="classmate-count">—</span></div><div id="classmates-list" class="grid3"><div class="loading">수강생 확인 중</div></div><p class="hint" style="margin-top:17px">개인정보 보호를 위해 이름만 공개되며, 이메일이나 개별 학습 성적은 보이지 않습니다.</p></div>`;
   S.live.classmates=onSnapshot(collection(db,'classes',S.classId,'members'),snap=>{
     if(S.tab!=='classmates')return;const list=$('#classmates-list');if(!list)return;const members=snap.docs.map(d=>d.data()).filter(m=>m.status==='active').sort((a,b)=>(a.name||'').localeCompare(b.name||'','ko'));$('#classmate-count').textContent=members.length+'명';loaded(list,members.map(m=>`<div class="classmate-card"><span class="classmate-avatar">${esc((m.name||'?')[0])}</span><div><strong>${esc(m.name||'이름 미등록')}</strong>${m.uid===S.user.uid?'<p class="hint">나</p>':''}</div></div>`).join('')||empty('아직 반 명단이 없습니다','강사가 수강생 관리를 열면 기존 명단도 동기화됩니다.'));
-  },onLiveError);
+  },err=>{showLoadFailed($('#classmates-list'),()=>renderBody(),err);onLiveError(err)});
 }
 
 if(CONFIGURED){onAuthStateChanged(auth,async user=>{try{if(!user){resetStudentSession();mountAuth(root);return}S.user=user;root.innerHTML='<div class="loading" style="min-height:90vh">학습 정보를 준비하고 있습니다</div>';S.profile=await ensureProfile(user);if(S.profile.role==='admin'){root.innerHTML=`<div style="max-width:450px;margin:100px auto;padding:24px" class="card"><h2>강사 계정입니다</h2><p style="margin:15px 0">강사 관리 페이지를 이용해 주세요.</p><a class="btn" href="admin.html">강사 페이지로 이동 →</a></div>`;return}await loadStudent()}catch(e){console.error(e);root.innerHTML=`<div class="card" style="max-width:550px;margin:70px auto"><h3>불러오기 실패</h3><p class="error">${esc(ex(e))}</p><button class="btn secondary" id="retry-student">다시 시도</button></div>`;$('#retry-student').onclick=()=>location.reload()}})}else mountAuth(root);

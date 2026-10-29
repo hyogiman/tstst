@@ -613,6 +613,133 @@ test('D09 학생 입장 시 입장 기록(joined) — v3 규칙에서는 함께 
   }
 });
 
+// ---------- 배치 07: 작업 보존 · 오류 처리 · 임시 파일 정리 ----------
+const lsKeys = page => page.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('senorayu:draft:')));
+test('B15 차시 편집 미저장 상태로 다른 차시 선택 → 확인창 → [버리고 이동]이면 저장 안 함', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  await page.click('[data-page="weeks"]'); await pause(page, 500);
+  await page.click('[data-week-open="w1"]'); await pause(page, 400);
+  await page.fill('#assignment-title', '바꾼 과제 제목');
+  assert((await page.innerText('#week-save-status')).includes('저장하지 않은 변경'), '미저장 표시: ' + await page.innerText('#week-save-status'));
+  await page.click('[data-week-open="w2"]'); await pause(page, 400);
+  const buttons = await page.$$eval('.app-modal [data-choice]', els => els.map(e => e.textContent));
+  assert(JSON.stringify(buttons) === JSON.stringify(['저장하고 이동', '버리고 이동', '취소']), '확인창 버튼: ' + buttons.join('|'));
+  await page.click('.app-modal [data-choice="2"]'); await pause(page, 300); // 취소
+  assert((await page.inputValue('#assignment-title')) === '바꾼 과제 제목', '취소했는데 편집 내용이 사라짐');
+  await page.click('[data-week-open="w2"]'); await pause(page, 400);
+  await page.click('.app-modal [data-choice="1"]'); await pause(page, 600); // 버리고 이동
+  assert((await page.inputValue('#week-label')).startsWith('2차시'), '다른 차시로 이동하지 않음');
+  assert((await dump(page, 'classes/c1/weeks/w1')).assignment.title === '자기소개 3문장 쓰고 녹음하기', '버렸는데 저장됨');
+});
+
+test('B15b 차시 편집 → 메뉴 이동 시 [저장하고 이동]이면 저장 후 이동', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  await page.click('[data-page="weeks"]'); await pause(page, 500);
+  await page.click('[data-week-open="w1"]'); await pause(page, 400);
+  await page.fill('#assignment-title', '저장할 새 제목');
+  await page.click('[data-page="questions"]'); await pause(page, 400);
+  await page.click('.app-modal [data-choice="0"]'); await pause(page, 900);
+  assert((await dump(page, 'classes/c1/weeks/w1')).assignment.title === '저장할 새 제목', '저장되지 않음');
+  assert(await page.$('#admin-questions-list'), '질문함으로 이동하지 않음');
+});
+
+test('B15c 저장하지 않은 업로드 파일은 [버리고 이동] 때 삭제', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  await page.click('[data-page="weeks"]'); await pause(page, 500);
+  await page.click('[data-week-open="w5"]'); await pause(page, 400);
+  await page.click('[data-week-tab="preview"]'); await pause(page, 200);
+  await page.setInputFiles('#preview-extra-file', { name: 'handout.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 mock') });
+  await pause(page, 600);
+  const uploaded = (await page.evaluate(() => window.__mock.uploads())).map(u => u.path);
+  assert(uploaded.length === 1, '업로드되지 않음');
+  await page.click('[data-week-open="w4"]'); await pause(page, 400);
+  await page.click('.app-modal [data-choice="1"]'); await pause(page, 600);
+  const deleted = await page.evaluate(() => window.__mock.deletedFiles());
+  assert(deleted.includes(uploaded[0]), '저장하지 않은 업로드가 남음: ' + JSON.stringify(deleted));
+  assert(!(await dump(page, 'classes/c1/weeks/w5')).preview.files.some(f => f.path === uploaded[0]), '문서에 연결됨');
+});
+
+test('B16 강사 피드백: 학생 A 작성 → 학생 B → A로 돌아와도, 새로고침해도 입력 유지', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  const open = async () => { await page.click('[data-page="feedback"]'); await pause(page, 500); await page.selectOption('#admin-week-picker', 'w1'); await pause(page, 700); };
+  await open();
+  await page.click('[data-feedback-uid="s2"]'); await pause(page, 400);
+  await page.fill('[data-feedback-text]', '이준호님, 다음에는 직업도 말해 봐요.');
+  await page.click('[data-feedback-uid="s3"]'); await pause(page, 400);
+  assert(!(await page.inputValue('[data-feedback-text]')), '다른 학생 입력칸에 글이 보임');
+  assert(!(await page.$eval('[data-feedback-uid="s2"] [data-draft-mark]', el => el.classList.contains('hide'))), '목록에 작성 중 표시가 없음');
+  await page.click('[data-feedback-uid="s2"]'); await pause(page, 400);
+  assert((await page.inputValue('[data-feedback-text]')) === '이준호님, 다음에는 직업도 말해 봐요.', '돌아왔을 때 입력 사라짐');
+  await pause(page, 500); await page.reload(); await pause(page, 900); await open();
+  await page.click('[data-feedback-uid="s2"]'); await pause(page, 400);
+  assert((await page.inputValue('[data-feedback-text]')).includes('직업도'), '새로고침 후 복원되지 않음');
+  await page.click('[data-feedback-save]'); await pause(page, 900);
+  assert(!(await lsKeys(page)).length, '등록 후에도 임시 저장본이 남음');
+});
+
+test('B17 학생 답안: 수정 → 다른 탭 → 돌아오면 유지, 새로고침 복원, 제출하면 삭제', async b => {
+  const { page } = await openAs(b, 'index.html', 's2', { viewport: { width: 390, height: 844 } });
+  await page.selectOption('#student-week-picker', 'w4'); await pause(page, 700);
+  await page.fill('#assignment-text', 'Mi madre tiene cincuenta años.');
+  await page.click('[data-tab="quiz"]'); await pause(page, 500);
+  await page.click('[data-tab="assignment"]'); await pause(page, 700);
+  assert((await page.inputValue('#assignment-text')) === 'Mi madre tiene cincuenta años.', '탭 이동 후 사라짐');
+  assert(await page.$('[data-draft-notice]'), '임시 저장본 안내가 없음');
+  await page.reload(); await pause(page, 900);
+  await page.selectOption('#student-week-picker', 'w4'); await pause(page, 700);
+  assert((await page.inputValue('#assignment-text')).includes('cincuenta'), '새로고침 후 복원되지 않음');
+  await page.click('#submit-assignment'); await pause(page, 1000);
+  assert(!(await lsKeys(page)).length, '제출 후에도 임시 저장본이 남음');
+});
+
+test('B17b 임시 저장 답안: 로그아웃하면 안내 후 삭제, 다른 계정에는 보이지 않음', async b => {
+  const { page } = await openAs(b, 'index.html', 's2', { viewport: { width: 390, height: 844 } });
+  await page.selectOption('#student-week-picker', 'w4'); await pause(page, 700);
+  await page.fill('#assignment-text', '이준호의 초안'); await pause(page, 700);
+  await page.evaluate(() => window.__mock.loginAs('s1')); await pause(page, 1200);
+  await page.selectOption('#student-week-picker', 'w4'); await pause(page, 700);
+  assert(!(await page.inputValue('#assignment-text')).includes('이준호의 초안'), '다른 계정에 초안이 보임');
+  await page.evaluate(() => window.__mock.loginAs('s2')); await pause(page, 1200);
+  await page.click('#student-logout'); await pause(page, 400);
+  assert((await page.innerText('.app-modal')).includes('임시 저장된 답안이 지워져요'), '로그아웃 안내가 없음');
+  await ok(page); await pause(page, 600);
+  assert(!(await lsKeys(page)).some(k => k.includes(':s2:')), '로그아웃 후에도 초안이 남음');
+});
+
+test('B17c 퀴즈를 3번 문항까지 풀다 다른 탭 → 복습 탭 → [이어서 풀기]로 3번 문항과 답 유지', async b => {
+  const { page } = await openAs(b, 'index.html', 's2', { viewport: { width: 390, height: 844 } });
+  await page.click('[data-tab="quiz"]'); await pause(page, 500);
+  await page.selectOption('#student-week-picker', 'w4'); await pause(page, 700);
+  await page.click('.answer-option:has-text("20살")'); await page.click('#quiz-next'); await pause(page, 200);
+  await page.click('.answer-option:has-text("O")'); await page.click('#quiz-next'); await pause(page, 200);
+  await page.click('.answer-option:has-text("quince")'); await pause(page, 200);
+  await page.click('[data-tab="questions"]'); await pause(page, 500);
+  await page.click('[data-tab="quiz"]'); await pause(page, 700);
+  assert((await page.innerText('#quiz-content')).includes('풀던 문제가 있어요'), '이어 풀기 안내가 없음');
+  await page.click('[data-resume]'); await pause(page, 300);
+  assert((await page.textContent('.question-count')).includes('3 /'), '3번 문항이 아님');
+  assert((await page.innerText('.answer-option.selected')).includes('quince'), '고른 답이 사라짐');
+  await page.click('#quiz-next'); await pause(page, 900);
+  assert((await dump(page, 'classes/c1/weeks/w4/quizResults/s2'))?.score === 3, '이어 푼 결과 저장 실패');
+});
+
+test('B18 기록을 불러오지 못하면 "불러오지 못했어요"와 다시 시도 (미제출로 보이지 않음, 개발 용어 없음)', async b => {
+  const { page } = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 } });
+  await page.evaluate(() => window.__mock.failReads('classes/c1/weeks/w1/submissions/s1$'));
+  await page.selectOption('#student-week-picker', 'w1'); await pause(page, 700);
+  const area = await page.innerText('#assignment-form-area');
+  assert(area.includes('불러오지 못했어요') && await page.$('#assignment-form-area [data-retry]'), '불러오기 실패 안내: ' + area);
+  assert(!(await page.$('#submit-assignment')), '실패했는데 제출 폼이 보임');
+  assert(!/Firestore|Storage|permission|보안 규칙/i.test(area), '학생 화면에 개발 용어: ' + area);
+});
+
+test('B19 Firebase CDN이 막히면 백지 대신 안내 화면', async b => {
+  const { page } = await openApp(b, { file: 'index.html', user: 's1', blockCdn: true, bootTimeoutMs: 1200 });
+  await pause(page, 1800);
+  const text = await page.innerText('#root');
+  assert(text.includes('화면을 불러오지 못했어요') && text.includes('새로고침'), '안내 화면이 없음: ' + text.slice(0, 80));
+});
+
 test('기본: 학생 과제 텍스트 제출, 퀴즈 3/3, 강사 화면 주요 메뉴 오류 없음', async b => {
   const r = await openAs(b, 'index.html', 's2', { viewport: { width: 390, height: 844 } });
   await r.page.selectOption('#student-week-picker', 'w4'); await pause(r.page, 700);

@@ -20,24 +20,25 @@ async function launch() {
   return chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required'] });
 }
 
-async function openApp(browser, { file = 'index.html', user = null, viewport = { width: 1280, height: 860 }, rules = 'v3', seed = makeSeed(), timezoneId = 'Asia/Seoul' } = {}) {
-  const context = await browser.newContext({ viewport, timezoneId, locale: 'ko-KR', permissions: ['microphone'], deviceScaleFactor: 1 });
+async function openApp(browser, { file = 'index.html', user = null, viewport = { width: 1280, height: 860 }, rules = 'v3', seed = makeSeed(), timezoneId = 'Asia/Seoul', blockCdn = false, bootTimeoutMs = null, context: existing = null } = {}) {
+  const context = existing || await browser.newContext({ viewport, timezoneId, locale: 'ko-KR', permissions: ['microphone'], deviceScaleFactor: 1 });
   await context.route('**/*', route => {
     const url = route.request().url();
     if (url.startsWith(BASE)) {
       const rel = decodeURIComponent(url.slice(BASE.length).split(/[?#]/)[0]) || 'index.html';
       return serveFile(route, path.join(ROOT, rel));
     }
-    if (url.startsWith('https://www.gstatic.com/firebasejs/13.1.0/')) return serveFile(route, path.join(MOCK_DIR, url.split('/').pop().split('?')[0]));
+    if (url.startsWith('https://www.gstatic.com/firebasejs/13.1.0/')) return blockCdn ? route.abort() : serveFile(route, path.join(MOCK_DIR, url.split('/').pop().split('?')[0]));
     const font = url.match(/^https:\/\/cdn\.jsdelivr\.net\/gh\/orioncactus\/pretendard@v1\.3\.9\/dist\/web\/(.+)$/);
     if (font) return serveFile(route, path.join(FONT_DIR, 'dist', 'web', font[1].replace('.min.css', '.css')));
     if (/^https:\/\/fonts\.(googleapis|gstatic)\.com\//.test(url)) return route.continue();
     if (url.startsWith('blob:') || url.startsWith('data:')) return route.continue();
     return route.abort();
   });
-  await context.addInitScript(({ seed, user, rules }) => {
+  await context.addInitScript(({ seed, user, rules, bootTimeoutMs }) => {
     window.__MOCK_SEED__ = seed; window.__MOCK_USER__ = user; window.__MOCK_RULES__ = rules;
-  }, { seed, user, rules });
+    if (bootTimeoutMs) window.__BOOT_TIMEOUT_MS = bootTimeoutMs;
+  }, { seed, user, rules, bootTimeoutMs });
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push('pageerror: ' + e.message));

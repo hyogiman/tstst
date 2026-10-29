@@ -59,6 +59,7 @@
 .review-line{padding:14px 0;border-bottom:1px solid var(--line)}
 .review-line:last-of-type{border-bottom:0}
 .quiz-missed{color:var(--danger)}.quiz-correct{color:var(--success)}
+.resume-card{display:flex;flex-direction:column;gap:14px;padding:18px;border-radius:var(--r-md);background:var(--saffron-50);border:1px solid var(--saffron-100)}
 
 /* 다음 차시(예습) 영상 */
 .lesson-video-block{margin:8px 0 16px}

@@ -5,7 +5,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import { getFirestore, doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
-import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-storage.js';
+import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-storage.js';
 
 // Firebase 웹 앱 설정(두 화면 공통). API key는 비밀 키가 아니며 보안은 Rules가 담당합니다.
 export const firebaseConfig = {
@@ -216,7 +216,47 @@ export function readAudioDuration(file, timeoutMs = 4000) {
     audio.src = url;
   });
 }
-export const ex = e => { console.error(e); const c=e?.code||''; return ({'auth/invalid-credential':'이메일 또는 비밀번호를 확인해 주세요.','auth/email-already-in-use':'이미 가입된 이메일입니다.','auth/weak-password':'비밀번호는 6자 이상으로 설정해 주세요.','auth/invalid-email':'올바른 이메일을 입력해 주세요.','auth/unauthorized-domain':'Firebase Authentication에서 현재 도메인을 승인해 주세요.','auth/too-many-requests':'로그인 시도가 많습니다. 잠시 후 다시 시도해 주세요.','permission-denied':'접근 권한이 없습니다. 보안 규칙 또는 계정 권한을 확인해 주세요.','storage/unauthorized':'파일 저장 권한이 없습니다. Storage 보안 규칙을 확인해 주세요.','storage/quota-exceeded':'Storage 사용량 또는 요금제 제한을 확인해 주세요.'})[c] || e?.message || '처리 중 오류가 발생했습니다.'; };
+// ---------- 오류 문구 (P1-08) ----------
+// 강사 화면은 원인을 찾을 수 있게 자세히, 학생 화면은 개발 용어 없이 '무엇이 안 됐는지 + 다음 행동'만 보여 줍니다.
+// 기술 상세는 항상 console에만 남깁니다.
+let errorAudience = 'admin';
+export function setErrorAudience(audience) { errorAudience = audience === 'student' ? 'student' : 'admin'; }
+const AUTH_MESSAGES = {
+  'auth/invalid-credential': '이메일 또는 비밀번호를 확인해 주세요.',
+  'auth/email-already-in-use': '이미 가입된 이메일입니다.',
+  'auth/weak-password': '비밀번호는 6자 이상으로 설정해 주세요.',
+  'auth/invalid-email': '올바른 이메일을 입력해 주세요.',
+  'auth/too-many-requests': '로그인 시도가 많습니다. 잠시 후 다시 시도해 주세요.',
+  'auth/network-request-failed': '인터넷 연결을 확인한 뒤 다시 시도해 주세요.',
+};
+const ADMIN_MESSAGES = {
+  ...AUTH_MESSAGES,
+  'auth/unauthorized-domain': 'Firebase Authentication에서 현재 도메인을 승인해 주세요.',
+  'permission-denied': '접근 권한이 없습니다. 보안 규칙(저장소의 firestore.rules) 게시 여부와 계정 권한을 확인해 주세요.',
+  'storage/unauthorized': '파일 저장 권한이 없습니다. Storage 보안 규칙(storage.rules)을 확인해 주세요.',
+  'storage/quota-exceeded': 'Storage 사용량 또는 요금제 제한을 확인해 주세요.',
+  'unavailable': 'Firebase에 연결하지 못했습니다. 네트워크를 확인해 주세요.',
+};
+const STUDENT_MESSAGES = {
+  ...AUTH_MESSAGES,
+  'auth/unauthorized-domain': '이 주소에서는 로그인할 수 없어요. 선생님께 문의해 주세요.',
+  'permission-denied': '권한이 없어 처리하지 못했어요. 선생님께 문의해 주세요.',
+  'storage/unauthorized': '파일을 올리거나 열 권한이 없어요. 선생님께 문의해 주세요.',
+  'storage/quota-exceeded': '지금은 파일을 올릴 수 없어요. 선생님께 문의해 주세요.',
+  'storage/retry-limit-exceeded': '인터넷 연결이 불안정해 파일을 올리지 못했어요. 다시 시도해 주세요.',
+  'storage/canceled': '파일 올리기가 취소되었어요.',
+  'unavailable': '인터넷 연결이 불안정해요. 잠시 후 다시 시도해 주세요.',
+  'deadline-exceeded': '응답이 늦어 처리하지 못했어요. 다시 시도해 주세요.',
+};
+export const ex = e => {
+  console.error(e);
+  const code = e?.code || '';
+  const map = errorAudience === 'student' ? STUDENT_MESSAGES : ADMIN_MESSAGES;
+  if (map[code]) return map[code];
+  // 앱이 직접 만든 오류(코드 없음)는 이미 한국어 안내문입니다.
+  if (!code && e?.message) return e.message;
+  return errorAudience === 'student' ? '처리 중 문제가 생겼어요. 잠시 후 다시 시도해 주세요.' : (e?.message || '처리 중 오류가 발생했습니다.');
+};
 let toastTimer; export function toast(message,bad=false){const box=$('#toast');if(!box)return;box.textContent=message;box.className='toast show'+(bad?' bad':'');clearTimeout(toastTimer);toastTimer=setTimeout(()=>box.className='toast',4200)}
 export function loading(el){el.classList.add('loading');el.textContent='불러오는 중입니다'}
 export function loaded(el,html){if(!el)return;el.classList.remove('loading');el.innerHTML=html}
@@ -234,6 +274,12 @@ export async function uploadMedia(file,path,kind,progressEl){
     const task=uploadBytesResumable(r,file,{contentType:file.type||'application/octet-stream'});
     task.on('state_changed',snap=>{if(progressEl)progressEl.textContent=`업로드 ${Math.round(snap.bytesTransferred/snap.totalBytes*100)}%`},reject,()=>{if(progressEl)progressEl.textContent='업로드 완료';resolve(path)});
   });
+}
+// 업로드는 됐지만 문서 저장이 실패했을 때 방금 올린 파일을 지웁니다(P1-09). 실패해도 화면 흐름은 막지 않습니다.
+export async function removeUploaded(path) {
+  if (!path) return;
+  try { await deleteObject(storageRef(storage, path)); }
+  catch (e) { if (e?.code !== 'storage/object-not-found') console.warn('업로드 파일 정리 실패', path, e); }
 }
 export async function urlFor(path){try{return path?await getDownloadURL(storageRef(storage,path)):null}catch(e){console.warn('파일을 열 수 없습니다.',e);return null}}
 export function useMediaPaths(container){
@@ -382,6 +428,38 @@ export function showLiveNotice(host,message,actionText,onAction){
 }
 
 
+// ---------- 불러오기 실패 (P1-08) ----------
+// '미제출·미입력'과 '불러오지 못함'을 구분해 보여 주고, 그 자리에서 다시 시도하게 합니다.
+export function showLoadFailed(el, retry, err) {
+  if (!el) return;
+  const reason = err ? ex(err) : '';
+  el.classList.remove('loading');
+  el.innerHTML = `<div class="load-failed" role="alert"><span>기록을 불러오지 못했어요.${reason ? ' ' + esc(reason) : ''}</span>${retry ? '<button type="button" class="btn secondary small" data-retry>다시 시도</button>' : ''}</div>`;
+  const button = el.querySelector('[data-retry]');
+  if (button) button.onclick = () => retry();
+}
+
+// ---------- 작성 중 초안 (P1-07) ----------
+// 키에 사용자 uid가 들어가 다른 계정에는 보이지 않습니다. 로그아웃하면 그 사용자의 초안을 지웁니다(공용 PC 보호).
+// 사생활 보호 모드 등에서 저장소를 못 쓰면 조용히 건너뜁니다.
+const DRAFT_PREFIX = 'senorayu:draft:';
+export const draftKey = (...parts) => DRAFT_PREFIX + parts.join(':');
+export const drafts = {
+  get(key, area = 'local') { try { return (area === 'session' ? sessionStorage : localStorage).getItem(key); } catch (e) { return null; } },
+  set(key, value, area = 'local') {
+    try { const store = area === 'session' ? sessionStorage : localStorage; if (value) store.setItem(key, value); else store.removeItem(key); }
+    catch (e) { console.warn('임시 저장 실패', e); }
+  },
+  remove(key, area = 'local') { this.set(key, '', area); },
+  // 이 사용자의 초안 개수(로그아웃 안내용)
+  countFor(uid) { try { return Object.keys(localStorage).filter(k => k.startsWith(DRAFT_PREFIX + uid + ':')).length; } catch (e) { return 0; } },
+  clearUser(uid) {
+    for (const store of [globalThis.localStorage, globalThis.sessionStorage]) {
+      try { for (const k of Object.keys(store)) if (k.startsWith(DRAFT_PREFIX + uid + ':')) store.removeItem(k); } catch (e) { /* 저장소 사용 불가 */ }
+    }
+  },
+};
+
 // ---------- 모달 (P0-06) ----------
 // 모든 확인·수정은 브라우저 기본 팝업 대신 앱 안의 모달로 처리합니다.
 // 열면 첫 입력칸으로 포커스가 가고, Tab은 모달 안에서만 돌며, 닫으면 모달을 연 버튼으로 포커스가 돌아갑니다.
@@ -453,6 +531,35 @@ export function modalDialog({
     };
     requestAnimationFrame(() => { (input || ok).focus(); if (input && value !== null && !verify && !multiline) input.select(); });
   });
+}
+// 선택지가 셋 이상인 확인 창. 고른 value를, 닫거나 Escape를 누르면 null을 돌려줍니다.
+// choices: [{value, label, kind:'primary'|'secondary'|'danger'}]
+export function modalChoice({ title = '확인해 주세요', message = '', choices = [] } = {}) {
+  return new Promise(resolve => {
+    const layer = document.createElement('div');
+    layer.className = 'app-modal-backdrop';
+    layer.innerHTML = `<section class="app-modal" role="dialog" aria-modal="true" aria-labelledby="app-modal-title" aria-describedby="app-modal-message"><div class="app-modal-head"><div><span class="eyebrow">쎄뇨라유 · 안내</span><h2 id="app-modal-title">${esc(title)}</h2></div><button type="button" class="app-modal-x" aria-label="닫기">×</button></div><p class="app-modal-message" id="app-modal-message">${esc(message)}</p><div class="app-modal-actions">${choices.map((c, i) => `<button type="button" class="btn ${c.kind === 'danger' ? 'danger-solid' : c.kind === 'secondary' ? 'secondary' : ''}" data-choice="${i}">${esc(c.label)}</button>`).join('')}</div></section>`;
+    let settled = false;
+    const close = openModalLayer(layer, { onEscape: () => done(null) });
+    function done(v) { if (settled) return; settled = true; close(); resolve(v); }
+    layer.querySelector('.app-modal-x').onclick = () => done(null);
+    layer.onclick = e => { if (e.target === layer) done(null); };
+    layer.querySelectorAll('[data-choice]').forEach(b => b.onclick = () => done(choices[Number(b.dataset.choice)].value));
+    requestAnimationFrame(() => layer.querySelector('[data-choice]')?.focus());
+  });
+}
+// 인터넷이 끊기면 화면 위에 띠로 알립니다(P1-08 선택 항목).
+export function installOfflineBanner() {
+  const show = () => {
+    if (document.querySelector('.offline-banner')) return;
+    const bar = document.createElement('div');
+    bar.className = 'offline-banner'; bar.setAttribute('role', 'status');
+    bar.textContent = '인터넷 연결이 끊겼어요. 연결되면 자동으로 다시 이어집니다.';
+    document.body.appendChild(bar);
+  };
+  window.addEventListener('offline', show);
+  window.addEventListener('online', () => document.querySelector('.offline-banner')?.remove());
+  if (navigator.onLine === false) show();
 }
 // 확인 창: 동작마다 알맞은 제목과 버튼 문구를 붙입니다.
 export async function modalConfirm(message, { title = '확인해 주세요', confirmText = '진행하기', danger = false } = {}) {
