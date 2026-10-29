@@ -1,0 +1,197 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function userDoc(uid) { return /databases/$(database)/documents/users/$(uid); }
+    function enrollmentDoc(uid, cid) { return /databases/$(database)/documents/enrollments/$(uid + '_' + cid); }
+    function classDoc(cid) { return /databases/$(database)/documents/classes/$(cid); }
+    function weekDoc(cid,wid) { return /databases/$(database)/documents/classes/$(cid)/weeks/$(wid); }
+    function admin() {
+      return signedIn() && exists(userDoc(request.auth.uid)) &&
+        get(userDoc(request.auth.uid)).data.role == 'admin';
+    }
+    function member(cid) {
+      return signedIn() && exists(enrollmentDoc(request.auth.uid,cid)) &&
+        get(enrollmentDoc(request.auth.uid,cid)).data.status == 'active' &&
+        get(classDoc(cid)).data.archived == false;
+    }
+    function visible(cid,wid) { return get(weekDoc(cid,wid)).data.published == true; }
+
+    // 수강 코드를 아는 로그인 사용자만 문서 하나를 조회할 수 있습니다.
+    // 반 전체 목록 조회와 임의 수정은 불가합니다.
+    match /joinCodes/{code} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create, update: if admin() &&
+        request.resource.data.keys().hasOnly(['classId','createdBy','updatedAt']) &&
+        request.resource.data.classId is string &&
+        request.resource.data.createdBy == request.auth.uid;
+      allow delete: if admin();
+    }
+    match /users/{uid} {
+      allow get: if admin() || (signedIn() && request.auth.uid == uid);
+      allow list: if admin();
+      allow create: if admin() ||
+        (signedIn() && request.auth.uid == uid &&
+         request.resource.data.keys().hasOnly(['displayName','realName','nickname','email','role','createdAt']) &&
+         request.resource.data.role == 'student' &&
+         request.resource.data.email == request.auth.token.email &&
+         request.resource.data.displayName is string &&
+         request.resource.data.realName is string && request.resource.data.realName.size()>0 && request.resource.data.realName.size()<=35 &&
+         request.resource.data.nickname == '' && request.resource.data.displayName == request.resource.data.realName);
+      allow update: if admin() ||
+        (signedIn() && request.auth.uid == uid &&
+         (
+           (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName','realName','nickname','updatedAt']) && request.resource.data.displayName is string && request.resource.data.get('nickname','') is string && request.resource.data.get('realName','') is string && request.resource.data.get('nickname','').size() <= 35 && request.resource.data.get('realName','').size() <= 35)
+           ||
+           (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['assignedClassId']) &&
+             !('assignedClassId' in resource.data) &&
+             request.resource.data.assignedClassId is string &&
+             exists(enrollmentDoc(uid,request.resource.data.assignedClassId)) &&
+             get(enrollmentDoc(uid,request.resource.data.assignedClassId)).data.status == 'active')
+         ));
+      allow delete: if admin();
+    }
+    match /enrollments/{eid} {
+      allow get, list: if admin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow create: if signedIn() &&
+        request.resource.data.keys().hasOnly(['uid','classId','studentName','email','joinCode','status','joinedAt']) &&
+        request.resource.data.uid == request.auth.uid &&
+        eid == request.auth.uid + '_' + request.resource.data.classId &&
+        request.resource.data.status == 'active' &&
+        request.resource.data.studentName is string &&
+        request.resource.data.email == request.auth.token.email &&
+        exists(classDoc(request.resource.data.classId)) &&
+        get(classDoc(request.resource.data.classId)).data.archived == false &&
+        get(classDoc(request.resource.data.classId)).data.joinCode == request.resource.data.joinCode &&
+        get(userDoc(request.auth.uid)).data.role == 'student' &&
+        get(userDoc(request.auth.uid)).data.get('assignedClassId',request.resource.data.classId) == request.resource.data.classId;
+      allow update, delete: if admin();
+    }
+    match /classes/{cid} {
+      allow get: if admin() || member(cid);
+      allow list: if admin();
+      allow create, update, delete: if admin();
+
+      // 수강생 개인 특이사항: 강사에게만 공개. 학생은 읽거나 쓸 수 없습니다.
+      match /teacherNotes/{uid} {
+        allow get, list, create, update, delete: if admin();
+      }
+
+      // 공개 반명단: 이메일/성적/과제는 넣지 않으며 같은 반 학생만 읽습니다.
+      match /members/{uid} {
+        allow get, list: if admin() || member(cid);
+        allow create: if admin() || (member(cid) && request.auth.uid == uid &&
+          request.resource.data.keys().hasOnly(['uid','name','status','joinedAt']) &&
+          request.resource.data.uid == uid && request.resource.data.name is string &&
+          request.resource.data.name.size() <= 35 && request.resource.data.status == 'active');
+        allow update: if admin() || (member(cid) && request.auth.uid == uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']) &&
+          request.resource.data.name is string && request.resource.data.name.size() <= 35);
+        allow delete: if admin();
+      }
+
+      // 질문과 댓글: 본인 작성 질문 또는 강사 계정에서만 열람.
+      match /questions/{qid} {
+        function owner() {return signedIn() && resource.data.uid == request.auth.uid && member(cid);}
+        function ownsQuestion() {return signedIn() && member(cid) &&
+          get(/databases/$(database)/documents/classes/$(cid)/questions/$(qid)).data.uid == request.auth.uid;}
+        allow get, list: if admin() || owner();
+        allow create: if member(cid) &&
+          request.resource.data.keys().hasOnly(['uid','studentName','title','content','createdAt','status']) &&
+          request.resource.data.uid == request.auth.uid && request.resource.data.status == 'open' &&
+          request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 100 &&
+          request.resource.data.content is string && request.resource.data.content.size() > 0 && request.resource.data.content.size() <= 8000;
+        allow update, delete: if admin();
+
+        match /replies/{rid} {
+          allow get, list: if admin() || ownsQuestion();
+          allow create: if (admin() || ownsQuestion()) &&
+            request.resource.data.keys().hasOnly(['uid','role','author','text','createdAt']) &&
+            request.resource.data.uid == request.auth.uid &&
+            request.resource.data.role == (admin() ? 'admin' : 'student') &&
+            request.resource.data.author is string &&
+            request.resource.data.text is string && request.resource.data.text.size() > 0 &&
+            request.resource.data.text.size() <= 8000;
+          allow update, delete: if admin();
+        }
+      }
+
+      match /weeks/{wid} {
+        // 수강생 목록 조회는 반드시 where('published','==',true) 조건을 사용해야 합니다.
+        allow get, list: if admin() || (member(cid) && resource.data.published == true);
+        allow create, update, delete: if admin();
+
+        match /submissions/{uid} {
+          allow get, list: if admin() ||
+            (signedIn() && request.auth.uid == uid && member(cid) && visible(cid,wid));
+          allow create: if signedIn() && request.auth.uid == uid && member(cid) &&
+            visible(cid,wid) && get(weekDoc(cid,wid)).data.assignment.enabled == true &&
+            request.resource.data.keys().hasOnly(['userId','studentName','email','text','audioPath','submittedAt']) &&
+            request.resource.data.userId == uid && request.resource.data.text is string &&
+            request.resource.data.text.size() <= 20000 && request.resource.data.audioPath is string &&
+            (request.resource.data.audioPath == '' || request.resource.data.audioPath.matches('^classes/' + cid + '/submissions/' + wid + '/' + uid + '/.*$'));
+          allow update: if admin() ||
+            (signedIn() && request.auth.uid == uid && member(cid) && visible(cid,wid) &&
+             get(weekDoc(cid,wid)).data.assignment.enabled == true &&
+             request.resource.data.userId == uid &&
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['studentName','email','text','audioPath','submittedAt']) &&
+             request.resource.data.text is string && request.resource.data.text.size() <= 20000 &&
+             request.resource.data.audioPath is string &&
+             (request.resource.data.audioPath == '' || request.resource.data.audioPath.matches('^classes/' + cid + '/submissions/' + wid + '/' + uid + '/.*$')));
+          allow delete: if admin();
+        }
+        match /quizResults/{uid} {
+          allow get, list: if admin() ||
+            (signedIn() && request.auth.uid == uid && member(cid) && visible(cid,wid));
+          allow create: if signedIn() && request.auth.uid == uid && member(cid) &&
+            visible(cid,wid) && get(weekDoc(cid,wid)).data.quiz.enabled == true &&
+            request.resource.data.keys().hasOnly(['userId','studentName','email','answers','score','total','submittedAt','firstAttempt','attemptCount']) &&
+            request.resource.data.userId == uid && request.resource.data.answers is list &&
+            request.resource.data.answers.size() <= 200 &&
+            request.resource.data.score is int && request.resource.data.total is int &&
+            request.resource.data.score >= 0 && request.resource.data.score <= request.resource.data.total &&
+            request.resource.data.firstAttempt.score == request.resource.data.score &&
+            request.resource.data.firstAttempt.total == request.resource.data.total &&
+            request.resource.data.attemptCount == 1;
+          allow update: if admin() ||
+            (signedIn() && request.auth.uid == uid && member(cid) && visible(cid,wid) &&
+             get(weekDoc(cid,wid)).data.quiz.enabled == true &&
+             request.resource.data.userId == uid &&
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['studentName','email','answers','score','total','submittedAt','firstAttempt','attemptCount']) &&
+             request.resource.data.answers is list && request.resource.data.answers.size() <= 200 &&
+             request.resource.data.score is int && request.resource.data.total is int &&
+             request.resource.data.score >= 0 && request.resource.data.score <= request.resource.data.total &&
+             request.resource.data.attemptCount is int && request.resource.data.attemptCount >= 1 &&
+             (
+               (('firstAttempt' in resource.data) && request.resource.data.firstAttempt == resource.data.firstAttempt)
+               ||
+               (!('firstAttempt' in resource.data) &&
+                 request.resource.data.firstAttempt.score == resource.data.score &&
+                 request.resource.data.firstAttempt.total == resource.data.total)
+             ));
+          allow delete: if admin();
+
+          match /attempts/{attemptId} {
+            allow get, list: if admin() || (signedIn() && request.auth.uid == uid && member(cid) && visible(cid,wid));
+            allow create: if signedIn() && request.auth.uid == uid && member(cid) && visible(cid,wid) &&
+              get(weekDoc(cid,wid)).data.quiz.enabled == true &&
+              request.resource.data.keys().hasOnly(['userId','answers','score','total','attemptNumber','submittedAt']) &&
+              request.resource.data.userId == uid && request.resource.data.answers is list && request.resource.data.answers.size() <= 200 &&
+              request.resource.data.score is int && request.resource.data.total is int &&
+              request.resource.data.score >= 0 && request.resource.data.score <= request.resource.data.total &&
+              request.resource.data.attemptNumber is int && request.resource.data.attemptNumber > 0 &&
+              getAfter(/databases/$(database)/documents/classes/$(cid)/weeks/$(wid)/quizResults/$(uid)).data.score == request.resource.data.score;
+            allow update, delete: if admin();
+          }
+        }
+        match /attendance/{uid} {
+          allow get, list: if admin() ||
+            (signedIn() && request.auth.uid == uid && member(cid));
+          allow create, update, delete: if admin();
+        }
+      }
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}

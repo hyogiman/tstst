@@ -1,0 +1,44 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() { return request.auth != null; }
+    // Storage 규칙은 요청당 Firestore 문서 조회 최대 2개: 관리자 프로필 1 + 수강 등록 1.
+    function admin() {
+      return signedIn() &&
+        firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    function member(cid) {
+      return signedIn() &&
+        firestore.exists(/databases/(default)/documents/enrollments/$(request.auth.uid + '_' + cid)) &&
+        firestore.get(/databases/(default)/documents/enrollments/$(request.auth.uid + '_' + cid)).data.status == 'active';
+    }
+    match /classes/{cid}/previews/{wid}/image/{file} {
+      allow read: if admin() || member(cid);
+      allow create, update: if admin() && request.resource.size < 8 * 1024 * 1024 && request.resource.contentType.matches('image/.*');
+      allow delete: if admin();
+    }
+    match /classes/{cid}/previews/{wid}/video/{file} {
+      allow read: if admin() || member(cid);
+      allow create, update: if admin() && request.resource.size <= 2 * 1024 * 1024 * 1024 && request.resource.contentType.matches('video/.*');
+      allow delete: if admin();
+    }
+    match /classes/{cid}/previews/{wid}/file/{file} {
+      allow read: if admin() || member(cid);
+      allow create, update: if admin() && request.resource.size < 20 * 1024 * 1024;
+      allow delete: if admin();
+    }
+    match /classes/{cid}/submissions/{wid}/{uid}/{file} {
+      allow read: if admin() || (signedIn() && request.auth.uid == uid && member(cid));
+      allow create, update: if signedIn() && request.auth.uid == uid && member(cid) &&
+        request.resource.size < 15 * 1024 * 1024 && request.resource.contentType.matches('audio/.*');
+      allow delete: if admin() || (signedIn() && request.auth.uid == uid && member(cid));
+    }
+    match /classes/{cid}/feedback/{wid}/{uid}/{file} {
+      allow read: if admin() || (signedIn() && request.auth.uid == uid && member(cid));
+      allow create, update: if admin() && request.resource.size < 15 * 1024 * 1024 && request.resource.contentType.matches('audio/.*');
+      allow delete: if admin();
+    }
+    match /{allPaths=**} { allow read, write: if false; }
+  }
+}
