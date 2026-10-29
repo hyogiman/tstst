@@ -51,15 +51,15 @@ classes/{cid}             name, description, joinCode, archived,
                                      dueAt('YYYY-MM-DDTHH:mm' 문자열, 한국 시간으로 해석),
                                      dueAtTs(Timestamp, 배치 06 — 학생 D-day 표시용, D3: 통계 마감 아님)},
                           quiz{enabled, title, version(배치 06), questions[{id, type('single'|'multiple'|'ox'),
-                               stem, options[], correctIndices[], correctIndex, explanation}]},
+                               stem, options[], correctIndices[], explanation}]},   ← correctIndex는 배치 12부터 쓰지 않음(읽기만 호환)
                           preview{enabled, title, mode('rich'|'image'), richHtml, imagePath,
                                   videos[{path,name,size}], files[{path,name,size}]}
     submissions/{uid}     userId, studentName, email, text, audioPath,
                           submittedAt(재제출 시 덮어씀),
                           revision(1부터, 재제출마다 +1), firstSubmittedAt(불변), latestSubmittedAt  ← 배치 05
                           audioDuration(초), studentSeenFeedbackAt                                  ← 배치 06
-                          feedbacks[{id, text, audioPath, audioDuration, createdAt(ISO 문자열), author, forRevision}],
-                          (구버전) feedback{text, audioPath, updatedAt}
+                          feedbacks[{id, text, audioPath, audioDuration, createdAt(ISO 문자열), author, forRevision}]
+                          (업로드 이전 버전의 단일 feedback 필드 호환은 배치 12에서 제거, D7)
       revisions/{회차}    revision, text, audioPath, audioDuration, submittedAt, studentName, legacy?
                           ← 배치 06: 제출 1회 = 문서 1개, 변경 불가. 회차 없던 이전 제출은 처음 다시 낼 때 1차로 보존
     quizVersions/{버전}   version, questions(정답 포함), savedAt, savedBy   ← 배치 06, 강사 전용

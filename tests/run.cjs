@@ -1271,6 +1271,59 @@ test('SP05 390px: 수강생 관리는 카드형 목록, 가로 넘침 없음, �
   assert(await page.$eval('#student-detail', el => el.hidden) && await page.evaluate(() => document.activeElement?.dataset.openDetail) === 's1', '[← 목록] 뒤 목록으로 돌아가지 않음');
 });
 
+// ----- 배치 12: 접근성 -----
+// 키보드만으로: Tab을 눌러 원하는 요소까지 이동합니다(마우스 클릭 없음).
+async function tabTo(page, selector, max = 120) {
+  for (let i = 0; i < max; i++) {
+    await page.keyboard.press('Tab');
+    if (await page.evaluate(sel => !!document.activeElement?.matches(sel), selector)) return;
+  }
+  throw new Error('키보드로 닿지 못함: ' + selector);
+}
+test('A11Y01 키보드만으로 학생 과제 제출 (Tab · 화살표 · Enter)', async b => {
+  const { page } = await openAs(b, 'index.html', 's2', { viewport: { width: 1280, height: 900 }, tab: 'home' });
+  await tabTo(page, '.nav-item[data-tab="assignment"]'); await page.keyboard.press('Enter'); await pause(page, 700);
+  await tabTo(page, '#student-week-picker');
+  for (let i = 0; i < 15 && (await page.inputValue('#student-week-picker')) !== 'w4'; i++) { await page.keyboard.press('ArrowUp'); await pause(page, 300); } // 처음 선택은 마지막 공개 차시(5차시)
+  assert((await page.inputValue('#student-week-picker')) === 'w4' && await page.evaluate(() => document.activeElement?.id) === 'student-week-picker', '키보드로 차시를 고르지 못함(포커스 유지)');
+  await pause(page, 600);
+  await tabTo(page, '#assignment-text'); await page.keyboard.type('Mi hermana tiene diez años.');
+  await tabTo(page, '#submit-assignment'); await page.keyboard.press('Enter'); await pause(page, 1000);
+  assert((await dump(page, 'classes/c1/weeks/w4/submissions/s2'))?.text === 'Mi hermana tiene diez años.', '키보드로 제출되지 않음');
+});
+
+test('A11Y02 키보드만으로 강사 피드백 등록 (사이드바 · 차시 선택 · 학생 · 피드백 저장)', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  await tabTo(page, '.side-link[data-page="feedback"]'); await page.keyboard.press('Enter'); await pause(page, 800);
+  await tabTo(page, '#admin-week-picker');
+  for (let i = 0; i < 15 && (await page.inputValue('#admin-week-picker')) !== 'w1'; i++) { await page.keyboard.press('ArrowUp'); await pause(page, 400); }
+  assert((await page.inputValue('#admin-week-picker')) === 'w1', '키보드로 차시를 고르지 못함');
+  await pause(page, 800);
+  await tabTo(page, '[data-feedback-uid="s2"]'); await page.keyboard.press('Enter'); await pause(page, 500);
+  await tabTo(page, '[data-feedback-text]'); await page.keyboard.type('Muy bien. 다음에는 가족 이름도 넣어 볼까요?');
+  await tabTo(page, '[data-feedback-save]'); await page.keyboard.press('Enter'); await pause(page, 900);
+  const fb = (await dump(page, 'classes/c1/weeks/w1/submissions/s2')).feedbacks || [];
+  assert(fb.some(f => f.text.includes('가족 이름')), '키보드로 피드백이 저장되지 않음');
+});
+
+test('A11Y03 긴 이름·긴 스페인어 문장·확대(좁은 폭)에서도 가로로 넘치지 않음', async b => {
+  const seed = makeSeed();
+  const long = '마리아 페르난다 가르시아 로페스 데 라 크루스 산티아고';
+  Object.assign(seed.docs['users/s1'], { realName: long, displayName: long });
+  seed.docs['enrollments/s1_c1'].studentName = long;
+  seed.docs['classes/c1/members/s1'].name = long;
+  seed.docs['classes/c1/weeks/w1/submissions/s1'].text = 'Supercalifragilisticoespialidosoysiempremuyfelizdeaprenderespañolcontodosmisamigos '.repeat(3);
+  for (const [file, user, width, tab] of [['index.html', 's1', 320, 'assignment'], ['admin.html', 'admin1', 640, null]]) {
+    const { page, context } = await openApp(b, { file, user, seed, viewport: { width, height: 800 } });
+    await pause(page, 900);
+    if (tab) { await page.click(`[data-tab="${tab}"]`); await pause(page, 500); await page.selectOption('#student-week-picker', 'w1'); await pause(page, 700); }
+    else { await page.click('[data-page="classes"]'); await pause(page, 400); await page.click('[data-open-roster="c1"]'); await pause(page, 1000); }
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+    assert(overflow <= 0, `${file} ${width}px 가로 넘침 ${overflow}px`);
+    await context.close();
+  }
+});
+
 test('기본: 학생 과제 텍스트 제출, 퀴즈 3/3, 강사 화면 주요 메뉴 오류 없음', async b => {
   const r = await openAs(b, 'index.html', 's2', { viewport: { width: 390, height: 844 } });
   await r.page.selectOption('#student-week-picker', 'w4'); await pause(r.page, 700);

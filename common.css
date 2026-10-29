@@ -62,7 +62,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 audio{width:100%;max-width:420px;height:40px}
 video{max-width:100%}
 progress{accent-color:var(--wine-600)}
-.hide{display:none!important}
+.hide{display:none!important} /* 유틸리티: 어떤 컴포넌트의 display보다 우선해야 해서 !important를 둡니다 */
 .sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
 /* ---------- 레이아웃 도우미 ---------- */
@@ -71,15 +71,12 @@ progress{accent-color:var(--wine-600)}
 .between{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
 .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
 .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
-.spacer{height:16px}
 .separator{height:1px;background:var(--line);margin:18px 0}
 .muted{color:var(--muted)}
 .hint{font-size:13px;color:var(--muted);line-height:1.6}
 .error{color:var(--danger);font-size:13px;font-weight:600}
 .kicker{font-size:12px;color:var(--wine-600);font-weight:800;letter-spacing:.06em}
 .eyebrow{display:block;font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--wine-600);margin-bottom:8px}
-.form-actions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
-.badge-row{display:flex;gap:7px;flex-wrap:wrap}
 .section-title{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:22px}
 .section-title>div:first-child{min-width:0}
 .section-title p{color:var(--muted);margin-top:6px;font-size:14px}
@@ -104,7 +101,8 @@ progress{accent-color:var(--wine-600)}
 .btn.ghost:hover{background:var(--surface-2);color:var(--ink)}
 .btn.danger{background:var(--danger-bg);border-color:#f3cbc6;color:var(--danger);box-shadow:none}
 .btn.danger:hover{background:#fbdcd8}
-.btn.danger-solid,.danger-solid{background:var(--danger)!important;border-color:var(--danger)!important;color:#fff!important}
+.btn.danger-solid{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn.danger-solid:hover{box-shadow:inset 0 0 0 99px rgba(0,0,0,.16)} /* 어둡게: 새 색을 만들지 않고 겹침 */
 .btn.btn-outline-red,.btn-outline-red{background:var(--surface);border-color:var(--wine-200);color:var(--wine-700);box-shadow:none}
 .btn.btn-outline-red:hover{background:var(--wine-50)}
 .btn.small{min-height:36px;padding:0 13px;font-size:13px;border-radius:10px}
@@ -114,6 +112,13 @@ progress{accent-color:var(--wine-600)}
 /* ---------- 입력 ---------- */
 .field{display:flex;flex-direction:column;gap:7px;min-width:0}
 .field>label,.field-label{font-size:13px;font-weight:700;color:var(--ink-2)}
+/* 파일 선택 (배치 12): 숨긴 input + 한국어 버튼 + 고른 파일 이름 */
+.file-pick{position:relative;display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;min-width:0}
+.file-pick-input{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.file-pick-input:focus-visible+.file-pick-button{outline:3px solid rgba(180,35,59,.45);outline-offset:2px}
+.file-pick-input:disabled+.file-pick-button{opacity:.5;cursor:not-allowed}
+.file-pick-button{cursor:pointer}
+.file-pick-name{min-width:0;font-size:13px;color:var(--muted);overflow-wrap:anywhere}
 .field input,.field select,.field textarea,.input{width:100%;min-height:46px;padding:11px 14px;border:1px solid var(--line-strong);border-radius:12px;background:var(--surface);color:var(--ink);font-size:15px;outline:none;transition:border-color .15s,box-shadow .15s}
 .field textarea,textarea.input{min-height:110px;line-height:1.7;resize:vertical}
 .field input::placeholder,.field textarea::placeholder,.input::placeholder{color:#a9999d}
@@ -121,7 +126,6 @@ progress{accent-color:var(--wine-600)}
 .field input[type=file]{padding:9px 10px;min-height:auto;background:var(--surface-2);font-size:13px}
 .field input[type=file]::file-selector-button{border:1px solid var(--line-strong);background:var(--surface);border-radius:9px;padding:7px 12px;margin-right:10px;font-weight:700;color:var(--ink-2);cursor:pointer}
 .field input[type=checkbox]{width:18px;height:18px;min-height:0;accent-color:var(--wine-600)}
-.field.inline{flex-direction:row;align-items:center;gap:9px}
 select.input,.field select{appearance:none;-webkit-appearance:none;padding-right:40px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%236f6266' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 15px center}
 .checkline{display:flex;align-items:center;gap:9px;cursor:pointer;font-size:14px;font-weight:600}
 .checkline input{accent-color:var(--wine-600);width:18px;height:18px}
@@ -130,8 +134,6 @@ select.input,.field select{appearance:none;-webkit-appearance:none;padding-right
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:24px;box-shadow:var(--shadow-sm);min-width:0}
 .card+.card{margin-top:16px}
 .subtle{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-md);padding:16px}
-.list-card{padding:17px;border:1px solid var(--line);border-radius:var(--r-md);margin-bottom:11px}
-.list-card h4{font-size:14px}.list-card p{font-size:13px;color:var(--muted)}
 .mini-stat{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-md);padding:16px;display:flex;flex-direction:column;gap:4px}
 .mini-stat strong{font-family:var(--font-display);font-size:28px;font-weight:600;letter-spacing:-.02em;line-height:1.1;color:var(--ink)}
 .mini-stat span{font-size:12px;color:var(--muted)}
@@ -275,7 +277,7 @@ a.media-item:hover{border-color:var(--wine-200);background:var(--wine-50);color:
 .auth-hero .eyebrow{color:#ffd9a3;font-family:var(--font-display);font-style:italic;font-weight:500;font-size:16px;letter-spacing:.02em;text-transform:none}
 .auth-hero h1,.auth-hero .senorayu-opening{max-width:560px;font-size:clamp(34px,4.3vw,56px);font-weight:800;line-height:1.28;letter-spacing:-.04em;color:#fff}
 .senorayu-opening span{display:block;color:#fff}
-.senorayu-opening-intro{font-weight:500!important;font-size:.62em;letter-spacing:-.02em;opacity:.85;margin-bottom:.35em}
+.senorayu-opening-intro{font-weight:500;font-size:.62em;letter-spacing:-.02em;opacity:.85;margin-bottom:.35em}
 .senorayu-opening .opening-dot{display:inline;color:var(--saffron-500)}
 .auth-hero p{max-width:440px;margin-top:22px;font-size:16px;line-height:1.85;color:rgba(255,255,255,.86)}
 .auth-hero footer{font-family:var(--font-display);font-style:italic;font-size:17px;color:rgba(255,255,255,.82)}

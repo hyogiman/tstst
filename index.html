@@ -15,8 +15,8 @@
 <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;1,9..144,500&display=swap">
 <!-- 배포할 때 CSS를 바꾸면 ?v= 값을 함께 올려 브라우저 캐시를 갱신하세요 -->
-<link rel="stylesheet" href="common.css?v=20261029i">
-<link rel="stylesheet" href="student.css?v=20261029i">
+<link rel="stylesheet" href="common.css?v=20261029j">
+<link rel="stylesheet" href="student.css?v=20261029j">
 </head>
 <body>
 <div id="root"></div>
@@ -35,7 +35,7 @@ window.__appStarted=true; // 모듈(외부 SDK 포함)을 모두 불러와 앱�
 
 import { onAuthStateChanged, updateProfile, signOut } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import { doc, getDoc, getDocs, collection, query, where, addDoc, setDoc, updateDoc, serverTimestamp, onSnapshot, runTransaction, writeBatch } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
-import { CONFIGURED, auth, db, $, $$, esc, fmt, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, ensureProfile, mountAuth, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalConfirm, formatDateTime, statusPill, paintPill, needsReply, byLastActivity, feedbackItems, reviewState, toDate, todayKey, daysBetween, audioMarkup, parseAnswer, encodeAnswer, normalizeQuizQuestion, isCorrectAnswer, answersFor, attendanceValue, dateKeyOf, shortLabel, questionSessionTag, setErrorAudience, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded, sessionState, sessionDateText, youtubeEmbedUrl } from './common.js?v=20261029i';
+import { CONFIGURED, auth, db, $, $$, esc, fmt, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, ensureProfile, mountAuth, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalConfirm, formatDateTime, statusPill, paintPill, needsReply, byLastActivity, feedbackItems, reviewState, toDate, todayKey, daysBetween, audioMarkup, parseAnswer, encodeAnswer, normalizeQuizQuestion, isCorrectAnswer, answersFor, attendanceValue, dateKeyOf, shortLabel, questionSessionTag, setErrorAudience, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded, sessionState, sessionDateText, youtubeEmbedUrl } from './common.js?v=20261029j';
 
 
 // ===== INDEX PAGE =====
@@ -329,7 +329,7 @@ async function drawHomeAttendance(){
   }catch(e){if(box.isConnected)showLoadFailed(box,()=>drawHomeAttendance(),e)}
 }
 
-const wselect=()=>`<select id="student-week-picker" class="input week-chooser">${S.weeks.map(w=>`<option value="${esc(w.id)}" ${w.id===S.weekId?'selected':''}>${esc(w.label)}</option>`).join('')}</select>`;
+const wselect=()=>`<select id="student-week-picker" class="input week-chooser" aria-label="차시 선택">${S.weeks.map(w=>`<option value="${esc(w.id)}" ${w.id===S.weekId?'selected':''}>${esc(w.label)}</option>`).join('')}</select>`;
 function enterStudentHistory(){if(history.state?.senorayuStudent)return;history.replaceState({senorayuStudent:true,tab:'home'},'');history.pushState({senorayuStudent:true,tab:S.tab},'','#'+S.tab)}
 window.addEventListener('popstate',e=>{if(!S.user||!document.querySelector('.student-app'))return;S.tab=e.state?.senorayuStudent?e.state.tab:'home';S.quiz=null;renderBody()});
 function frame(){
@@ -348,7 +348,8 @@ function frame(){
 }
 function bodyHeader(title,description){return `<div class="page-head"><div class="eyebrow">LEARNING JOURNEY</div><h1>${title}</h1><p>${description}</p></div>`}
 function weekHeader(title,description){return `<div class="section-title"><div>${bodyHeader(title,description)}</div>${S.weeks.length?wselect():''}</div>`}
-function weeklyPicker(){ $('#student-week-picker')?.addEventListener('change',e=>{S.weekId=e.target.value;S.quiz=null;renderBody()}) }
+// 차시를 바꾸면 화면을 다시 그리므로, 키보드로 고르던 사람이 처음부터 Tab을 다시 누르지 않게 선택기로 포커스를 돌려 둡니다(배치 12).
+function weeklyPicker(){ $('#student-week-picker')?.addEventListener('change',e=>{S.weekId=e.target.value;S.quiz=null;renderBody();$('#student-week-picker')?.focus()}) }
 function renderBody(){
   flushAssignmentDraft(); // P1-07: 화면을 옮기기 전에 작성 중인 답안을 임시 저장
   stopRecordingForNavigation(); // P0-02: 화면을 옮기면 녹음을 멈춥니다.
@@ -582,7 +583,8 @@ async function renderAssignment(body){
   if(S.weekId!==w.id||S.tab!=='assignment')return;
   const data=snap.exists()?snap.data():null,draftKey=assignmentDraftKey(w.id);
   const area=$('#assignment-area');if(!area)return;
-  const revision=Number(data?.revision)||1,newSince=seenAt(data?.studentSeenFeedbackAt);
+  // 지난 반(보관된 반)은 확인 시각을 남길 수 없어 '새 피드백' 표시를 하지 않습니다.
+  const revision=Number(data?.revision)||1,newSince=S.past?Number.MAX_SAFE_INTEGER:seenAt(data?.studentSeenFeedbackAt);
   const brief=`<section class="card stack assignment-brief" aria-labelledby="assignment-title"><div class="between"><h2 id="assignment-title">${esc(w.assignment.title||'스페인어 과제')}</h2><span class="pill brand">TAREA</span></div><div class="subtle article" style="white-space:pre-wrap">${esc(w.assignment.instructions||'과제 내용을 확인해 주세요.')}</div>${dueLine(w.assignment)}${!S.past&&w.preview?.enabled?'<button type="button" class="linkbutton assignment-preview-link" data-open-preview>이 차시 예습 자료 보기 →</button>':''}</section>`;
   const feedback=`<div id="student-assignment-feedback">${feedbackMarkup(data,{askable:!S.past,newSince})}</div>`;
   // 제출 기록이 있으면: 제출한 답안 → 피드백 → 과제 안내 → (닫힌) 수정 폼. 없으면: 과제 안내 → 답안 작성 폼
@@ -673,7 +675,7 @@ async function renderQuiz(body){const w=week();body.innerHTML=weekHeader('복습
   try{snap=await getDoc(doc(db,'classes',S.classId,'weeks',w.id,'quizResults',S.user.uid))}
   catch(e){if(S.weekId===w.id&&S.tab==='quiz'){body.insertAdjacentHTML('beforeend','<div class="card" id="quiz-stage"></div>');showLoadFailed($('#quiz-stage'),()=>renderQuiz(body),e)}return} // P1-08
   if(S.weekId!==w.id||S.tab!=='quiz')return;
-  const last=snap.exists()?snap.data():null,newSince=seenAt(last?.studentSeenFeedbackAt);
+  const last=snap.exists()?snap.data():null,newSince=S.past?Number.MAX_SAFE_INTEGER:seenAt(last?.studentSeenFeedbackAt);
   body.insertAdjacentHTML('beforeend',`<div class="card" id="quiz-stage"><div class="between"><div><h2>${esc(w.quiz.title||'이번 주 단어 퀴즈')}</h2></div><span class="pill brand">${w.quiz.questions.length}문항</span></div><div style="margin-top:19px" id="quiz-content"></div></div><div id="quiz-live-feedback">${feedbackMarkup(last,{askable:!S.past,newSince})}</div>`);
   // P1-02: 응시를 시작할 때의 문항과 버전을 고정합니다. 풀던 중 강사가 퀴즈를 바꿔도 시작한 버전으로 채점·저장합니다.
   const qs=w.quiz.questions.map(normalizeQuizQuestion);
@@ -868,7 +870,7 @@ async function renderMyPage(body){
   const realName=String(S.profile.realName||S.enrollmentRealName||S.profile.displayName||'').trim();
   const preferred=String(S.profile.nickname||(S.profile.displayName!==realName?S.profile.displayName:'')||'').trim();
   body.innerHTML=bodyHeader('내 정보','내 프로필, 출석 기록, 우리 반 친구들을 확인하세요.');
-  body.insertAdjacentHTML('beforeend',`<div class="grid2"><div class="card"><h3>👋 프로필</h3><div class="separator"></div><dl class="info-grid"><dt>내 이름</dt><dd>${esc(realName)}</dd><dt>사용하는 별명</dt><dd>${esc(preferred||'미설정')}</dd><dt>로그인 ID</dt><dd>${esc(S.user.email)}</dd><dt>현재 반</dt><dd>${esc(currentClass()?.name||'미등록')}</dd><dt>수강 시작</dt><dd>${esc((currentClass()?.schedule||[]).map(x=>x.date).filter(Boolean).sort()[0]||'수업 날짜 미설정')}</dd></dl><div class="separator"></div><form id="student-name-form" class="row" style="align-items:end"><div class="field" style="flex:1;min-width:160px"><label>우리 반에 표시할 별명</label><input name="displayName" maxlength="35" value="${esc(preferred)}" placeholder="비우면 실제 이름으로 표시"></div><button class="btn secondary small" type="submit">별명 저장</button></form><p class="hint">우리 반 명단에는 별명만 표시됩니다. 강사에게는 별명과 실명이 함께 표시됩니다.</p><div class="quiet-note">반 변경이 필요하시면 강사에게 요청해 주세요.</div></div><div class="card"><h3>📋 출석 현황</h3><p class="hint" style="margin:6px 0 12px">등록된 차시별 수업 날짜와 출결을 표시합니다.</p><div id="attendance-overview" class="loading">불러오는 중</div></div></div>${classmatesCard()}${pastClassesCard()}`);
+  body.insertAdjacentHTML('beforeend',`<div class="grid2"><div class="card"><h3>👋 프로필</h3><div class="separator"></div><dl class="info-grid"><dt>내 이름</dt><dd>${esc(realName)}</dd><dt>사용하는 별명</dt><dd>${esc(preferred||'미설정')}</dd><dt>로그인 ID</dt><dd>${esc(S.user.email)}</dd><dt>현재 반</dt><dd>${esc(currentClass()?.name||'미등록')}</dd><dt>수강 시작</dt><dd>${esc((currentClass()?.schedule||[]).map(x=>x.date).filter(Boolean).sort()[0]||'수업 날짜 미설정')}</dd></dl><div class="separator"></div><form id="student-name-form" class="row" style="align-items:end"><div class="field" style="flex:1;min-width:160px"><label for="student-nickname">우리 반에 표시할 별명</label><input id="student-nickname" name="displayName" maxlength="35" value="${esc(preferred)}" placeholder="비우면 실제 이름으로 표시"></div><button class="btn secondary small" type="submit">별명 저장</button></form><p class="hint">우리 반 명단에는 별명만 표시됩니다. 강사에게는 별명과 실명이 함께 표시됩니다.</p><div class="quiet-note">반 변경이 필요하시면 강사에게 요청해 주세요.</div></div><div class="card"><h3>📋 출석 현황</h3><p class="hint" style="margin:6px 0 12px">등록된 차시별 수업 날짜와 출결을 표시합니다.</p><div id="attendance-overview" class="loading">불러오는 중</div></div></div>${classmatesCard()}${pastClassesCard()}`);
   wirePastClasses(body);startClassmatesLive();
   $('#student-name-form')?.addEventListener('submit',async e=>{
     e.preventDefault();const form=e.currentTarget,name=String(new FormData(form).get('displayName')||'').trim();
@@ -902,7 +904,7 @@ async function drawAttendanceOverview(){
 // 질문 · 답변: 질문은 본인과 강사만, 댓글은 질문 작성자와 강사만 볼 수 있습니다.
 function questionPath(qid){return ['classes',S.classId,'questions',qid]}
 function renderQuestions(body){
-  const newQuestionCard=S.past?'':`<div class="card stack"><h3>새 질문</h3><form id="question-create" class="stack"><div class="field"><label>제목</label><input name="title" required maxlength="100" placeholder="예: 오늘 배운 표현이 궁금해요"></div><div class="field"><label>질문 내용</label><textarea name="content" required maxlength="8000" rows="6" placeholder="질문을 자세히 작성해 주세요."></textarea></div><div class="field"><label for="question-week">어느 차시에 대한 질문인가요? (선택)</label><select id="question-week" name="weekId"><option value="">차시 선택 안 함</option>${S.weeks.map(w=>`<option value="${esc(w.id)}">${esc(w.label)}</option>`).join('')}</select></div><button class="btn" type="submit">질문 보내기</button></form></div>`;
+  const newQuestionCard=S.past?'':`<div class="card stack"><h3>새 질문</h3><form id="question-create" class="stack"><div class="field"><label for="question-title">제목</label><input id="question-title" name="title" required maxlength="100" placeholder="예: 오늘 배운 표현이 궁금해요"></div><div class="field"><label for="question-content">질문 내용</label><textarea id="question-content" name="content" required maxlength="8000" rows="6" placeholder="질문을 자세히 작성해 주세요."></textarea></div><div class="field"><label for="question-week">어느 차시에 대한 질문인가요? (선택)</label><select id="question-week" name="weekId"><option value="">차시 선택 안 함</option>${S.weeks.map(w=>`<option value="${esc(w.id)}">${esc(w.label)}</option>`).join('')}</select></div><button class="btn" type="submit">질문 보내기</button></form></div>`;
   // 지난 반: 주고받은 질문과 답변만 읽을 수 있습니다. 새 질문은 현재 반에서 남깁니다.
   body.innerHTML=(S.past?bodyHeader('질문 기록','지난 반에서 주고받은 질문과 답변이에요. 새 질문은 현재 반에서 남겨 주세요.'):bodyHeader('질문하기','궁금한 점을 선생님께 남겨보세요. 답변은 실시간으로 표시됩니다.'))+`<div class="${S.past?'stack':'grid2'}" style="align-items:start">${newQuestionCard}<div class="stack"><div class="between"><h3>내 질문</h3><span class="pill brand" id="question-count">0건</span></div><div id="question-list" class="question-list"><div class="loading">질문 확인 중</div></div></div></div><div id="student-thread" style="margin-top:17px"></div>`;
   if($('#question-create'))$('#question-create').onsubmit=async e=>{e.preventDefault();const form=e.currentTarget,fd=new FormData(form);const title=String(fd.get('title')||'').trim(),content=String(fd.get('content')||'').trim(),weekId=String(fd.get('weekId')||'');if(!title||!content)return;const btn=$('button[type="submit"]',form);btn.disabled=true;try{await createQuestion({title,content,weekId});form.reset();toast('질문이 전송되었습니다.')}catch(err){toast(ex(err),true)}finally{btn.disabled=false}};

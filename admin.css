@@ -37,13 +37,12 @@
 .topbar-greeting strong{font-size:19px;font-weight:800;letter-spacing:-.03em}
 .topbar-actions{display:flex;align-items:flex-end;gap:10px}
 .topbar-actions .field{gap:4px}
-.topbar-actions .field label{font-size:11px;color:var(--muted)}
-.topbar-actions .field select{min-width:260px;min-height:42px;font-weight:700}
+.topbar-actions .field label{font-size:12px;font-weight:800;color:var(--wine-700)}
+.topbar-actions .field select{min-width:260px;min-height:44px;border:1.5px solid var(--wine-200);background-color:var(--wine-50);color:var(--wine-800);font-size:15px;font-weight:800} /* 배치 12: 화면 제목에서 반 이름을 빼고, 반 선택기를 눈에 띄게 */
 .topbar-actions .btn{min-height:42px}
 
 /* 화면 제목 */
 #admin-body>.section-title h1{font-size:clamp(26px,2.6vw,32px)}
-.current-class{display:inline-block;margin-left:4px;font-size:.58em;font-weight:700;color:var(--wine-600);letter-spacing:-.01em;vertical-align:middle}
 
 /* ---------- 대시보드 (배치 09) ---------- */
 /* 퍼센트 옆에는 항상 건수(n)를 씁니다. 상태 색(성공·주의·위험·중립)은 기호·글자와 함께 상태에만 쓰고,
@@ -181,7 +180,7 @@ button.dash-action:hover{border-color:var(--wine-200);box-shadow:var(--shadow-md
 .class-manager-item.is-archived td{color:var(--subtle)}
 .db-class-name,.student-name-link{padding:0;border:0;background:none;color:var(--wine-700);font:inherit;font-weight:800;text-align:left}
 .db-class-name:hover,.student-name-link:hover{text-decoration:underline;text-underline-offset:3px}
-.db-muted{color:var(--muted)!important}
+.db-table .db-muted{color:var(--muted)}
 .db-ellipsis{max-width:220px;overflow:hidden;text-overflow:ellipsis}
 .db-code-copy{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border:1px dashed var(--line-strong);border-radius:9px;background:var(--surface-2);color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;font-weight:700;letter-spacing:.06em}
 .db-code-copy:hover{border-color:var(--wine-200);background:var(--wine-50)}
@@ -193,10 +192,10 @@ button.dash-action:hover{border-color:var(--wine-200);box-shadow:var(--shadow-md
 .db-action-row{display:flex;align-items:center;gap:6px}
 .db-light-button{min-height:34px;padding:0 11px;border:1px solid var(--line-strong);border-radius:9px;background:var(--surface);color:var(--ink-2);font-size:13px;font-weight:650;white-space:nowrap}
 .db-light-button:hover{background:var(--surface-2)}
-.db-border-red{border-color:var(--wine-200)!important;color:var(--wine-700)!important}
+.db-light-button.db-border-red{border-color:var(--wine-200);color:var(--wine-700)}
 .db-danger-button{background:var(--danger-bg);border-color:#f3cbc6;color:var(--danger)}
 .db-danger-button:hover{background:#fbdcd8}
-.db-no-data{text-align:center;padding:30px 16px!important;color:var(--muted)}
+.db-table td.db-no-data{text-align:center;padding:30px 16px;color:var(--muted)}
 
 /* ---------- 수강생 관리 ---------- */
 .roster-summary{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:14px;padding:14px 18px;border-radius:var(--r-lg);background:var(--surface);border:1px solid var(--line)}
@@ -209,7 +208,7 @@ button.dash-action:hover{border-color:var(--wine-200);box-shadow:var(--shadow-md
 .roster-tools input{width:240px;max-width:100%}
 .roster-tools select{min-width:130px;appearance:none;-webkit-appearance:none;padding-right:34px;background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%236f6266' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 12px center}
 .roster-tools input:focus,.roster-tools select:focus{outline:none;border-color:var(--wine-500);box-shadow:var(--focus-ring)}
-.roster-card{padding:0!important;overflow:hidden}
+.card.roster-card{padding:0;overflow:hidden}
 .roster-card .data-table{min-width:0}
 /* 수강생 관리 (배치 11): 이름 · 상태 · 최근 기호 4칸 · 메모 · ⋯ / 학생 상세 패널 */
 .students-workspace{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:start}
@@ -260,7 +259,7 @@ button.dash-action:hover{border-color:var(--wine-200);box-shadow:var(--shadow-md
 .detail-question:hover{border-color:var(--wine-200);background:var(--wine-50)}
 .detail-more{margin:12px 18px}
 /* 강사 메모는 학생 공개 정보와 확실히 구분: 빗금 배경 + '강사만 볼 수 있어요' */
-.detail-private{background:repeating-linear-gradient(135deg,#fcf6ec 0 12px,#f8efe1 12px 24px)}
+.detail-private{background:repeating-linear-gradient(135deg,var(--saffron-50) 0 12px,var(--surface-2) 12px 24px)}
 .private-label,.public-label{padding:3px 9px;border-radius:var(--r-pill);font-size:11px;font-weight:800}
 .private-label{background:var(--warning-bg);color:var(--warning)}
 .public-label{background:var(--success-bg);color:var(--success)}
@@ -268,12 +267,9 @@ button.dash-action:hover{border-color:var(--wine-200);box-shadow:var(--shadow-md
 .detail-goal{background:var(--olive-50)}
 .roster-content{min-height:0}
 .roster-empty{padding:28px 20px}
-.roster-error{padding:22px}
 .name-cell{display:flex;align-items:center;gap:12px;min-width:150px}
 .name-cell small{display:block;margin-top:1px;font-size:12px;color:var(--subtle)}
-.row-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.row-actions .btn{min-height:34px;padding:0 11px}
-.dup-warning{color:var(--warning)!important;font-weight:700}
+.name-cell small.dup-warning{color:var(--warning);font-weight:700}
 .dup-warning .linkbutton{font-size:12px;color:var(--warning)}
 
 /* ---------- 차시별 콘텐츠: 목록 + 상세 ---------- */
@@ -342,7 +338,6 @@ button.dash-action:hover{border-color:var(--wine-200);box-shadow:var(--shadow-md
 .feedback-person .person-secondary{display:block;margin-top:2px;font-size:12px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .feedback-person .person-side{display:flex;flex-direction:column;align-items:flex-end;gap:5px}
 .feedback-person .person-side .pill{font-size:11px;padding:3px 8px}
-.mini-score{font-size:11px;color:var(--muted)}
 .feedback-inspector,.question-inspector{position:sticky;top:96px;max-height:calc(100vh - 112px);overflow:auto;padding:22px 24px}
 .inspector-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--line)}
 .inspector-title .name{font-size:20px;font-weight:800;letter-spacing:-.025em;line-height:1.35}
@@ -461,7 +456,7 @@ button.dash-action:hover{border-color:var(--wine-200);box-shadow:var(--shadow-md
   .side-nav{flex-direction:row;overflow-x:auto;padding:8px 12px 8px 4px;scrollbar-width:none}
   .side-nav::-webkit-scrollbar{display:none}
   .side-menu-group{flex-shrink:0}
-  .side-submenu,.side-chevron,.sidebar-footnote{display:none!important}
+  .side-menu-group:has([data-page="classes"].active) .side-submenu,.side-submenu,.side-chevron,.sidebar-footnote{display:none}
   .side-link{width:auto;min-height:40px;white-space:nowrap;font-size:13px;padding:0 12px}
   .side-link.active{box-shadow:inset 0 -3px 0 var(--wine-600)}
   .admin-topbar{position:static}

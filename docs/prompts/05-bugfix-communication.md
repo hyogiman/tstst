@@ -86,7 +86,7 @@
    - 시간대 없는 문자열은 **D10 시간대(Asia/Seoul)의 시각**으로 해석합니다. `new Date('YYYY-MM-DDTHH:mm')`는 브라우저 시간대로 해석하므로 직접 계산합니다.
    - 출력: `Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', … })`. 옵션으로 요일 포함 여부, 날짜만 표시 등을 고를 수 있게 합니다.
 2. `.slice(0,16)` 방식과 `fmt()`·`shortDate()`의 개별 구현을 모두 이 함수로 바꿉니다.
-3. 마감 표시 예: `10월 30일 (목) 오후 11:59`
+3. 마감 표시 예: `10월 30일 (금) 오후 11:59`
 
 **완료 기준**
 - [ ] B11 통과: Playwright 브라우저 시간대를 `Asia/Seoul`과 `Europe/Madrid`로 각각 설정해도 같은 한국 시간으로 표시됨

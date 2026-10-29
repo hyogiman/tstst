@@ -60,7 +60,6 @@
 .score-ring-inner span{font-size:13px;color:var(--muted)}
 .review-line{padding:14px 0;border-bottom:1px solid var(--line)}
 .review-line:last-of-type{border-bottom:0}
-.quiz-missed{color:var(--danger)}.quiz-correct{color:var(--success)}
 .resume-card{display:flex;flex-direction:column;gap:14px;padding:18px;border-radius:var(--r-md);background:var(--saffron-50);border:1px solid var(--saffron-100)}
 
 /* 다음 차시(예습) 영상 */
@@ -79,8 +78,6 @@
 .past-class{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:52px;padding:12px 16px;border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--surface);color:var(--ink);text-align:left}
 .past-class span{color:var(--wine-600);font-size:13px;font-weight:700;white-space:nowrap}
 .past-class:hover{border-color:var(--wine-200);background:var(--wine-50)}
-.past-answer{display:flex;flex-direction:column;gap:10px;padding:16px;border-radius:var(--r-md);background:var(--surface-2)}
-.past-answer-text{white-space:pre-wrap;overflow-wrap:anywhere}
 .quiz-note{margin-top:12px}
 
 /* 홈 (배치 10 · D6 B안): 넓은 화면은 두 칸, 휴대폰은 다음 수업 → 할 일 → 새 소식 → 예습 → 출석 순서 */
@@ -133,7 +130,6 @@
 .classmates-card{margin-top:16px}
 .classmate-card{display:flex;align-items:center;gap:12px;padding:14px 16px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface)}
 .classmate-avatar{width:40px;height:40px;flex-shrink:0;border-radius:13px;display:grid;place-items:center;background:var(--olive-50);color:var(--olive-700);font-weight:800}
-.focus-card{padding:24px;border-radius:var(--r-lg);background:var(--surface);border:1px solid var(--line)}
 
 /* 반응형 */
 @media (max-width:680px){
