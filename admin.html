@@ -36,7 +36,6 @@ const adminInitialState=()=>({user:null,profile:null,classes:[],classId:'',class
 const A=adminInitialState();
 // 계정마다 마지막으로 본 반을 따로 기억합니다.
 const classPrefKey=()=>'spanish-lms-admin-class:'+(A.user?.uid||'');
-const PAGES=[['overview','◈','대시보드'],['weeks','▤','주차 콘텐츠'],['feedback','◉','제출·피드백'],['attendance','✓','출석 관리'],['students','♙','수강생 관리'],['questions','♧','질문함'],['classes','▦','반 관리']];
 const activeClass=()=>A.classes.find(c=>c.id===A.classId);
 const activeWeek=()=>A.weeks.find(w=>w.id===A.weekId);
 function adminStopLive(key){if(A.live[key]){A.live[key]();delete A.live[key]}}
@@ -49,7 +48,6 @@ function resetAdminSession(){
 }
 window.addEventListener('beforeunload',e=>{if(A.user&&(isRecording()||Object.keys(A.voiceDrafts).length||isFeedbackTextDirty())){e.preventDefault();e.returnValue=''}});
 function adminLiveError(err){console.error('실시간 연결 실패',err);toast('실시간 구독 오류: '+ex(err),true)}
-const classKey=(cid)=>`classes/${cid}`;
 const weekKey=(cid,wid)=>`classes/${cid}/weeks/${wid}`;
 const codeGen=()=>Array.from(crypto.getRandomValues(new Uint8Array(8))).map(n=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[n%32]).join('');
 // 코드만으로 입장하기 위한 비공개 목록 없는 단일 조회용 연결표.
@@ -94,7 +92,6 @@ function classSchedule(c){
   if(Array.isArray(c?.schedule)&&c.schedule.length)return c.schedule.map((s,i)=>({weekId:s.weekId||'',label:s.label||`${i+1}차시`,date:s.date||''}));
   return A.weeks.filter(w=>!c||c.id===A.classId).map((w,i)=>({weekId:w.id,label:w.label||`${i+1}차시`,date:w.sessionDate||''}));
 }
-function courseStart(c){return (c?.schedule||[]).map(s=>s.date).filter(Boolean).sort()[0]||''}
 async function openClassRoster(cid){
   if(!A.classes.some(c=>c.id===cid))return;
   adminClearLive();A.classId=cid;localStorage.setItem(classPrefKey(),cid);A.weekId='';
@@ -872,7 +869,6 @@ async function showStudents(b){
         const student=students.find(x=>x.uid===el.dataset.moveStudent);if(!student)return;
         const destinations=A.classes.filter(c=>!c.archived&&c.id!==cid);
         if(!destinations.length){toast('이동할 다른 운영 반을 먼저 개설해 주세요.',true);return}
-        const choices=destinations.map((c,i)=>`${i+1}. ${c.name}`).join('\n');
         const answer=await modalDialog({title:'반 이동',message:`${student.studentName}님이 이동할 반을 선택해 주세요.`,choices:destinations.map(c=>({value:c.id,label:c.name})),confirmText:'반 이동'});if(answer===null)return;
         const target=destinations.find(c=>c.id===answer);if(!target){toast('반 번호를 확인해 주세요.',true);return}
         if(!await modalConfirm(`${student.studentName}님을 ${target.name}(으)로 이동할까요?\n이전 반의 학습 기록은 보존되지만 새 반에 복사되지 않습니다.`))return;
