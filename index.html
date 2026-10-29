@@ -15,8 +15,8 @@
 <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;1,9..144,500&display=swap">
 <!-- 배포할 때 CSS를 바꾸면 ?v= 값을 함께 올려 브라우저 캐시를 갱신하세요 -->
-<link rel="stylesheet" href="common.css?v=20261029e">
-<link rel="stylesheet" href="student.css?v=20261029e">
+<link rel="stylesheet" href="common.css?v=20261029f">
+<link rel="stylesheet" href="student.css?v=20261029f">
 </head>
 <body>
 <div id="root"></div>
@@ -35,7 +35,7 @@ window.__appStarted=true; // 모듈(외부 SDK 포함)을 모두 불러와 앱�
 
 import { onAuthStateChanged, updateProfile, signOut } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import { doc, getDoc, getDocs, collection, query, where, addDoc, setDoc, updateDoc, serverTimestamp, onSnapshot, runTransaction, writeBatch } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
-import { CONFIGURED, auth, db, $, $$, esc, fmt, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, ensureProfile, mountAuth, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalConfirm, formatDateTime, statusPill, paintPill, needsReply, byLastActivity, feedbackItems, reviewState, toDate, todayKey, daysBetween, audioMarkup, parseAnswer, encodeAnswer, questionKey, setErrorAudience, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded } from './common.js?v=20261029e';
+import { CONFIGURED, auth, db, $, $$, esc, fmt, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, ensureProfile, mountAuth, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalConfirm, formatDateTime, statusPill, paintPill, needsReply, byLastActivity, feedbackItems, reviewState, toDate, todayKey, daysBetween, audioMarkup, parseAnswer, encodeAnswer, questionKey, setErrorAudience, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded, sessionState, sessionDateText, youtubeEmbedUrl } from './common.js?v=20261029f';
 
 
 // ===== INDEX PAGE =====
@@ -45,7 +45,7 @@ const root=$('#root');
 // 로그아웃하면 이 초기값으로 되돌립니다(P0-09).
 const studentInitialState=()=>({user:null,profile:null,classes:[],classId:'',weeks:[],weekId:'',tab:'assignment',quiz:null,live:{},activeQuestionId:'',directory:[],enrollmentRealName:'',enrollments:[],hadEnrollment:false,audioDrafts:{},joining:false,pastClasses:[],past:null,seenMarked:{}});
 const S=studentInitialState();
-const NAV=[['assignment','pencil','과제'],['quiz','review','복습'],['preview','book','다음차시'],['questions','chat','질문'],['classmates','people','우리 반'],['mypage','user','내 정보']];
+const NAV=[['assignment','pencil','과제'],['quiz','review','복습'],['preview','book','예습'],['questions','chat','질문'],['classmates','people','우리 반'],['mypage','user','내 정보']];
 // 하단 메뉴 아이콘: 강사 화면 사이드바와 같은 선 아이콘(기기마다 모양이 달라지는 이모지 대신)
 const NAV_ICONS={
  pencil:'<path d="M4 20h4L19.5 8.5a2.8 2.8 0 0 0-4-4L4 16v4z"/><path d="m13.5 6.5 4 4"/>',
@@ -172,7 +172,7 @@ function frame(){
     resetStudentSession();signOut(auth); // P0-09: 구독을 먼저 끊고 로그아웃
   });
   $('#past-exit')?.addEventListener('click',closePastClass);
-  $$('[data-tab]').forEach(b=>b.addEventListener('click',()=>{S.tab=b.dataset.tab;history.pushState({senorayuStudent:true,tab:S.tab},'','#'+S.tab);S.quiz=null;renderBody()}));
+  $$('[data-tab]').forEach(b=>b.addEventListener('click',()=>{S.tab=b.dataset.tab;if(S.tab==='preview'&&!S.past)S.weekId=upcomingWeekId()||S.weekId;history.pushState({senorayuStudent:true,tab:S.tab},'','#'+S.tab);S.quiz=null;renderBody()}));
   renderBody();
 }
 function bodyHeader(title,description){return `<div class="page-head"><div class="eyebrow">LEARNING JOURNEY</div><h1>${title}</h1><p>${description}</p></div>`}
@@ -350,7 +350,7 @@ async function markFeedbackSeen(kind,wid,data){
 async function renderAssignment(body){
   const w=week();
   body.innerHTML=weekHeader('과제',S.past?'제출한 답안과 선생님의 피드백을 다시 볼 수 있어요.':'말하기와 쓰기를 차근차근 연습해 보세요.');weeklyPicker();
-  if(!w.assignment?.enabled){body.insertAdjacentHTML('beforeend',empty('이 주차의 과제는 아직 열리지 않았습니다','강사가 과제를 공개하면 여기서 제출할 수 있습니다.'));return}
+  if(!w.assignment?.enabled){body.insertAdjacentHTML('beforeend',empty('이 차시의 과제는 아직 열리지 않았습니다','선생님이 과제를 공개하면 여기서 제출할 수 있어요.'));return}
   body.insertAdjacentHTML('beforeend',`<div class="card stack"><div class="between"><div><h2>${esc(w.assignment.title||'스페인어 과제')}</h2></div><span class="pill brand">TAREA</span></div><div class="subtle article" style="white-space:pre-wrap">${esc(w.assignment.instructions||'과제 내용을 확인해 주세요.')}</div>${dueLine(w.assignment)}<div id="assignment-form-area" class="stack"><div class="loading">제출 기록 확인 중</div></div></div>`);
   let snap;
   try{snap=await getDoc(doc(db,'classes',S.classId,'weeks',w.id,'submissions',S.user.uid))}
@@ -441,7 +441,7 @@ function shuffleQuestion(q){
   return opt;
 }
 async function renderQuiz(body){const w=week();body.innerHTML=weekHeader('단어 복습',S.past?'연습 모드예요. 다시 풀어 볼 수 있지만 결과는 저장되지 않아요.':'한 문제씩 풀고 마지막에 결과를 확인하세요.');weeklyPicker();
-  if(!w.quiz?.enabled||!w.quiz.questions?.length){body.insertAdjacentHTML('beforeend',empty('이 주차의 복습 퀴즈가 준비 중입니다'));return}
+  if(!w.quiz?.enabled||!w.quiz.questions?.length){body.insertAdjacentHTML('beforeend',empty('이 차시의 복습 퀴즈를 준비하고 있어요'));return}
   let snap;
   try{snap=await getDoc(doc(db,'classes',S.classId,'weeks',w.id,'quizResults',S.user.uid))}
   catch(e){if(S.weekId===w.id&&S.tab==='quiz'){body.insertAdjacentHTML('beforeend','<div class="card" id="quiz-stage"></div>');showLoadFailed($('#quiz-stage'),()=>renderQuiz(body),e)}return} // P1-08
@@ -536,9 +536,27 @@ function showQuizResult(target,z,score,note=''){
     target.innerHTML=`<div style="text-align:center"><div class="eyebrow">QUIZ COMPLETE ✨</div><h2>복습을 완료했어요!</h2><div class="score-ring" style="--angle:${pct}%"><div class="score-ring-inner"><div><strong>${score} / ${z.questions.length}</strong><br><span>정답 ${pct}%</span></div></div></div><p class="muted">복수정답은 정답을 모두 선택해야 1점입니다.</p>${note?`<p class="notice quiz-note">${esc(note)}</p>`:''}</div><div class="separator"></div>${z.questions.map((q,i)=>{const good=isCorrect(q,z.answers[i]);return `<div class="review-line"><div class="between"><strong>${i+1}. ${esc(q.stem)}</strong>${good?statusPill('success','정답'):statusPill('danger','오답')}</div><p class="hint" style="margin-top:7px">내 답: ${esc(answerLabel(q,z.answers[i]))} · 정답: ${esc(answerLabel(q,q.correctIndices))}</p>${q.explanation?`<p class="hint" style="margin-top:5px">💡 ${esc(q.explanation)}</p>`:''}</div>`}).join('')}${feedbackMarkup(z.last)}<button id="quiz-retry" class="btn secondary full" style="margin-top:20px">다시 풀기</button>`;
     useMediaPaths(target);$('#quiz-retry').onclick=()=>renderBody();
 }
-async function renderPreview(body){const w=week();body.innerHTML=weekHeader('다음 차시 안내','수업 전에 미리 읽고, 보고, 생각해 보는 시간입니다.');weeklyPicker();const p=w.preview;
-  if(!p?.enabled){body.insertAdjacentHTML('beforeend',empty('다음 차시 안내를 준비하고 있습니다'));return}
-  const mode=p.mode||'rich';body.insertAdjacentHTML('beforeend',`<div class="card stack"><div class="between"><div><h2>${esc(p.title||'다음 시간에 만나요')}</h2></div><span class="pill brand">PRÓXIMA CLASE</span></div>${mode==='image'?(p.imagePath?`<img class="article-image" alt="다음 차시 안내" data-media-path="${esc(p.imagePath)}">`:empty('안내 이미지가 없습니다')):`<div class="article">${sanitizeRich(p.richHtml||'<p>학습 내용을 곧 안내할 예정입니다.</p>')}</div>`}${(p.videos||[]).length&&S.past?`<div class="separator"></div><p class="notice warn">🎬 이 차시의 강의 영상 ${p.videos.length}개는 수강 기간에만 볼 수 있어요.</p>`:''}${(p.videos||[]).length&&!S.past?`<div class="separator"></div><h3>🎬 수업 영상</h3><p class="hint">앱 안에서 재생됩니다. 다운로드 메뉴는 숨겨져 있습니다.</p>${p.videos.map((v,i)=>`<div class="stack lesson-video-block"><div class="lesson-video-label"><span class="lesson-play-icon" aria-hidden="true">▶</span><strong>수업 영상 ${i+1}</strong></div><video controls controlslist="nodownload noremoteplayback" disablepictureinpicture disableremoteplayback playsinline preload="metadata" class="media-preview" data-media-path="${esc(v.path)}"></video></div>`).join('')}`:''}${(p.files||[]).length?`<div class="separator"></div><h3>📎 첨부 자료</h3><div class="media-list">${p.files.map(f=>`<a href="#" data-media-path="${esc(f.path)}" class="media-item">${esc(f.name||'첨부 파일')} ↗</a>`).join('')}</div>`:''}</div>`);useMediaPaths(body);
+// D8: N차시 문서의 예습 = N차시 수업 전에 볼 자료. 수업 날짜는 차시 문서 → 반 일정 사본 순으로 찾습니다.
+const sessionDateOf=w=>w?.sessionDate||currentClass()?.schedule?.find(x=>x.weekId===w?.id)?.date||'';
+// 예습 탭을 열 때 기본 차시: 오늘이거나 가장 가까운 다가오는 공개 차시(없으면 마지막 차시)
+function upcomingWeekId(){
+  const list=S.weeks.map(w=>({w,date:sessionDateOf(w)})).filter(x=>x.date&&['today','upcoming'].includes(sessionState({date:x.date})));
+  list.sort((a,b)=>a.date.localeCompare(b.date));
+  return (list[0]?.w||S.weeks.at(-1))?.id||'';
+}
+function videoMarkup(v,i){
+  // D9: 유튜브 '일부 공개' 링크는 개인정보 보호 강화 모드(youtube-nocookie.com)로 끼워 넣습니다.
+  if(v.kind==='youtube')return `<div class="stack lesson-video-block"><div class="lesson-video-label"><span class="lesson-play-icon" aria-hidden="true">▶</span><strong>수업 영상 ${i+1}</strong><span class="hint">유튜브에서 재생됩니다</span></div><div class="video-embed"><iframe src="${esc(youtubeEmbedUrl(v.videoId))}" title="수업 영상 ${i+1}" loading="lazy" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div></div>`;
+  return `<div class="stack lesson-video-block"><div class="lesson-video-label"><span class="lesson-play-icon" aria-hidden="true">▶</span><strong>수업 영상 ${i+1}</strong></div><video controls controlslist="nodownload noremoteplayback" disablepictureinpicture disableremoteplayback playsinline preload="metadata" class="media-preview" data-media-path="${esc(v.path)}"></video></div>`;
+}
+async function renderPreview(body){
+  const w=week(),date=sessionDateOf(w);
+  body.innerHTML=weekHeader('예습',`${w.label} 수업 준비 · ${sessionDateText(date)}`);weeklyPicker();const p=w.preview;
+  if(!p?.enabled){body.insertAdjacentHTML('beforeend',empty('예습 자료를 준비하고 있어요','선생님이 수업 전에 볼 자료를 올리면 여기에 나타나요.'));return}
+  const mode=p.mode||'rich',videos=p.videos||[];
+  // 보관된 반(지난 반)에서는 강의 영상을 보여 주지 않습니다(직접 업로드·유튜브 모두).
+  const videoPart=!videos.length?'':S.past?`<div class="separator"></div><p class="notice warn">🎬 이 차시의 강의 영상 ${videos.length}개는 수강 기간에만 볼 수 있어요.</p>`:`<div class="separator"></div><h3>🎬 수업 영상</h3><p class="hint">앱 안에서 재생됩니다. 다운로드 메뉴는 숨겨져 있습니다.</p>${videos.map(videoMarkup).join('')}`;
+  body.insertAdjacentHTML('beforeend',`<div class="card stack"><div class="between"><div><h2>${esc(p.title&&p.title!=='다음 차시'?p.title:`${w.label} 예습`)}</h2></div><span class="pill brand">PREPARACIÓN</span></div>${mode==='image'?(p.imagePath?`<img class="article-image" alt="${esc(w.label)} 예습 자료" data-media-path="${esc(p.imagePath)}">`:empty('안내 이미지가 없습니다')):`<div class="article">${sanitizeRich(p.richHtml||'<p>학습 내용을 곧 안내할 예정입니다.</p>')}</div>`}${videoPart}${(p.files||[]).length?`<div class="separator"></div><h3>📎 첨부 자료</h3><div class="media-list">${p.files.map(f=>`<a href="#" data-media-path="${esc(f.path)}" class="media-item">${esc(f.name||'첨부 파일')} ↗</a>`).join('')}</div>`:''}</div>`);useMediaPaths(body);
 }
 async function renderMyPage(body){
   if(S.past){

@@ -91,6 +91,33 @@ export function daysBetween(fromKey, toKey) {
   return Math.round((b - a) / 86400000);
 }
 
+// ---------- 차시 상태 (배치 08) ----------
+// 'upcoming' 예정 · 'today' 오늘 · 'done' 지난 차시. 오늘은 운영 시간대(D10) 기준입니다.
+// 날짜가 없는 차시는 출결 기록이 하나라도 있으면 'done', 없으면 'upcoming'.
+export function sessionState(session, today = todayKey(), { hasAttendance = false } = {}) {
+  const date = session?.date || session?.sessionDate || '';
+  if (!date) return hasAttendance ? 'done' : 'upcoming';
+  if (date === today) return 'today';
+  return date < today ? 'done' : 'upcoming';
+}
+// 날짜 'YYYY-MM-DD' → '10월 30일 (금)'
+export const sessionDateText = date => date ? formatDateTime(date, { time: false }) : '날짜 미정';
+
+// ---------- 영상 링크 (배치 08, D9) ----------
+// 유튜브 '일부 공개' 영상 등을 개인정보 보호 강화 모드(youtube-nocookie.com)로 임베드합니다. 허용한 주소만 받습니다.
+const YOUTUBE_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be', 'youtube-nocookie.com', 'www.youtube-nocookie.com']);
+export function parseYouTube(input) {
+  let url;
+  try { url = new URL(String(input || '').trim()); } catch (e) { return null; }
+  if (!/^https?:$/.test(url.protocol) || !YOUTUBE_HOSTS.has(url.hostname)) return null;
+  let id = '';
+  if (url.hostname === 'youtu.be') id = url.pathname.slice(1).split('/')[0];
+  else if (url.pathname === '/watch') id = url.searchParams.get('v') || '';
+  else { const m = url.pathname.match(/^\/(?:embed|shorts|live)\/([^/?#]+)/); id = m ? m[1] : ''; }
+  return /^[A-Za-z0-9_-]{11}$/.test(id) ? id : null;
+}
+export const youtubeEmbedUrl = id => `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?rel=0`;
+
 // ---------- 상태 표시 (P0-07) ----------
 // 상태는 색만으로 구분하지 않고 기호와 글자를 함께 씁니다.
 // success ✓ 완료·정답·출석 · warning ! 대기 · danger ✕ 오답·불참 · neutral – 미입력·해당 없음 · brand(기호 없음) 상태가 아닌 라벨
@@ -264,15 +291,30 @@ export function empty(title,detail=''){return `<div class="empty"><span class="s
 export function makeId(){return (globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2));}
 export const enId = (uid,cid)=>`${uid}_${cid}`;
 export const isMedia = (file,kind) => kind==='audio'?file.type.startsWith('audio/'):kind==='image'?file.type.startsWith('image/'):kind==='video'?file.type.startsWith('video/'):true;
-export const sizeLimit={audio:15*1024*1024,image:8*1024*1024,video:2*1024*1024*1024,file:20*1024*1024};
+// D9: 복습용 강의 전체 영상을 올리므로 영상은 10GB까지(1080p 2시간 녹화도 대개 들어가는 크기). 바꾸면 storage.rules도 함께 고칩니다.
+export const sizeLimit={audio:15*1024*1024,image:8*1024*1024,video:10*1024*1024*1024,file:20*1024*1024};
+const sizeText=bytes=>bytes>=1024**3?`${Math.round(bytes/1024**3*10)/10}GB`:`${Math.round(bytes/1024**2)}MB`;
+export const SIZE_LABEL=Object.fromEntries(Object.entries(sizeLimit).map(([k,v])=>[k,sizeText(v)]));
+let uploading=0;
+// 진행 중인 업로드 수(창 닫기·화면 이동 경고용)
+export const uploadsInProgress=()=>uploading;
 export async function uploadMedia(file,path,kind,progressEl){
   if(!file)throw Error('파일을 선택해 주세요.');
   if(!isMedia(file,kind))throw Error('선택한 파일 형식을 확인해 주세요.');
-  if(file.size>sizeLimit[kind])throw Error(`파일 크기 제한을 초과했습니다. (${Math.round(sizeLimit[kind]/1024/1024)}MB)`);
+  if(file.size>sizeLimit[kind])throw Error(`파일 크기 제한을 초과했습니다. (최대 ${sizeText(sizeLimit[kind])})`);
   const r=storageRef(storage,path);
+  uploading++;
   return new Promise((resolve,reject)=>{
     const task=uploadBytesResumable(r,file,{contentType:file.type||'application/octet-stream'});
-    task.on('state_changed',snap=>{if(progressEl)progressEl.textContent=`업로드 ${Math.round(snap.bytesTransferred/snap.totalBytes*100)}%`},reject,()=>{if(progressEl)progressEl.textContent='업로드 완료';resolve(path)});
+    const started=Date.now();
+    // 큰 영상을 위해 진행률과 남은 시간을 함께 보여 줍니다(배치 08, D9).
+    task.on('state_changed',snap=>{
+      if(!progressEl)return;
+      const pct=snap.totalBytes?Math.round(snap.bytesTransferred/snap.totalBytes*100):0;
+      const elapsed=(Date.now()-started)/1000,rate=elapsed>2?snap.bytesTransferred/elapsed:0;
+      const left=rate&&pct<100?Math.round((snap.totalBytes-snap.bytesTransferred)/rate):null;
+      progressEl.textContent=`업로드 ${pct}% (${sizeText(snap.bytesTransferred)} / ${sizeText(snap.totalBytes)})${left!==null?` · 남은 시간 약 ${left>=60?Math.ceil(left/60)+'분':left+'초'}`:''}`;
+    },err=>{uploading--;reject(err)},()=>{uploading--;if(progressEl)progressEl.textContent='업로드 완료';resolve(path)});
   });
 }
 // 업로드는 됐지만 문서 저장이 실패했을 때 방금 올린 파일을 지웁니다(P1-09). 실패해도 화면 흐름은 막지 않습니다.

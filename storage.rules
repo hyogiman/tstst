@@ -28,7 +28,8 @@ service firebase.storage {
     // 문서 2개 한도: 학생은 openMember(등록+반)에서 끝나고, 강사는 등록 없음(1) + 관리자 프로필(1)로 끝나도록 순서를 지킵니다.
     match /classes/{cid}/previews/{wid}/video/{file} {
       allow read: if openMember(cid) || admin();
-      allow create, update: if admin() && request.resource.size <= 2 * 1024 * 1024 * 1024 && request.resource.contentType.matches('video/.*');
+      // D9: 복습용 강의 전체 영상까지 직접 올릴 수 있게 10GB로 둡니다(common.js의 sizeLimit.video와 같은 값).
+      allow create, update: if admin() && request.resource.size <= 10 * 1024 * 1024 * 1024 && request.resource.contentType.matches('video/.*');
       allow delete: if admin();
     }
     match /classes/{cid}/previews/{wid}/file/{file} {

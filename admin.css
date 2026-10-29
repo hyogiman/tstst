@@ -371,3 +371,18 @@
   .student-attendance-row{grid-template-columns:1fr 120px}
   .student-attendance-row input{grid-column:1/-1}
 }
+/* 차시 편집(배치 08): 학생에게 보이는 범위 · 기본 정보 · 하단 고정 저장 영역 · 서식 도구 '더 보기' */
+.week-visibility{margin:-4px 0 0}
+.week-visibility-line{display:block;color:var(--muted);font-size:12px}
+.week-basic{grid-template-columns:2fr 1fr 1.3fr}
+.week-save-bar{position:sticky;bottom:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:4px -24px -24px;padding:14px 24px;border-top:1px solid var(--line);border-radius:0 0 var(--r-lg) var(--r-lg);background:rgba(255,255,255,.96);backdrop-filter:blur(8px)}
+#week-save-status[data-state="dirty"]{color:var(--warning);font-weight:700}
+.toolbar-more{position:relative}
+.toolbar-more summary{cursor:pointer;list-style:none;padding:6px 10px;border-radius:8px;font-size:13px;font-weight:700;color:var(--ink-2)}
+.toolbar-more summary::-webkit-details-marker{display:none}
+.toolbar-more[open] summary{background:var(--surface-3)}
+.toolbar-more-items{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px}
+.link-row{flex-wrap:nowrap}
+.link-row input{flex:1;min-width:0}
+@media (max-width:700px){.week-basic{grid-template-columns:1fr 1fr}.week-basic .field:first-child{grid-column:1/-1}}
+@media (max-width:640px){.week-save-bar{margin:4px -18px -18px;padding:12px 18px}}

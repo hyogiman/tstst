@@ -619,6 +619,7 @@ test('B15 차시 편집 미저장 상태로 다른 차시 선택 → 확인창 �
   const { page } = await openAs(b, 'admin.html', 'admin1');
   await page.click('[data-page="weeks"]'); await pause(page, 500);
   await page.click('[data-week-open="w1"]'); await pause(page, 400);
+  await page.click('[data-week-tab="assignment"]'); await pause(page, 200); // 수업 흐름 순서 탭: 예습이 먼저
   await page.fill('#assignment-title', '바꾼 과제 제목');
   assert((await page.innerText('#week-save-status')).includes('저장하지 않은 변경'), '미저장 표시: ' + await page.innerText('#week-save-status'));
   await page.click('[data-week-open="w2"]'); await pause(page, 400);
@@ -636,6 +637,7 @@ test('B15b 차시 편집 → 메뉴 이동 시 [저장하고 이동]이면 저�
   const { page } = await openAs(b, 'admin.html', 'admin1');
   await page.click('[data-page="weeks"]'); await pause(page, 500);
   await page.click('[data-week-open="w1"]'); await pause(page, 400);
+  await page.click('[data-week-tab="assignment"]'); await pause(page, 200);
   await page.fill('#assignment-title', '저장할 새 제목');
   await page.click('[data-page="questions"]'); await pause(page, 400);
   await page.click('.app-modal [data-choice="0"]'); await pause(page, 900);
@@ -738,6 +740,101 @@ test('B19 Firebase CDN이 막히면 백지 대신 안내 화면', async b => {
   await pause(page, 1800);
   const text = await page.innerText('#root');
   assert(text.includes('화면을 불러오지 못했어요') && text.includes('새로고침'), '안내 화면이 없음: ' + text.slice(0, 80));
+});
+
+// ---------- 배치 08: 차시 구조 ----------
+test('S01 정렬 번호를 바꾸면 반 일정 사본·출석 드롭다운 순서가 차시 목록과 같아짐', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  await page.click('[data-page="weeks"]'); await pause(page, 500);
+  await page.click('[data-week-open="w3"]'); await pause(page, 400);
+  await page.fill('#week-order', '99'); await page.fill('#week-date', '2027-01-15');
+  await page.click('#save-week'); await pause(page, 900);
+  const listOrder = await page.$$eval('[data-week-open]', els => els.map(e => e.dataset.weekOpen));
+  const schedule = (await dump(page, 'classes/c1')).schedule;
+  assert(JSON.stringify(schedule.map(x => x.weekId)) === JSON.stringify(listOrder), '일정 사본 순서: ' + schedule.map(x => x.weekId).join(',') + ' / 목록: ' + listOrder.join(','));
+  assert(schedule.at(-1).weekId === 'w3' && schedule.at(-1).date === '2027-01-15', '바꾼 날짜가 사본에 반영되지 않음');
+  assert((await dump(page, 'classes/c1/weeks/w3')).sessionDate === '2027-01-15', '차시 문서에 날짜가 저장되지 않음');
+  await page.click('[data-page="attendance"]'); await pause(page, 600);
+  const options = await page.$$eval('#quick-session option', os => os.map(o => o.value));
+  assert(JSON.stringify(options) === JSON.stringify(listOrder), '출석 드롭다운 순서: ' + options.join(','));
+});
+
+test('S02 반 수정 모달과 + 새 차시 어느 쪽으로 만들어도 차시 문서와 일정 사본이 일치', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  await page.click('[data-page="classes"]'); await pause(page, 400);
+  await page.click('[data-edit-class="c2"]'); await pause(page, 600);
+  await page.click('#course-add-session'); await pause(page, 200);
+  await page.fill('#course-date-fields [data-session="4"] [data-session-date]', '2026-12-05');
+  await page.click('#course-submit'); await pause(page, 1200);
+  await page.selectOption('#admin-class-switch', 'c2'); await pause(page, 700);
+  await page.click('[data-page="weeks"]'); await pause(page, 500);
+  await page.click('#new-week'); await pause(page, 300);
+  await page.fill('#new-week-label', '보충 차시'); await page.fill('#new-week-date', '2026-12-12');
+  await page.click('#week-create-form button[type="submit"]'); await pause(page, 900);
+  const weeks = await page.evaluate(() => window.__mock.list('classes/c2/weeks/').filter(p => p.split('/').length === 4).map(p => ({ id: p.split('/')[3], ...window.__mock.dump(p) })));
+  const schedule = (await dump(page, 'classes/c2')).schedule;
+  const expect = [...weeks].sort((x, y) => x.order - y.order).map(w => `${w.id}|${w.label}|${w.sessionDate || ''}`);
+  assert(JSON.stringify(schedule.map(x => `${x.weekId}|${x.label}|${x.date}`)) === JSON.stringify(expect), '불일치\n사본 ' + JSON.stringify(schedule) + '\n문서 ' + JSON.stringify(expect));
+  assert(weeks.length === 6 && weeks.some(w => w.label === '보충 차시' && w.sessionDate === '2026-12-12'), '새 차시 생성 이상');
+});
+
+test('S03 sessionState: 어제·오늘·내일·날짜 없음(출결 있음/없음)', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  const r = await page.evaluate(async () => {
+    const { sessionState, todayKey } = await import('/common.js?v=test');
+    const day = n => todayKey(new Date(Date.now() + n * 86400000));
+    return [sessionState({ date: day(-1) }), sessionState({ date: day(0) }), sessionState({ date: day(1) }), sessionState({}, undefined, { hasAttendance: true }), sessionState({})];
+  });
+  assert(JSON.stringify(r) === JSON.stringify(['done', 'today', 'upcoming', 'done', 'upcoming']), JSON.stringify(r));
+});
+
+test('S04 학생 예습(D8): 대상 차시·날짜 표시, 예습 탭을 열면 오늘/다가오는 차시가 기본 선택', async b => {
+  const { page } = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 } });
+  await page.selectOption('#student-week-picker', 'w1'); await pause(page, 500);
+  await page.click('[data-tab="preview"]'); await pause(page, 600);
+  assert((await page.inputValue('#student-week-picker')) === 'w5', '기본 선택: ' + await page.inputValue('#student-week-picker'));
+  const head = await page.innerText('.page-head');
+  assert(head.includes('예습') && /5차시 · 카페에서 주문하기 수업 준비 · \d+월 \d+일 \(.\)/.test(head), '머리말: ' + head);
+  assert((await page.innerText('.student-nav')).includes('예습') && !(await page.innerText('.student-nav')).includes('다음차시'), '하단 메뉴 이름');
+});
+
+test('S05 유튜브 링크: 허용 주소만 추가, 학생 화면은 youtube-nocookie 임베드, 지난 반에서는 숨김', async b => {
+  let r = await openAs(b, 'admin.html', 'admin1');
+  await r.page.click('[data-page="weeks"]'); await pause(r.page, 500);
+  await r.page.click('[data-week-open="w5"]'); await pause(r.page, 400);
+  await r.page.fill('#preview-video-link', 'https://evil.example.com/watch?v=dQw4w9WgXcQ'); await r.page.click('#add-video-link'); await pause(r.page, 200);
+  assert((await lastToast(r.page)).includes('유튜브 영상 주소'), '잘못된 주소를 받아들임');
+  await r.page.fill('#preview-video-link', 'https://youtu.be/dQw4w9WgXcQ?si=abc'); await r.page.click('#add-video-link'); await pause(r.page, 200);
+  assert((await r.page.innerText('#preview-videos-list')).includes('유튜브 링크'), '영상 종류 표시 없음');
+  await r.page.click('#save-week'); await pause(r.page, 900);
+  const v = (await dump(r.page, 'classes/c1/weeks/w5')).preview.videos;
+  assert(v.length === 1 && v[0].kind === 'youtube' && v[0].videoId === 'dQw4w9WgXcQ', '저장 형식: ' + JSON.stringify(v));
+  await r.context.close();
+  r = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 } });
+  await r.page.evaluate(v => window.__mock.remoteWrite('classes/c1/weeks/w5', { preview: { videos: v } }), v);
+  await pause(r.page, 400);
+  await r.page.click('[data-tab="preview"]'); await pause(r.page, 600);
+  const src = await r.page.getAttribute('.video-embed iframe', 'src');
+  assert(src === 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?rel=0', 'iframe 주소: ' + src);
+  await r.context.close();
+  r = await openAs(b, 'index.html', 's5', { viewport: { width: 390, height: 844 } });
+  await r.page.evaluate(v => window.__mock.remoteWrite('classes/c3/weeks/ow1', { preview: { videos: v } }), v);
+  await r.page.click('[data-past-class="c3"]'); await pause(r.page, 700);
+  await r.page.selectOption('#student-week-picker', 'ow1'); await pause(r.page, 400);
+  await r.page.click('[data-tab="preview"]'); await pause(r.page, 600);
+  assert(!(await r.page.$('iframe')) && (await r.page.innerText('#student-body')).includes('수강 기간에만'), '지난 반에 유튜브 영상이 보임');
+});
+
+test('S06 차시 편집: 학생에게 보이는 범위 요약과 수업 흐름 순서 탭', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  await page.click('[data-page="weeks"]'); await pause(page, 500);
+  await page.click('[data-week-open="w6"]'); await pause(page, 400);
+  assert((await page.innerText('#week-visibility')).includes('비공개 초안'), '비공개 요약: ' + await page.innerText('#week-visibility'));
+  await page.click('label.switch:has(#week-published)'); await pause(page, 150);
+  assert((await page.innerText('#week-visibility')).includes('공개됨 — 예습 ✕ · 과제 ✕ · 복습 ✕'), '공개 요약: ' + await page.innerText('#week-visibility'));
+  const tabs = await page.$$eval('[data-week-tab]', els => els.map(e => e.textContent));
+  assert(JSON.stringify(tabs) === JSON.stringify(['수업 전 · 예습', '수업 후 · 과제', '수업 후 · 복습']), '탭: ' + tabs.join('|'));
+  assert((await page.innerText('[data-week-panel="preview"] .notice')).includes('수업(') , '예습 탭 안내 없음');
 });
 
 test('기본: 학생 과제 텍스트 제출, 퀴즈 3/3, 강사 화면 주요 메뉴 오류 없음', async b => {
