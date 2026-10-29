@@ -511,21 +511,70 @@ function mountAuth(root,opts={signup:true}){
   $('#login-form').addEventListener('submit',async e=>{e.preventDefault();if(!CONFIGURED){toast('Firebase 설정을 먼저 입력해 주세요.',true);return} const form=e.currentTarget;const data=new FormData(form);const btn=$('button[type="submit"]',form);btn.disabled=true;try{if(mode==='login')await signInWithEmailAndPassword(auth,String(data.get('email')).trim(),String(data.get('password')));else{const cred=await createUserWithEmailAndPassword(auth,String(data.get('email')).trim(),String(data.get('password')));await updateProfile(cred.user,{displayName:String(data.get('name')).trim()});await ensureProfile(cred.user);await updateDoc(doc(db,'users',cred.user.uid),{displayName:String(data.get('name')).trim(),updatedAt:serverTimestamp()});} }catch(err){$('#login-message').textContent=ex(err)}finally{btn.disabled=false}});
   $('#forgot-password').addEventListener('click',async()=>{if(!CONFIGURED){toast('Firebase 설정이 필요합니다.',true);return}const email=$('input[name="email"]')?.value?.trim();if(!email){toast('먼저 이메일을 입력해 주세요.',true);return}try{await sendPasswordResetEmail(auth,email);toast('비밀번호 재설정 메일을 발송했습니다.')}catch(e){toast(ex(e),true)}});
 }
-// 한 번에 하나의 마이크 녹음만 활성화됩니다. 파일 선택 업로드를 대안으로 함께 제공합니다.
+// 녹음은 한 번에 하나만 합니다. 녹음 결과는 '녹음을 시작한 대상'에만 저장되고,
+// 화면을 옮기면 자동으로 멈춰 마이크를 끕니다(P0-02). 파일 선택 업로드도 대안으로 제공합니다.
 let activeRecorder=null;
-async function recordStart(onFile,onStatus){
+const formatDuration=sec=>`${Math.floor(sec/60)}:${String(Math.round(sec)%60).padStart(2,'0')}`;
+async function recordStart(onFile,onStatus,label=''){
   if(activeRecorder)throw Error('현재 녹음 중인 항목을 먼저 종료해 주세요.');
   if(!navigator.mediaDevices?.getUserMedia||!globalThis.MediaRecorder)throw Error('이 브라우저에서 음성 녹음을 지원하지 않습니다. 음성 파일을 선택해 주세요.');
   const stream=await navigator.mediaDevices.getUserMedia({audio:true});
   const options=['audio/webm;codecs=opus','audio/mp4','audio/webm','audio/ogg'].find(t=>MediaRecorder.isTypeSupported(t));
   let recorder;try{recorder=options?new MediaRecorder(stream,{mimeType:options}):new MediaRecorder(stream)}catch(err){stream.getTracks().forEach(t=>t.stop());throw err}
-  const chunks=[];recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
-  recorder.onstop=()=>{stream.getTracks().forEach(t=>t.stop());activeRecorder=null;const mime=recorder.mimeType||'audio/webm';const ext=mime.includes('mp4')?'m4a':mime.includes('ogg')?'ogg':'webm';const file=new File(chunks,`recording-${Date.now()}.${ext}`,{type:mime});onFile(file);onStatus('녹음 완료 · '+(file.size/1024).toFixed(0)+'KB');};
-  recorder.start();activeRecorder=recorder;onStatus('● 녹음 중입니다. 종료 버튼을 눌러 주세요.');
+  const chunks=[],startedAt=Date.now();
+  recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+  recorder.onstop=()=>{
+    stream.getTracks().forEach(t=>t.stop());
+    activeRecorder=null;
+    const mime=recorder.mimeType||'audio/webm';
+    const ext=mime.includes('mp4')?'m4a':mime.includes('ogg')?'ogg':'webm';
+    const file=new File(chunks,`recording-${Date.now()}.${ext}`,{type:mime});
+    // webm 녹음은 길이 정보가 비어 있는 경우가 있어 시작·종료 시각으로 계산합니다.
+    file.durationSec=Math.max(1,Math.round((Date.now()-startedAt)/1000));
+    onFile(file);
+    onStatus(`녹음 완료 · ${formatDuration(file.durationSec)}`);
+  };
+  recorder.start();
+  activeRecorder={recorder,stream,label};
+  onStatus('● 녹음 중입니다. 종료 버튼을 눌러 주세요.');
 }
-function recordStop(){if(activeRecorder&&activeRecorder.state==='recording')activeRecorder.stop()}
-function makeMediaUi(kind,label){return `<div class="stack" style="gap:9px"><div class="record-controls"><button class="btn soft small" type="button" data-record-start>🎙️ 녹음 시작</button><button class="btn secondary small" type="button" data-record-stop>■ 녹음 종료</button><span class="file-note" data-rec-status></span></div><div class="field"><label>${esc(label||'또는 음성 파일 선택')}</label><input type="file" accept="audio/*" data-audio-input></div><audio controls data-local-audio class="hide"></audio><p class="hint">마이크 권한과 HTTPS 연결이 필요합니다. 음성 파일은 최대 15MB입니다.</p></div>`}
-function wireMediaUi(container,onFile){const status=$('[data-rec-status]',container),player=$('[data-local-audio]',container);const onSelected=file=>{if(!file)return;onFile(file);if(player.dataset.blob)URL.revokeObjectURL(player.dataset.blob);const url=URL.createObjectURL(file);player.dataset.blob=url;player.src=url;player.classList.remove('hide');status.textContent=`선택됨: ${file.name}`;};$('[data-record-start]',container)?.addEventListener('click',async()=>{try{await recordStart(onSelected,t=>status.textContent=t)}catch(e){toast(ex(e),true)}});$('[data-record-stop]',container)?.addEventListener('click',recordStop);$('[data-audio-input]',container)?.addEventListener('change',e=>onSelected(e.target.files[0]));}
+function recordStop(){if(activeRecorder?.recorder.state==='recording')activeRecorder.recorder.stop()}
+function isRecording(){return !!activeRecorder}
+// 화면 전환·로그아웃 때 호출합니다. 녹음 중이면 멈추고 마이크를 끄며, 결과는 녹음을 시작한 대상의 초안으로 보관됩니다.
+function stopRecordingForNavigation(){
+  if(!activeRecorder)return false;
+  const {recorder,stream,label}=activeRecorder;
+  if(recorder.state==='recording')recorder.stop();
+  stream.getTracks().forEach(t=>t.stop());
+  toast(label?`녹음을 멈췄어요. ${label} 초안에 보관했어요.`:'녹음을 멈췄어요.');
+  return true;
+}
+function makeMediaUi(kind,label){return `<div class="stack media-ui"><div class="record-controls"><button class="btn soft small" type="button" data-record-start><span aria-hidden="true">●</span> 녹음 시작</button><button class="btn secondary small" type="button" data-record-stop><span aria-hidden="true">■</span> 녹음 종료</button><span class="file-note" data-rec-status role="status"></span></div><div class="field"><label>${esc(label||'또는 음성 파일 선택')}</label><input type="file" accept="audio/*" data-audio-input></div><div class="media-draft hide" data-media-draft><audio controls data-local-audio></audio><div class="media-draft-meta"><span data-media-draft-name></span><button type="button" class="btn ghost small" data-record-clear>첨부 취소</button></div></div><p class="hint">마이크 권한과 HTTPS 연결이 필요합니다. 음성 파일은 최대 15MB입니다.</p></div>`}
+// onFile(file|null): 선택·녹음한 파일을 해당 대상의 초안에 저장(null이면 첨부 취소). initialFile: 보관된 초안 복원
+function wireMediaUi(container,onFile,{label='',initialFile=null}={}){
+  const status=$('[data-rec-status]',container),player=$('[data-local-audio]',container),draft=$('[data-media-draft]',container),name=$('[data-media-draft-name]',container),input=$('[data-audio-input]',container);
+  const show=(file,prefix)=>{
+    if(player.dataset.blob){URL.revokeObjectURL(player.dataset.blob);delete player.dataset.blob}
+    if(!file){player.removeAttribute('src');draft.classList.add('hide');return}
+    const url=URL.createObjectURL(file);player.dataset.blob=url;player.src=url;
+    name.textContent=`${prefix}: ${file.name}${file.durationSec?` · ${formatDuration(file.durationSec)}`:''}`;
+    draft.classList.remove('hide');
+  };
+  const onSelected=file=>{if(!file)return;onFile(file);if(container.isConnected){show(file,'첨부할 음성');status.textContent=''}};
+  $('[data-record-start]',container)?.addEventListener('click',async()=>{try{await recordStart(onSelected,t=>{if(status.isConnected)status.textContent=t},label)}catch(e){toast(ex(e),true)}});
+  $('[data-record-stop]',container)?.addEventListener('click',recordStop);
+  input?.addEventListener('change',e=>onSelected(e.target.files[0]));
+  $('[data-record-clear]',container)?.addEventListener('click',()=>{onFile(null);show(null);if(input)input.value='';status.textContent='첨부를 취소했어요.'});
+  if(initialFile)show(initialFile,'보관된 음성');
+}
+// 실시간 갱신 안내 띠(P0-10): 작업 중에는 화면을 다시 그리지 않고 이 띠로 알립니다.
+function showLiveNotice(host,message,actionText,onAction){
+  if(!host)return;
+  let bar=host.querySelector(':scope > .live-notice');
+  if(!bar){bar=document.createElement('div');bar.className='live-notice';bar.setAttribute('role','status');host.prepend(bar)}
+  bar.innerHTML=`<span>${esc(message)}</span><button type="button" class="btn small">${esc(actionText)}</button>`;
+  bar.querySelector('button').onclick=()=>{bar.remove();onAction()};
+}
 
 
 // 모든 확인/수정은 브라우저 기본 팝업 대신 접근 가능한 앱 내부 모달로 처리합니다.
@@ -551,12 +600,23 @@ async function modalInput(message,value=''){return await modalDialog({title:'정
 
 // ===== ADMIN PAGE =====
 const root=$('#root');
-const A={user:null,profile:null,classes:[],classId:'',classFilter:'all',weeks:[],weekId:'',page:'overview',weekTab:'assignment',feedbackTab:'submissions',preview:{},pendingDeletes:[],voiceDrafts:{},live:{},activeQuestionId:'',feedbackSelectedUid:'',feedbackSearch:'',feedbackFilter:'all',feedbackRenderToken:0,questionSearch:'',questionNameMap:new Map()};
+// 로그아웃하면 이 초기값으로 되돌립니다(P0-09).
+const adminInitialState=()=>({user:null,profile:null,classes:[],classId:'',classFilter:'all',weeks:[],weekId:'',page:'overview',weekTab:'assignment',feedbackTab:'submissions',preview:{},pendingDeletes:[],voiceDrafts:{},live:{},activeQuestionId:'',feedbackSelectedUid:'',feedbackSearch:'',feedbackFilter:'all',feedbackRenderToken:0,questionSearch:'',questionNameMap:new Map(),attendanceWeekId:''});
+const A=adminInitialState();
+// 계정마다 마지막으로 본 반을 따로 기억합니다.
+const classPrefKey=()=>'spanish-lms-admin-class:'+(A.user?.uid||'');
 const PAGES=[['overview','◈','대시보드'],['weeks','▤','주차 콘텐츠'],['feedback','◉','제출·피드백'],['attendance','✓','출석 관리'],['students','♙','수강생 관리'],['questions','♧','질문함'],['classes','▦','반 관리']];
 const activeClass=()=>A.classes.find(c=>c.id===A.classId);
 const activeWeek=()=>A.weeks.find(w=>w.id===A.weekId);
 function adminStopLive(key){if(A.live[key]){A.live[key]();delete A.live[key]}}
 function adminClearLive(){for(const key of Object.keys(A.live))adminStopLive(key)}
+// 로그아웃 때 실시간 연결·녹음·음성 초안·화면 상태를 모두 정리합니다(P0-09).
+function resetAdminSession(){
+  stopRecordingForNavigation();
+  adminClearLive();
+  Object.assign(A,adminInitialState());
+}
+window.addEventListener('beforeunload',e=>{if(A.user&&(isRecording()||Object.keys(A.voiceDrafts).length||isFeedbackTextDirty())){e.preventDefault();e.returnValue=''}});
 function adminLiveError(err){console.error('실시간 연결 실패',err);toast('실시간 구독 오류: '+ex(err),true)}
 const classKey=(cid)=>`classes/${cid}`;
 const weekKey=(cid,wid)=>`classes/${cid}/weeks/${wid}`;
@@ -606,7 +666,7 @@ function classSchedule(c){
 function courseStart(c){return (c?.schedule||[]).map(s=>s.date).filter(Boolean).sort()[0]||''}
 async function openClassRoster(cid){
   if(!A.classes.some(c=>c.id===cid))return;
-  adminClearLive();A.classId=cid;localStorage.setItem('spanish-lms-admin-class',cid);A.weekId='';
+  adminClearLive();A.classId=cid;localStorage.setItem(classPrefKey(),cid);A.weekId='';
   await loadWeeks();frame();navigateAdminPage('students');
 }
 async function classEditor(c=null){
@@ -652,30 +712,40 @@ async function classEditor(c=null){
 async function showStudentAttendance(student){
  const cid=A.classId;const sch=classSchedule(activeClass());
  if(!sch.length){toast('클래스 수정에서 차시별 날짜를 먼저 등록해 주세요.',true);return}
- const records=await Promise.all(sch.map(async s=>{try{const d=await getDoc(doc(db,'classes',cid,'weeks',s.weekId,'attendance',student.uid));return {...s,status:d.exists()?d.data().status:'unchecked',note:d.exists()?d.data().note||'':''}}catch(e){return {...s,status:'unchecked',note:'',error:ex(e)}}}));
+ const records=await Promise.all(sch.map(async s=>{try{const d=await getDoc(doc(db,'classes',cid,'weeks',s.weekId,'attendance',student.uid));const raw=d.exists()?d.data():null;return {...s,exists:!!raw,value:attendanceValue(raw?.status),note:raw?.note||''}}catch(e){return {...s,exists:false,value:'',note:'',error:ex(e)}}}));
  const layer=document.createElement('div');layer.className='app-modal-backdrop';document.querySelector('.app-modal-backdrop')?.remove();
- layer.innerHTML=`<section class="app-modal student-attendance-modal" role="dialog" aria-modal="true" aria-labelledby="student-attendance-title"><header class="app-modal-head"><div><div class="eyebrow">ATTENDANCE HISTORY</div><h2 id="student-attendance-title">${esc(student.studentName)} · 출석현황</h2><p class="hint">${esc(activeClass()?.name||'')} · 전체 ${records.length}차시</p></div><button class="app-modal-x" type="button" aria-label="닫기">×</button></header><form id="student-attendance-form"><div class="student-attendance-list">${records.map((r,i)=>`<div class="student-attendance-row" data-att-row="${i}"><div><strong>${esc(r.label)}</strong><small>${esc(r.date||'날짜 미정')}</small></div><select class="input" data-att-status aria-label="${esc(r.label)} 출석상태">${attendanceOptions.map(([v,label])=>`<option value="${v}" ${v===r.status?'selected':''}>${label}</option>`).join('')}</select><input class="input" data-att-note value="${esc(r.note)}" maxlength="200" placeholder="메모 (선택)" aria-label="${esc(r.label)} 출석 메모"></div>`).join('')}</div><div class="app-modal-actions"><button type="button" class="btn secondary" id="student-attendance-close">취소</button><button class="btn" id="student-attendance-save" type="submit">출석현황 저장</button></div></form></section>`;
+ layer.innerHTML=`<section class="app-modal student-attendance-modal" role="dialog" aria-modal="true" aria-labelledby="student-attendance-title"><header class="app-modal-head"><div><div class="eyebrow">ASISTENCIA</div><h2 id="student-attendance-title">${esc(student.studentName)} · 출석현황</h2><p class="hint">${esc(activeClass()?.name||'')} · 전체 ${records.length}차시</p></div><button class="app-modal-x" type="button" aria-label="닫기">×</button></header><form id="student-attendance-form"><div class="student-attendance-list">${records.map((r,i)=>`<div class="student-attendance-row" data-att-row="${i}"><div><strong>${esc(r.label)}</strong><small>${esc(r.date||'날짜 미정')}</small></div><select class="input" data-att-status aria-label="${esc(r.label)} 출결">${attendanceOptions.map(([v,label])=>`<option value="${v}" ${v===(r.value||'unchecked')?'selected':''}>${label}</option>`).join('')}</select><input class="input" data-att-note value="${esc(r.note)}" maxlength="200" placeholder="메모 (선택)" aria-label="${esc(r.label)} 출결 메모"></div>`).join('')}</div><div class="app-modal-actions"><button type="button" class="btn secondary" id="student-attendance-close">취소</button><button class="btn" id="student-attendance-save" type="submit">출석현황 저장</button></div></form></section>`;
  document.body.appendChild(layer);document.body.classList.add('modal-open');
- const close=()=>{layer.remove();document.body.classList.remove('modal-open')};layer.querySelector('.app-modal-x').onclick=close;layer.querySelector('#student-attendance-close').onclick=close;
- layer.querySelector('#student-attendance-form').onsubmit=async e=>{e.preventDefault();const btn=layer.querySelector('#student-attendance-save');btn.disabled=true;try{const batch=writeBatch(db);layer.querySelectorAll('[data-att-row]').forEach(node=>{const r=records[Number(node.dataset.attRow)],ref=doc(db,'classes',cid,'weeks',r.weekId,'attendance',student.uid),status=node.querySelector('[data-att-status]').value,note=node.querySelector('[data-att-note]').value.trim();if(status==='unchecked')batch.delete(ref);else batch.set(ref,{status,note,updatedAt:serverTimestamp()},{merge:true})});await batch.commit();toast(`${student.studentName}님의 출석을 저장했습니다.`);close()}catch(err){toast(ex(err),true);btn.disabled=false}};
+ const close=()=>{layer.remove();document.body.classList.remove('modal-open');document.removeEventListener('keydown',onKey)};
+ const onKey=e=>{if(e.key==='Escape')close()};document.addEventListener('keydown',onKey);
+ layer.querySelector('.app-modal-x').onclick=close;layer.querySelector('#student-attendance-close').onclick=close;
+ layer.querySelector('#student-attendance-form').onsubmit=async e=>{e.preventDefault();const btn=layer.querySelector('#student-attendance-save');
+   // P0-01: 바뀐 차시만 저장합니다. '미입력'으로 되돌린 차시는 저장된 기록을 지웁니다.
+   const changes=[...layer.querySelectorAll('[data-att-row]')].map(node=>{const r=records[Number(node.dataset.attRow)],raw=node.querySelector('[data-att-status]').value;return {r,value:raw==='unchecked'?'':raw,note:node.querySelector('[data-att-note]').value.trim()}}).filter(x=>x.value!==x.r.value||x.note!==x.r.note);
+   if(!changes.length){toast('바뀐 내용이 없습니다.');return}
+   const removals=changes.filter(x=>!x.value&&x.r.exists).length;
+   if(removals&&!await modalConfirm(`출결 기록 ${removals}건을 '미입력'으로 되돌리면 저장된 기록이 삭제됩니다. 계속할까요?`))return;
+   btn.disabled=true;
+   try{const batch=writeBatch(db);changes.forEach(({r,value,note})=>{const ref=doc(db,'classes',cid,'weeks',r.weekId,'attendance',student.uid);if(value)batch.set(ref,{status:value,note,updatedAt:serverTimestamp()},{merge:true});else if(r.exists)batch.delete(ref)});await batch.commit();toast(`${student.studentName}님의 출결 ${changes.length}건을 저장했어요.`);close()}catch(err){toast(ex(err),true);btn.disabled=false}};
 }
 function frame(){
   enterHistory();
   const sidebarEntries=[['overview','대시보드'],['classes','클래스 관리'],['weeks','주차별 콘텐츠'],['feedback','과제 · 복습 관리'],['questions','질문함'],['attendance','출석체크']];
   const sideMenu=sidebarEntries.map(([key,label])=>`<div class="side-menu-group"><button type="button" data-page="${key}" class="side-link ${A.page===key||(key==='classes'&&A.page==='students')?'active':''}">${sideIcon(key)}<span>${label}</span>${key==='classes'?'<span class="side-chevron">⌄</span>':''}</button>${key==='classes'?`<div class="side-submenu" aria-label="운영 중인 클래스 목록">${A.classes.filter(c=>!c.archived).map(c=>`<button type="button" class="side-class-link ${A.page==='students'&&A.classId===c.id?'active':''}" data-side-class="${esc(c.id)}" title="${esc(c.name)} 수강생 보기">${esc(c.name)}</button>`).join('')||'<span class="side-class-empty">운영 중인 클래스 없음</span>'}</div>`:''}</div>`).join('');
   root.innerHTML=`<div class="admin-shell senorayu-admin-v6"><aside class="sidebar"><div class="sidebar-identity"><img src="senorayu-mark-white.svg" alt="쎄뇨라유 올리브유 병 심벌"><span>당신의 스페인어 가이드</span><strong>쎄뇨라유</strong></div><div class="side-nav">${sideMenu}</div><div class="sidebar-footnote">ESPAÑOL · LEARNING STUDIO</div></aside><div class="admin-main"><header class="admin-topbar"><div><p class="eyebrow">INSTRUCTOR WORKSPACE</p><div class="topbar-greeting"><strong>${esc(A.profile?.displayName||'스페인어 강사')}${String(A.profile?.displayName||'').includes('선생님')?'':' 선생님'}</strong><span class="pill red">강사</span></div></div><div class="topbar-actions"><div class="field"><label for="admin-class-switch">운영 중인 반</label><select id="admin-class-switch">${A.classes.map(c=>`<option value="${esc(c.id)}" ${c.id===A.classId?'selected':''}>${esc(c.name)}${c.archived?' (보관)':''}</option>`).join('')||'<option value="">개설된 반이 없습니다</option>'}</select></div><button id="admin-logout" type="button" class="btn secondary small">로그아웃</button></div></header><main id="admin-body"></main></div></div>`;
-  $('#admin-logout').onclick=()=>signOut(auth);
-  $('#admin-class-switch')?.addEventListener('change',async e=>{adminClearLive();A.classId=e.target.value;localStorage.setItem('spanish-lms-admin-class',A.classId);A.weekId='';if(A.classId)await loadWeeks();renderPage()});
+  $('#admin-logout').onclick=()=>{resetAdminSession();signOut(auth)}; // P0-09: 구독을 먼저 끊고 로그아웃
+  $('#admin-class-switch')?.addEventListener('change',async e=>{adminClearLive();A.classId=e.target.value;localStorage.setItem(classPrefKey(),A.classId);A.weekId='';if(A.classId)await loadWeeks();renderPage()});
   $$('[data-page]').forEach(el=>el.onclick=()=>navigateAdminPage(el.dataset.page));
   $$('[data-side-class]').forEach(el=>el.onclick=()=>openClassRoster(el.dataset.sideClass));
   renderPage();
 }
 function renderPage(){
+  stopRecordingForNavigation(); // P0-02: 화면을 옮기면 녹음을 멈춥니다.
   adminClearLive();$$('.side-link').forEach(el=>el.classList.toggle('active',el.dataset.page===A.page));const b=$('#admin-body');if(!b)return;
   if(!A.classId&&A.page!=='classes'&&A.page!=='overview'){b.innerHTML=`<div class="section-title"><div><h1>첫 번째 반을 개설해 보세요</h1><p>학습자에게 전달할 수강 코드 하나를 발급합니다.</p></div></div>${empty('아직 생성한 반이 없습니다')}<button id="go-classes" class="btn" style="margin-top:17px">반 개설하기 →</button>`;$('#go-classes').onclick=()=>{navigateAdminPage('classes')};return}
   if(A.page==='overview')showOverview(b);if(A.page==='classes')showClasses(b);if(A.page==='weeks')showWeeks(b);if(A.page==='feedback')showFeedback(b);if(A.page==='attendance')showAttendance(b);if(A.page==='students')showStudents(b);if(A.page==='questions')showAdminQuestions(b);
 }
-async function loadAdmin(preferred=''){const cs=await getDocs(collection(db,'classes'));A.classes=cs.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.name||'').localeCompare(b.name||'','ko'));await syncJoinCodes(A.classes);const choice=preferred||A.classId||localStorage.getItem('spanish-lms-admin-class');A.classId=A.classes.some(c=>c.id===choice)?choice:(A.classes.find(c=>!c.archived)?.id||A.classes[0]?.id||'');if(A.classId){localStorage.setItem('spanish-lms-admin-class',A.classId);await loadWeeks();await syncMemberDirectory().catch(e=>console.warn('명단 동기화 실패',e))}else{A.weeks=[];A.weekId=''}frame()}
+async function loadAdmin(preferred=''){const cs=await getDocs(collection(db,'classes'));A.classes=cs.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.name||'').localeCompare(b.name||'','ko'));await syncJoinCodes(A.classes);const choice=preferred||A.classId||localStorage.getItem(classPrefKey());A.classId=A.classes.some(c=>c.id===choice)?choice:(A.classes.find(c=>!c.archived)?.id||A.classes[0]?.id||'');if(A.classId){localStorage.setItem(classPrefKey(),A.classId);await loadWeeks();await syncMemberDirectory().catch(e=>console.warn('명단 동기화 실패',e))}else{A.weeks=[];A.weekId=''}frame()}
 async function loadWeeks(){const snap=await getDocs(collection(db,'classes',A.classId,'weeks'));A.weeks=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.order||0)-(b.order||0));if(!A.weeks.some(w=>w.id===A.weekId))A.weekId=A.weeks.at(-1)?.id||'';}
 async function roster(){
   const snap=await getDocs(query(collection(db,'enrollments'),where('classId','==',A.classId)));
@@ -737,11 +807,11 @@ async function showOverview(b){
   let weekRows=[];
   for(const w of weeks){
    const d=state.weeks.get(w.id);const row={week:w,attended:0,attTotal:0,absent:0,late:0,excused:0,assignmentDone:0,assignmentTotal:0,quizFirst:[],quizRepeat:0};
+   // D2: 출석·불참 두 가지로 집계합니다(이전 형식의 지각=출석, 인정결석=불참).
    for(const a of d.attendance){if(!active.has(a.id))continue;
-     if(a.status==='present'){attendance.present++;attendance.total++;row.attended++;row.attTotal++}
-     if(a.status==='late'){attendance.late++;attendance.total++;row.late++;row.attended++;row.attTotal++}
-     if(a.status==='absent'){attendance.absent++;attendance.total++;row.absent++;row.attTotal++}
-     if(a.status==='excused'){attendance.excused++;row.excused++}
+     const v=attendanceValue(a.status);
+     if(v==='present'){attendance.present++;attendance.total++;row.attended++;row.attTotal++}
+     if(v==='absent'){attendance.absent++;attendance.total++;row.absent++;row.attTotal++}
    }
    if(w.published&&w.assignment?.enabled){
      row.assignmentTotal=members.length;row.assignmentDone=d.submissions.filter(x=>active.has(x.id)).length;
@@ -757,15 +827,16 @@ async function showOverview(b){
    }
    weekRows.push(row);
   }
-  const attendanceDen=attendance.present+attendance.late+attendance.absent;
-  const attendancePct=attendanceDen?Math.round(100*(attendance.present+attendance.late)/attendanceDen):null;
+  const attendanceDen=attendance.present+attendance.absent;
+  const attendancePct=attendanceDen?Math.round(100*attendance.present/attendanceDen):null;
   const assignmentPct=assignmentTotal?Math.round(assignmentDone/assignmentTotal*100):null;
   const firstQuizPct=firstQuizTotal?Math.round(firstQuizPercentSum/firstQuizTotal):null;
   const displayPct=value=>value===null?'—':value+'%';
   const kpi=(label,value,caption,kind,percent)=>`<article class="insight-kpi"><div class="insight-kpi-top"><span>${label}</span><span class="insight-kpi-symbol ${kind}" aria-hidden="true">${kind==='users'?'♙':kind==='attendance'?'✓':kind==='assignment'?'▤':'◈'}</span></div><strong>${value}</strong><small>${esc(caption)}</small>${percent!==null?`<div class="insight-kpi-track" role="meter" aria-label="${label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}"><span style="width:${percent}%"></span></div>`:''}</article>`;
   const published=weeks.filter(w=>w.published).length;
-  // 차시별 변화는 최근 8개 차시를 보여주며, 집계에는 전체 차시를 사용합니다.
-  const recent=weekRows.slice(-8);
+  // 차시별 차트는 이미 진행한 차시(오늘까지의 날짜, 날짜가 없으면 출결 기록이 있는 차시) 중 최근 8개를 보여 줍니다.
+  const today=kstToday(),sessionDay=w=>w.sessionDate||selected?.schedule?.find(x=>x.weekId===w.id)?.date||'';
+  const recent=weekRows.filter(r=>{const day=sessionDay(r.week);return day?day<=today:r.attTotal>0}).slice(-8);
   const rowLabel=(w)=>`${esc(w.label||'차시')}<small>${esc(w.sessionDate||selected?.schedule?.find(x=>x.weekId===w.id)?.date||'날짜 미설정')}</small>`;
   const attendanceRows=recent.map(row=>{
    const done=row.attended+row.absent;
@@ -779,20 +850,20 @@ async function showOverview(b){
   const hasAttendance=weekRows.filter(x=>x.attTotal>0).length;
   const summaryItems=[
    ['공개된 차시',`${published} / ${weeks.length}`,'전체 등록 차시 중 공개된 차시'],
-   ['출결 기록이 있는 차시',`${hasAttendance} / ${weeks.length}`,'출석 또는 결석이 입력된 차시'],
+   ['출결 기록이 있는 차시',`${hasAttendance} / ${weeks.length}`,'출석 또는 불참이 입력된 차시'],
    ['답변 대기 질문',`${questionWait}건`,'현재 클래스의 미답변 질문'],
    ['복습 재응시 학생·차시',`${repeatTotal}건`,'첫 응시 이후 다시 푼 기록이 있는 학생·차시']
   ];
   loaded(host,`<section class="insight-kpis" aria-label="주요 학습 지표">
     ${kpi('수강 중인 학생',`${members.length}명`,`현재 선택한 클래스`,'users',null)}
-    ${kpi('출석률',displayPct(attendancePct),attendanceDen?`출석 ${attendance.present} · 지각 ${attendance.late} · 결석 ${attendance.absent}`:'기록된 출결이 없습니다','attendance',attendancePct)}
+    ${kpi('출석률',displayPct(attendancePct),attendanceDen?`출석 ${attendance.present} · 불참 ${attendance.absent}`:'기록된 출결이 없습니다','attendance',attendancePct)}
     ${kpi('과제 제출률',displayPct(assignmentPct),assignmentTotal?`${assignmentDone} / ${assignmentTotal} 제출`:'공개된 과제 또는 수강생 없음','assignment',assignmentPct)}
     ${kpi('복습 첫 정답률',displayPct(firstQuizPct),firstQuizTotal?`첫 응시 ${firstQuizTotal}건 평균`:'첫 응시 기록 없음','quiz',firstQuizPct)}
    </section>
-   <div class="insight-layout"><section class="insight-panel"><div class="insight-panel-head"><div><span class="eyebrow">ATTENDANCE TREND</span><h2>차시별 출석률</h2></div><span class="insight-tag">최근 ${recent.length}개 차시</span></div><div class="insight-chart">${attendanceRows||'<p class="insight-unavailable">등록된 차시가 없습니다.</p>'}</div><div class="insight-legend"><span><i></i> 출석·지각</span><span>전체 입력 출결 대비</span></div></section>
+   <div class="insight-layout"><section class="insight-panel"><div class="insight-panel-head"><div><span class="eyebrow">ATTENDANCE TREND</span><h2>차시별 출석률</h2></div><span class="insight-tag">최근 ${recent.length}개 차시</span></div><div class="insight-chart">${attendanceRows||'<p class="insight-unavailable">등록된 차시가 없습니다.</p>'}</div><div class="insight-legend"><span><i></i> 출석</span><span>전체 입력 출결 대비</span></div></section>
    <section class="insight-panel"><div class="insight-panel-head"><div><span class="eyebrow">CLASS PULSE</span><h2>운영 현황</h2></div><span class="insight-tag">${esc(selected?.name||'')}</span></div><div class="insight-pulse">${summaryItems.map(([label,num,desc])=>`<div class="insight-pulse-item"><div><strong>${esc(label)}</strong><small>${esc(desc)}</small></div><b>${esc(num)}</b></div>`).join('')}</div></section></div>
    <section class="insight-panel insight-wide"><div class="insight-panel-head"><div><span class="eyebrow">HOMEWORK PROGRESS</span><h2>차시별 과제 제출률</h2></div><span class="insight-tag">공개된 과제 기준</span></div><div class="insight-chart insight-chart-assignments">${submitRows||'<p class="insight-unavailable">최근 차시에 공개된 과제가 없습니다.</p>'}</div></section>
-   <p class="insight-method">집계 기준 · 출석률: 출석+지각 ÷ (출석+지각+결석), 인정결석·미체크 제외 · 과제: 공개 과제에 대한 현재 수강생의 제출 건수 · 복습: 첫 응시 정답률의 평균 · 과거 수강생·회차별 등록 변동은 소급 반영하지 않습니다. 최근 16차시 데이터는 실시간 갱신되며 이전 차시는 화면 진입 시 조회합니다.</p>`);
+   <p class="insight-method">집계 기준 · 출석률: 출석 ÷ (출석+불참), 미입력 제외 · 차시별 차트: 오늘까지 진행한 차시 중 최근 8개 · 과제: 공개 과제에 대한 현재 수강생의 제출 건수 · 복습: 첫 응시 정답률의 평균 · 과거 수강생·회차별 등록 변동은 소급 반영하지 않습니다. 최근 16차시 데이터는 실시간 갱신되며 이전 차시는 화면 진입 시 조회합니다.</p>`);
  }
  // 현재 선택 클래스의 질문, 등록정보 및 최근 16차시는 실시간 반영됩니다.
  const liveWeeks=new Set(weeks.slice(-16).map(w=>w.id));
@@ -852,7 +923,7 @@ async function deleteClassDeep(c){
   // 직접 관리 중인 등록 파일을 정리합니다. 오래된 미참조 파일은 Storage에 잔존할 수 있습니다.
   let fileFailures=0;for(const path of paths){try{await deleteObject(storageRef(storage,path))}catch(e){if(e.code!=='storage/object-not-found'){fileFailures++;console.warn('파일 정리 필요',path,e)}}}
   await deleteDoc(doc(db,'classes',cid));
-  if(A.classId===cid){A.classId='';localStorage.removeItem('spanish-lms-admin-class')}
+  if(A.classId===cid){A.classId='';localStorage.removeItem(classPrefKey())}
   if(fileFailures)toast(`반은 삭제되었습니다. 파일 ${fileFailures}개는 Storage에서 직접 정리해야 합니다.`,true);
 }
 function weekSelect(){return `<select id="admin-week-picker" class="input week-chooser">${A.weeks.map(w=>`<option value="${esc(w.id)}" ${w.id===A.weekId?'selected':''}>${esc(w.label)}${w.published?' · 공개':' · 비공개'}</option>`).join('')}</select>`}
@@ -1039,7 +1110,17 @@ async function updateFeedbackItem(cid,wid,kind,uid,position,operation){
   if(operation==='delete'&&old.audioPath){try{await deleteObject(storageRef(storage,old.audioPath))}catch(e){if(e.code!=='storage/object-not-found')console.warn('삭제한 댓글의 음성 파일 정리 실패',e)}}
   toast(operation==='delete'?'피드백을 삭제했습니다.':'피드백을 수정했습니다.');await drawFeedbackList();
 }
+// P0-10: 피드백을 작성 중이면(글·음성 초안·녹음·입력칸 사용) 목록을 다시 그리지 않습니다.
+function isFeedbackTextDirty(){const t=$('[data-feedback-text]');return !!t&&!!t.value.trim()}
+function isFeedbackBusy(){
+  if(isRecording()||isFeedbackTextDirty())return true;
+  if(document.activeElement?.matches('textarea,input,select,[contenteditable]'))return true;
+  const card=$('[data-comment-card]');
+  if(card){const [type,uid]=card.dataset.commentCard.split(':');if(A.voiceDrafts[`${A.classId}:${A.weekId}:${type}:${uid}`])return true}
+  return false;
+}
 async function showFeedback(b){
+  stopRecordingForNavigation();
   adminStopLive('feedback');adminStopLive('feedbackMembers');
   b.innerHTML=`<div class="section-title"><div><div class="eyebrow">LEARNING FEEDBACK</div><h1>제출·피드백 <span class="current-class">(${esc(activeClass()?.name||"선택된 반")})</span></h1><p>학생을 선택하면 제출 내용과 피드백을 확인할 수 있습니다.</p></div>${A.weeks.length?weekSelect():''}</div><div class="tabset" style="margin-bottom:18px"><button class="tab ${A.feedbackTab==='submissions'?'active':''}" data-feedback-tab="submissions">과제 제출</button><button class="tab ${A.feedbackTab==='quizResults'?'active':''}" data-feedback-tab="quizResults">복습 결과</button></div><div id="feedback-list"></div>`;
   $('#admin-week-picker')?.addEventListener('change',e=>{A.weekId=e.target.value;A.feedbackSelectedUid='';showFeedback(b)});
@@ -1050,17 +1131,18 @@ async function showFeedback(b){
   A.live.feedbackMembers=onSnapshot(collection(db,'classes',cid,'members'),()=>{
     if(firstMemberEvent){firstMemberEvent=false;return}
     if(A.page!=='feedback'||A.classId!==cid||A.weekId!==wid||A.feedbackTab!==kind)return;
-    if(document.activeElement?.matches('textarea,input,[contenteditable]'))return;
+    if(isFeedbackBusy()){showLiveNotice($('#admin-body'),'수강생 명단이 바뀌었어요. 작성 중인 내용은 그대로 두었어요.','목록 새로고침',()=>drawFeedbackList());return}
     drawFeedbackList();
   },adminLiveError);
   A.live.feedback=onSnapshot(collection(db,weekKey(cid,wid),kind),()=>{
     if(first){first=false;return}
     if(A.page!=='feedback'||A.classId!==cid||A.weekId!==wid||A.feedbackTab!==kind)return;
-    if(document.activeElement?.matches('textarea,input')){toast('새 제출 또는 피드백이 도착했습니다. 메뉴를 다시 선택하면 갱신됩니다.');return}
+    if(isFeedbackBusy()){showLiveNotice($('#admin-body'),'새 제출·응시 기록이 도착했어요. 작성 중인 내용은 그대로 두었어요.','목록 새로고침',()=>drawFeedbackList());return}
     drawFeedbackList();
   },adminLiveError);
 }
 async function drawFeedbackList(){
+  stopRecordingForNavigation();
   const out=$('#feedback-list');if(!out)return;
   const w=activeWeek();if(!w){out.innerHTML=empty('먼저 주차를 추가해 주세요');return}
   const token=++A.feedbackRenderToken,cid=A.classId,wid=w.id,kind=A.feedbackTab;
@@ -1084,7 +1166,7 @@ async function drawFeedbackList(){
       if(!s){panel.innerHTML='<div class="inspector-empty"><div><strong>수강생을 선택해 주세요.</strong><p class="hint">왼쪽 목록에서 이름을 누르면 제출물과 피드백이 나타납니다.</p></div></div>';return}
       const d=map.get(s.uid);
       const content=d?(kind==='submissions'?`<div class="feedback-answer"><strong style="font-size:13px">학생 답안</strong>${d.text?`<p style="white-space:pre-wrap;margin-top:9px">${esc(d.text)}</p>`:'<p class="hint" style="margin-top:9px">텍스트 답안 없음</p>'}${d.audioPath?`<div style="margin-top:12px"><audio controls preload="none" data-media-path="${esc(d.audioPath)}"></audio></div>`:''}</div>`:`<div class="feedback-answer"><div class="grid3" style="margin-bottom:13px"><div class="mini-stat"><strong>${scorePct(d.firstAttempt?.score??d.score,d.firstAttempt?.total??d.total)}%</strong><span>첫 응시</span></div><div class="mini-stat"><strong>${scorePct(d.score,d.total)}%</strong><span>최근 응시</span></div><div class="mini-stat"><strong>${Number(d.attemptCount)||1}회</strong><span>총 응시</span></div></div><details data-attempt-history="${esc(s.uid)}"><summary style="cursor:pointer;font-weight:750;color:var(--primary)">전체 응시 기록 확인</summary><div class="hint" data-attempt-content style="margin-top:11px">펼치면 응시별 결과를 불러옵니다.</div></details></div>`):'<div class="feedback-answer"><p class="hint">아직 제출하거나 응시하지 않았습니다. 제출 후 피드백을 작성할 수 있습니다.</p></div>';
-      panel.innerHTML=`<div class="inspector-title"><div><div class="name">${esc(s.studentName)}</div><p class="hint">${esc(s.email||'')} ${d?'· '+esc(fmt(d.submittedAt)) : ''}</p></div><span class="pill ${d?'green':'gray'}">${d?(kind==='submissions'?'제출 완료':'응시 완료'):(kind==='submissions'?'미제출':'미응시')}</span></div>${content}${d?teacherComments(d,s.uid,kind)+`<div class="separator"></div><div class="stack" style="gap:9px" data-comment-card="${esc(kind)}:${esc(s.uid)}"><div class="field"><label>새 피드백 댓글</label><textarea data-feedback-text rows="4" maxlength="10000" placeholder="좋았던 점과 다음에 개선할 점을 작성해 주세요."></textarea></div><div data-feedback-media>${makeMediaUi('audio','또는 피드백 음성 파일')}</div><div class="between"><span class="hint" data-feedback-status>등록하면 학생에게 바로 공개됩니다.</span><button type="button" class="btn small" data-feedback-save>피드백 등록</button></div></div>`:''}`;
+      panel.innerHTML=`<div class="inspector-title"><div><div class="name">${esc(s.studentName)}</div><p class="hint">${esc(s.email||'')} ${d?'· '+esc(fmt(d.submittedAt)) : ''}</p></div><span class="pill ${d?'green':'gray'}">${d?(kind==='submissions'?'제출 완료':'응시 완료'):(kind==='submissions'?'미제출':'미응시')}</span></div>${content}${d?teacherComments(d,s.uid,kind)+`<div class="separator"></div><div class="stack" style="gap:9px" data-comment-card="${esc(kind)}:${esc(s.uid)}"><div class="field"><label>새 피드백 댓글</label><textarea data-feedback-text rows="4" maxlength="10000" placeholder="좋았던 점과 다음에 개선할 점을 작성해 주세요."></textarea></div><div data-feedback-media>${makeMediaUi('audio','또는 피드백 음성 파일')}</div><p class="feedback-target" data-feedback-target></p><div class="between"><span class="hint" data-feedback-status>등록하면 학생에게 바로 공개됩니다.</span><button type="button" class="btn small" data-feedback-save>피드백 등록</button></div></div>`:''}`;
       const attempt=$('[data-attempt-history]',panel);
       if(attempt)attempt.ontoggle=async()=>{
         if(!attempt.open)return;
@@ -1100,10 +1182,17 @@ async function drawFeedbackList(){
         try{await updateFeedbackItem(cid,wid,kind,uid,Number(pos),edit?'edit':'delete')}catch(e){toast(ex(e),true)}finally{if(button.isConnected)button.disabled=false}
       });
       const card=$('[data-comment-card]',panel);
-      if(card){const [type,uid]=card.dataset.commentCard.split(':');const key=type+':'+uid;
-        wireMediaUi($('[data-feedback-media]',card),file=>A.voiceDrafts[key]=file);
+      if(card){const [type,uid]=card.dataset.commentCard.split(':');
+        // P0-02: 음성 초안 키에 반·차시·종류·학생을 모두 넣어 다른 차시나 학생에게 붙지 않게 합니다.
+        const key=`${cid}:${wid}:${type}:${uid}`,label=`${w.label} · ${s.studentName}`;
+        const targetEl=$('[data-feedback-target]',card);
+        const showTarget=()=>{if(!targetEl.isConnected)return;const f=A.voiceDrafts[key];targetEl.textContent=f?`첨부할 음성: ${f.name}${f.durationSec?` (${formatDuration(f.durationSec)})`:''} · 대상: ${label}`:''};
+        wireMediaUi($('[data-feedback-media]',card),file=>{if(file)A.voiceDrafts[key]=file;else delete A.voiceDrafts[key];showTarget()},{label:`${label} 피드백`,initialFile:A.voiceDrafts[key]});
+        showTarget();
         $('[data-feedback-save]',card).onclick=async e=>{
           const text=$('[data-feedback-text]',card).value.trim(),file=A.voiceDrafts[key];if(!text&&!file){toast('텍스트나 음성 피드백을 작성해 주세요.',true);return}
+          // 방어 코드: 지금 화면의 반·차시·학생과 이 입력창의 대상이 같을 때만 등록합니다.
+          if(A.classId!==cid||A.weekId!==wid||A.feedbackSelectedUid!==uid||A.feedbackTab!==type){toast('선택한 학생이나 차시가 바뀌었어요. 다시 확인해 주세요.',true);return}
           const btn=e.currentTarget;btn.disabled=true;
           try{let audioPath='';if(file){audioPath=`classes/${cid}/feedback/${wid}/${uid}/${makeId()}-${file.name.replace(/[^\w.\-]/g,'_')}`;await uploadMedia(file,audioPath,'audio',$('[data-feedback-status]',card))}
             await updateDoc(doc(db,weekKey(cid,wid),type,uid),{feedbacks:arrayUnion({id:makeId(),text,audioPath,createdAt:new Date().toISOString(),author:A.profile.displayName||'선생님'})});
@@ -1128,6 +1217,7 @@ async function drawFeedbackList(){
         const secondary=d?(kind==='submissions'?(d.text?String(d.text).replace(/\s+/g,' ').slice(0,46):d.audioPath?'음성 과제 제출':'과제 제출 완료'):`첫 ${scorePct(d.firstAttempt?.score??d.score,d.firstAttempt?.total??d.total)}% · 최근 ${scorePct(d.score,d.total)}%`):'아직 제출 기록이 없습니다';
         return `<button type="button" class="feedback-person ${s.uid===A.feedbackSelectedUid?'selected':''}" data-feedback-uid="${esc(s.uid)}" aria-pressed="${s.uid===A.feedbackSelectedUid}"><span class="person-avatar">${esc((s.studentName||'?').slice(0,1))}</span><span style="min-width:0"><span class="person-name">${esc(s.studentName)}</span><span class="person-meta">${esc(s.email||'')}</span><span class="person-secondary">${esc(secondary)}</span></span><span class="person-side"><span class="pill ${d?'green':'gray'}">${d?(kind==='submissions'?'제출':'응시'):'대기'}</span>${d?`<span class="mini-score">${feedback?'피드백 완료':'피드백 대기'}</span>`:''}</span></button>`}).join('')||'<div class="directory-empty">조건에 맞는 수강생이 없습니다.</div>';
       $$('[data-feedback-uid]',rosterEl).forEach(button=>button.onclick=()=>{
+        stopRecordingForNavigation(); // P0-02: 다른 학생을 고르면 녹음을 멈추고, 녹음은 원래 학생의 초안에 남깁니다.
         A.feedbackSelectedUid=button.dataset.feedbackUid;
         $$('[data-feedback-uid]',rosterEl).forEach(el=>{el.classList.toggle('selected',el.dataset.feedbackUid===A.feedbackSelectedUid);el.setAttribute('aria-pressed',String(el.dataset.feedbackUid===A.feedbackSelectedUid))});
         renderDetail();
@@ -1183,39 +1273,134 @@ function showAdminQuestionThread(q){if(!q)return;adminStopLive('replies');const 
   $('#question-status').onclick=async()=>{try{await updateDoc(doc(db,'classes',A.classId,'questions',q.id),{status:q.status==='answered'?'open':'answered'});q.status=q.status==='answered'?'open':'answered';$('#question-status').textContent=q.status==='answered'?'답변 대기로 변경':'답변 완료 표시';toast('상태를 변경했습니다.')}catch(e){toast(ex(e),true)}};
   A.live.replies=onSnapshot(collection(db,'classes',A.classId,'questions',q.id,'replies'),snap=>{if(A.activeQuestionId!==q.id)return;const list=$('#admin-replies');if(!list)return;const replies=snap.docs.map(d=>d.data()).sort((a,b)=>(a.createdAt?.seconds||0)-(b.createdAt?.seconds||0));loaded(list,replies.map(r=>`<div class="reply-bubble ${r.role==='admin'?'teacher':'student'}"><p class="hint"><span data-reply-uid="${esc(r.uid||'')}">${esc(r.role==='student'?(A.questionNameMap.get(r.uid)||r.author||'수강생'):(r.author||''))}</span> · ${fmt(r.createdAt)}</p><p style="white-space:pre-wrap">${esc(r.text)}</p></div>`).join('')||'<p class="hint">아직 댓글이 없습니다.</p>')},adminLiveError);
 }
-const attendanceOptions=[['unchecked','미체크'],['present','출석'],['late','지각'],['absent','결석'],['excused','인정결석']];
+// D2: 출석은 '출석'·'불참' 두 가지만 씁니다. 이전 형식의 지각은 출석, 인정결석은 불참으로 읽습니다.
+const attendanceOptions=[['unchecked','미입력'],['present','출석'],['absent','불참']];
+const attendanceValue=status=>status==='present'||status==='late'?'present':status==='absent'||status==='excused'?'absent':'';
+const attendanceLabel=v=>v==='present'?'출석':v==='absent'?'불참':'미입력';
+const kstToday=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul'}).format(new Date());
+// 오늘 차시 → 오늘 이전 가장 최근 차시 → 첫 차시 순으로 기본 선택합니다.
+function defaultSessionId(list){
+  const today=kstToday();
+  const past=list.filter(s=>s.date&&s.date<today).sort((a,b)=>a.date.localeCompare(b.date));
+  return (list.find(s=>s.date===today)||past.at(-1)||list[0])?.weekId||'';
+}
 async function showAttendance(b){
  const all=classSchedule(activeClass());
- b.innerHTML=`<div class="section-title"><div><div class="eyebrow">QUICK ATTENDANCE</div><h1>출석체크 <span class="current-class">(${esc(activeClass()?.name||'선택된 반')})</span></h1><p>수업 중 출석한 학생만 체크하세요. 저장 시 체크하지 않은 학생은 결석으로 기록됩니다.</p></div><button class="btn secondary" id="quick-to-students" type="button">학생별 출석현황 →</button></div><section class="card quick-attendance"><div class="between"><div class="field" style="min-width:220px"><label>수업 차시 · 날짜</label><select id="quick-session" class="input">${all.map((r,i)=>`<option value="${esc(r.weekId)}" ${r.weekId===A.weekId?'selected':''}>${esc(r.label)}${r.date?' · '+esc(r.date):' · 날짜 미정'}</option>`).join('')}</select></div><div class="row"><button class="btn secondary small" id="quick-all" type="button">전체 체크</button><button class="btn secondary small" id="quick-clear" type="button">전체 해제</button></div></div><div id="quick-list" class="quick-list"><div class="loading">출석부 불러오는 중</div></div><div class="quick-footer"><span id="quick-count" class="hint">출석 현황을 불러오는 중입니다.</span><button id="quick-save" class="btn" type="button">출석 결과 저장</button></div></section>`;
+ b.innerHTML=`<div class="section-title"><div><div class="eyebrow">ASISTENCIA · 출석</div><h1>출석체크</h1><p>학생마다 '출석' 또는 '불참'을 눌러 주세요. 바꾼 학생만 저장되고 나머지 기록은 그대로 둡니다.</p></div><button class="btn secondary" id="quick-to-students" type="button">학생별 출석현황 →</button></div><section class="card quick-attendance"><div class="quick-head"><div class="field"><label for="quick-session">수업 차시 · 날짜</label><select id="quick-session" class="input">${all.map(r=>`<option value="${esc(r.weekId)}">${esc(r.label)}${r.date?' · '+esc(r.date):' · 날짜 미정'}</option>`).join('')}</select></div><div class="row quick-bulk"><button class="btn secondary small" id="quick-all-present" type="button">미입력 학생 모두 출석</button><button class="btn secondary small" id="quick-all-absent" type="button">미입력 학생 모두 불참</button></div></div><div id="quick-list" class="quick-list"><div class="loading">출석부 불러오는 중</div></div><div class="quick-footer"><span id="quick-count" class="hint" role="status">출석 현황을 불러오는 중입니다.</span><button id="quick-save" class="btn" type="button" disabled>출석 저장</button></div></section>`;
  $('#quick-to-students').onclick=()=>navigateAdminPage('students');
- if(!all.length){$('#quick-list').innerHTML=empty('등록된 차시가 없습니다','클래스 관리에서 차시와 날짜를 입력해 주세요.');$('#quick-save').disabled=true;return}
- if(!all.some(x=>x.weekId===A.weekId))A.weekId=all[0].weekId;
- $('#quick-session').value=A.weekId;
- const updateCount=()=>{const boxes=$$('#quick-list input[type="checkbox"]');$('#quick-count').textContent=`출석 ${boxes.filter(x=>x.checked).length}명 / 전체 ${boxes.length}명`};
- async function listSession(){const session=$('#quick-session').value,cid=A.classId;A.weekId=session;loading($('#quick-list'));
-  try{const [students,snap]=await Promise.all([roster(),getDocs(collection(db,'classes',cid,'weeks',session,'attendance'))]);if(cid!==A.classId||session!==$('#quick-session')?.value)return;
-  const map=new Map(snap.docs.map(d=>[d.id,d.data()]));const active=students.filter(s=>s.status==='active');
-  loaded($('#quick-list'),active.map(s=>`<label class="quick-person"><input type="checkbox" data-quick-uid="${esc(s.uid)}" ${map.get(s.uid)?.status==='present'?'checked':''}><span class="name-avatar">${esc((s.studentName||'?').slice(0,1))}</span><strong>${esc(s.studentName)}</strong><span class="quick-person-state">${map.get(s.uid)?.status==='late'?'지각':map.get(s.uid)?.status==='excused'?'인정결석':map.get(s.uid)?.status==='present'?'출석':'미체크 / 결석'}</span></label>`).join('')||empty('현재 수강 중인 학생이 없습니다'));
-  $$('#quick-list input[type="checkbox"]').forEach(el=>el.onchange=()=>{el.closest('.quick-person').querySelector('.quick-person-state').textContent=el.checked?'출석':'결석';updateCount()});updateCount();
-  }catch(e){loaded($('#quick-list'),`<p class="error">${esc(ex(e))}</p>`)}
+ if(!all.length){$('#quick-list').innerHTML=empty('등록된 차시가 없습니다','클래스 관리에서 차시와 날짜를 입력해 주세요.');return}
+ if(!all.some(x=>x.weekId===A.attendanceWeekId))A.attendanceWeekId=defaultSessionId(all);
+ const select=$('#quick-session');select.value=A.attendanceWeekId;
+ let students=[],initial=new Map(),current=new Map(),lastSession=select.value;
+ const changes=()=>students.filter(s=>(current.get(s.uid)||'')!==(initial.get(s.uid)||''));
+ const updateCount=()=>{
+   const n=changes().length,count={present:0,absent:0,'':0};
+   students.forEach(s=>count[current.get(s.uid)||'']++);
+   $('#quick-count').textContent=`출석 ${count.present} · 불참 ${count.absent} · 미입력 ${count['']} / 전체 ${students.length}명${n?` · 저장 안 한 변경 ${n}명`:''}`;
+   $('#quick-save').disabled=!n;
+ };
+ const paintRow=uid=>{
+   const row=$(`[data-quick-row="${CSS.escape(uid)}"]`);if(!row)return;
+   const v=current.get(uid)||'',changed=v!==(initial.get(uid)||'');
+   $$('[data-set]',row).forEach(btn=>btn.setAttribute('aria-pressed',String(btn.dataset.set===v)));
+   row.dataset.state=v||'none';row.classList.toggle('is-changed',changed);
+   $('.quick-person-state',row).textContent=attendanceLabel(v)+(changed?' · 저장 전':'');
+ };
+ async function listSession(){
+   const session=select.value,cid=A.classId;A.attendanceWeekId=session;loading($('#quick-list'));
+   try{
+     const [list,snap]=await Promise.all([roster(),getDocs(collection(db,'classes',cid,'weeks',session,'attendance'))]);
+     if(cid!==A.classId||session!==select.value)return;
+     const saved=new Map(snap.docs.map(d=>[d.id,d.data()]));
+     students=list.filter(s=>s.status==='active');
+     initial=new Map(students.map(s=>[s.uid,attendanceValue(saved.get(s.uid)?.status)]));current=new Map(initial);
+     loaded($('#quick-list'),students.map(s=>`<div class="quick-person" data-quick-row="${esc(s.uid)}"><span class="name-avatar" aria-hidden="true">${esc((s.studentName||'?').slice(0,1))}</span><div class="quick-person-name"><strong>${esc(s.studentName)}</strong><small class="quick-person-state"></small></div><div class="seg" role="group" aria-label="${esc(s.studentName)} 출결"><button type="button" class="seg-btn" data-set="present" aria-pressed="false">출석</button><button type="button" class="seg-btn" data-set="absent" aria-pressed="false">불참</button></div></div>`).join('')||empty('현재 수강 중인 학생이 없습니다'));
+     students.forEach(s=>paintRow(s.uid));
+     // 이미 고른 버튼을 다시 누르면 '미입력'으로 되돌립니다.
+     $$('[data-quick-row]').forEach(row=>$$('[data-set]',row).forEach(btn=>btn.onclick=()=>{const uid=row.dataset.quickRow;current.set(uid,current.get(uid)===btn.dataset.set?'':btn.dataset.set);paintRow(uid);updateCount()}));
+     updateCount();
+   }catch(e){loaded($('#quick-list'),`<p class="error">${esc(ex(e))}</p>`)}
  }
- $('#quick-session').onchange=listSession;$('#quick-all').onclick=()=>{$$('#quick-list input[type="checkbox"]').forEach(b=>{b.checked=true;b.dispatchEvent(new Event('change'))})};$('#quick-clear').onclick=()=>{$$('#quick-list input[type="checkbox"]').forEach(b=>{b.checked=false;b.dispatchEvent(new Event('change'))})};
- $('#quick-save').onclick=async e=>{const btn=e.currentTarget;const boxes=$$('#quick-list [data-quick-uid]');if(!boxes.length)return;
-   const s=all.find(x=>x.weekId===$('#quick-session').value),checked=boxes.filter(b=>b.checked).length;
-   if(!await modalConfirm(`${s?.label||'해당 차시'} 출석 ${checked}명, 결석 ${boxes.length-checked}명으로 저장하시겠습니까?\n지각·인정결석은 클래스 관리 → 학생별 출석현황에서 변경할 수 있습니다.`))return;
-   btn.disabled=true;try{const cid=A.classId,weekId=$('#quick-session').value,batch=writeBatch(db);boxes.forEach(el=>batch.set(doc(db,'classes',cid,'weeks',weekId,'attendance',el.dataset.quickUid),{status:el.checked?'present':'absent',updatedAt:serverTimestamp()},{merge:true}));await batch.commit();toast('출석체크를 저장했습니다.')}catch(err){toast(ex(err),true)}finally{btn.disabled=false}};
+ select.onchange=async()=>{
+   const pending=changes().length;
+   if(pending&&!(await modalConfirm(`저장하지 않은 출결 변경 ${pending}명이 있어요. 저장하지 않고 다른 차시로 이동할까요?`))){select.value=lastSession;return}
+   lastSession=select.value;listSession();
+ };
+ const fill=v=>{let n=0;students.forEach(s=>{if(!current.get(s.uid)){current.set(s.uid,v);n++;paintRow(s.uid)}});updateCount();toast(n?`미입력 학생 ${n}명을 '${attendanceLabel(v)}'(으)로 바꿨어요. 저장을 눌러 주세요.`:'미입력 학생이 없습니다.')};
+ $('#quick-all-present').onclick=()=>fill('present');$('#quick-all-absent').onclick=()=>fill('absent');
+ $('#quick-save').onclick=async e=>{
+   const btn=e.currentTarget,list=changes();if(!list.length){toast('바뀐 내용이 없습니다.');return}
+   const s=all.find(x=>x.weekId===select.value),cnt={present:0,absent:0,clear:0};
+   list.forEach(st=>{const v=current.get(st.uid)||'';if(v)cnt[v]++;else cnt.clear++});
+   const untouched=students.filter(st=>!current.get(st.uid)).length;
+   if(!await modalConfirm(`${s?.label||'해당 차시'} 출결을 저장할까요?\n변경 ${list.length}명 (출석 ${cnt.present} · 불참 ${cnt.absent} · 기록 삭제 ${cnt.clear})${untouched?`\n미입력 ${untouched}명은 그대로 둡니다.`:''}`))return;
+   btn.disabled=true;
+   try{
+     const cid=A.classId,weekId=select.value;
+     // 그 사이 다른 기기에서 바뀐 기록은 덮어쓰지 않습니다.
+     const fresh=await Promise.all(list.map(st=>getDoc(doc(db,'classes',cid,'weeks',weekId,'attendance',st.uid))));
+     const conflicts=[],batch=writeBatch(db);let writes=0;
+     list.forEach((st,i)=>{
+       const now=attendanceValue(fresh[i].exists()?fresh[i].data().status:'');
+       if(now!==(initial.get(st.uid)||'')){conflicts.push(st);return}
+       const ref=doc(db,'classes',cid,'weeks',weekId,'attendance',st.uid),v=current.get(st.uid)||'';
+       if(v)batch.set(ref,{status:v,updatedAt:serverTimestamp()},{merge:true});else if(fresh[i].exists())batch.delete(ref);
+       writes++;
+     });
+     if(writes)await batch.commit();
+     list.forEach(st=>{if(!conflicts.includes(st))initial.set(st.uid,current.get(st.uid)||'')});
+     students.forEach(st=>paintRow(st.uid));updateCount();
+     toast(conflicts.length?`${writes}명을 저장했어요. ${conflicts.map(x=>x.studentName).join(', ')}님 기록은 다른 기기에서 먼저 바뀌어 저장하지 않았어요. 차시를 다시 선택해 확인해 주세요.`:'출결을 저장했어요.',!!conflicts.length);
+   }catch(err){toast(ex(err),true)}
+   finally{btn.disabled=!changes().length}
+ };
  await listSession();
+}
+// D4: 한 학생은 동시에 한 반만 수강합니다. 반 이동·재등록은 모두 이 함수로 처리합니다(P0-08).
+// 대상 반 등록을 수강 중으로 만들고, 그 학생의 다른 수강 중 등록은 '반 이동'으로 바꿉니다.
+async function activateEnrollment(student,targetClassId){
+  const uid=student.uid,target=A.classes.find(c=>c.id===targetClassId);
+  if(!target)throw Error('반 정보를 찾을 수 없습니다.');
+  const snap=await getDocs(query(collection(db,'enrollments'),where('uid','==',uid)));
+  const targetId=enId(uid,targetClassId),batch=writeBatch(db);
+  const publicName=student.publicName||student.studentName||'',realName=student.realName||student.studentName||'';
+  for(const d of snap.docs){
+    const e=d.data();
+    if(d.id!==targetId&&e.status==='active'){
+      batch.update(d.ref,{status:'transferred'});
+      batch.set(doc(db,'classes',e.classId,'members',uid),{uid,name:publicName,status:'transferred'},{merge:true});
+    }
+  }
+  if(snap.docs.some(d=>d.id===targetId))batch.update(doc(db,'enrollments',targetId),{status:'active'});
+  else batch.set(doc(db,'enrollments',targetId),{uid,classId:targetClassId,studentName:realName,email:student.email||'',joinCode:target.joinCode||'',status:'active',joinedAt:serverTimestamp()});
+  batch.set(doc(db,'classes',targetClassId,'members',uid),{uid,name:publicName,status:'active',joinedAt:serverTimestamp()},{merge:true});
+  batch.update(doc(db,'users',uid),{assignedClassId:targetClassId});
+  try{await batch.commit()}
+  catch(e){if(e?.code==='permission-denied')throw Error('권한이 없어 반을 옮기지 못했어요. Firestore 규칙에서 강사의 수강 등록 생성을 허용해야 합니다(저장소의 firestore.rules 참고).');throw e}
+}
+async function otherActiveClasses(uid,exceptClassId){
+  const snap=await getDocs(query(collection(db,'enrollments'),where('uid','==',uid)));
+  return snap.docs.map(d=>d.data()).filter(e=>e.status==='active'&&e.classId!==exceptClassId).map(e=>A.classes.find(c=>c.id===e.classId)||{id:e.classId,name:'다른 반'});
+}
+async function duplicateActiveStudents(){
+  try{
+    const snap=await getDocs(query(collection(db,'enrollments'),where('status','==','active')));
+    const count={};snap.docs.forEach(d=>{const u=d.data().uid;count[u]=(count[u]||0)+1});
+    return new Set(Object.keys(count).filter(u=>count[u]>1));
+  }catch(e){console.warn('중복 수강 확인 실패',e);return new Set()}
 }
 async function showStudents(b){
   adminStopLive('students');adminStopLive('studentsMembers');
   b.innerHTML=`<div class="section-title"><div><div class="eyebrow">STUDENT DIRECTORY · 수강생</div><h1>수강생 관리 <span class="current-class">(${esc(activeClass()?.name||"선택된 반")})</span></h1><p>이름을 눌러 해당 수강생의 차시별 출결을 수정할 수 있습니다.</p></div><button id="students-back" class="btn secondary" type="button">← 클래스 목록</button></div>
-  <div class="roster-summary"><div class="roster-summary-left"><div id="roster-count" class="roster-count">—</div><div><strong id="roster-total">수강생 불러오는 중</strong><small>${esc(activeClass()?.name||'선택된 반')}</small></div></div><div class="roster-tools"><input id="roster-search" type="search" placeholder="이름 또는 이메일 검색" aria-label="수강생 검색"><select id="roster-status" aria-label="수강 상태 필터"><option value="all">전체 학생</option><option value="active">수강 중</option><option value="inactive">수강 중지</option></select></div></div>
+  <div class="roster-summary"><div class="roster-summary-left"><div id="roster-count" class="roster-count">—</div><div><strong id="roster-total">수강생 불러오는 중</strong><small>${esc(activeClass()?.name||'선택된 반')}</small></div></div><div class="roster-tools"><input id="roster-search" type="search" placeholder="이름 또는 이메일 검색" aria-label="수강생 검색"><select id="roster-status" aria-label="수강 상태 필터"><option value="all">전체 학생</option><option value="active">수강 중</option><option value="inactive">수강 중지</option><option value="transferred">반 이동</option></select></div></div>
   <div class="card roster-card"><div id="roster-list" class="roster-content loading">학생 목록 확인 중</div></div><p class="hint" style="margin-top:15px">※ 이름은 계정의 최신 프로필을 기준으로 표시합니다. 이름이 등록되지 않은 학생은 강사가 수정할 수 있습니다.</p>`;
   $('#students-back').onclick=()=>{A.classFilter='all';navigateAdminPage('classes')};
   const list=$('#roster-list');
   try{
     const cid=A.classId;let students=await roster();
     if(cid!==A.classId || !list.isConnected)return;
+    // D4: 다른 반에도 수강 중으로 남아 있는 학생(이전 버전 데이터)을 찾아 경고합니다.
+    const duplicateActive=await duplicateActiveStudents();
     const active=students.filter(s=>s.status==='active');
     $('#roster-count').textContent=active.length;
     $('#roster-total').textContent=`${active.length}명 수강 중 · 전체 ${students.length}명`;
@@ -1226,7 +1411,7 @@ async function showStudents(b){
         !queryText || (s.studentName||'').toLocaleLowerCase('ko').includes(queryText) || (s.email||'').toLocaleLowerCase('ko').includes(queryText)
       ));
       if(!filtered.length){loaded(list,`<div class="roster-empty">${empty(students.length?'조건에 맞는 수강생이 없습니다':'아직 등록된 수강생이 없습니다',students.length?'검색어나 필터를 변경해 주세요.':'강사가 발급한 수강 코드를 공유해 주세요.')}</div>`);return}
-      loaded(list,`<div class="data-table-wrap"><table class="data-table"><thead><tr><th>수강생</th><th>이메일 · 로그인 ID</th><th>수강 상태</th><th>등록일</th><th>출석현황</th><th>강사 메모</th><th>관리</th></tr></thead><tbody>${filtered.map(s=>`<tr><td><div class="name-cell"><span class="name-avatar" aria-hidden="true">${esc((s.studentName||'?').slice(0,1))}</span><div><button class="student-name-link" data-student-attendance="${esc(s.uid)}">${esc(s.studentName)}</button>${s.hasGenericName?'<small>이름 확인 필요</small>':'<small>학습자 프로필</small>'}</div></div></td><td>${esc(s.email||'—')}</td><td><span class="pill ${s.status==='active'?'green':'gray'}">${s.status==='active'?'수강 중':s.status==='transferred'?'반 이동':'수강 중지'}</span></td><td>${fmt(s.joinedAt)}</td><td><button type="button" class="btn secondary small" data-student-attendance="${esc(s.uid)}">출석현황</button></td><td><button type="button" class="btn btn-outline-red small" data-student-memo="${esc(s.uid)}">메모 입력</button></td><td><div class="row-actions"><button type="button" class="btn secondary small" data-edit-name="${esc(s.uid)}">실명 수정</button><button type="button" class="btn soft small" data-move-student="${esc(s.uid)}">반 이동</button><button type="button" class="btn ${s.status==='active'?'danger':'soft'} small" data-status-uid="${esc(s.uid)}">${s.status==='active'?'수강 중지':'재등록'}</button></div></td></tr>`).join('')}</tbody></table></div>`);
+      loaded(list,`<div class="data-table-wrap"><table class="data-table"><thead><tr><th>수강생</th><th>이메일 · 로그인 ID</th><th>수강 상태</th><th>등록일</th><th>출석현황</th><th>강사 메모</th><th>관리</th></tr></thead><tbody>${filtered.map(s=>`<tr><td><div class="name-cell"><span class="name-avatar" aria-hidden="true">${esc((s.studentName||'?').slice(0,1))}</span><div><button class="student-name-link" data-student-attendance="${esc(s.uid)}">${esc(s.studentName)}</button>${s.hasGenericName?'<small>이름 확인 필요</small>':'<small>학습자 프로필</small>'}${duplicateActive.has(s.uid)?`<small class="dup-warning">활성 반 중복 · <button type="button" class="linkbutton" data-keep-class="${esc(s.uid)}">이 반만 남기기</button></small>`:''}</div></div></td><td>${esc(s.email||'—')}</td><td><span class="pill ${s.status==='active'?'green':'gray'}">${s.status==='active'?'수강 중':s.status==='transferred'?'반 이동':'수강 중지'}</span></td><td>${fmt(s.joinedAt)}</td><td><button type="button" class="btn secondary small" data-student-attendance="${esc(s.uid)}">출석현황</button></td><td><button type="button" class="btn btn-outline-red small" data-student-memo="${esc(s.uid)}">메모 입력</button></td><td><div class="row-actions"><button type="button" class="btn secondary small" data-edit-name="${esc(s.uid)}">실명 수정</button><button type="button" class="btn soft small" data-move-student="${esc(s.uid)}">반 이동</button><button type="button" class="btn ${s.status==='active'?'danger':'soft'} small" data-status-uid="${esc(s.uid)}">${s.status==='active'?'수강 중지':'재등록'}</button></div></td></tr>`).join('')}</tbody></table></div>`);
       $$('[data-student-attendance]',list).forEach(el=>el.onclick=()=>{const student=students.find(s=>s.uid===el.dataset.studentAttendance);if(student)showStudentAttendance(student)});
       $$('[data-student-memo]',list).forEach(el=>el.onclick=async()=>{
         const student=students.find(x=>x.uid===el.dataset.studentMemo);if(!student)return;const ref=doc(db,'classes',cid,'teacherNotes',student.uid);
@@ -1260,19 +1445,32 @@ async function showStudents(b){
         const answer=await modalDialog({title:'반 이동',message:`${student.studentName}님이 이동할 반을 선택해 주세요.`,choices:destinations.map(c=>({value:c.id,label:c.name})),confirmText:'반 이동'});if(answer===null)return;
         const target=destinations.find(c=>c.id===answer);if(!target){toast('반 번호를 확인해 주세요.',true);return}
         if(!await modalConfirm(`${student.studentName}님을 ${target.name}(으)로 이동할까요?\n이전 반의 학습 기록은 보존되지만 새 반에 복사되지 않습니다.`))return;
-        try{const batch=writeBatch(db);const enrollment=doc(db,'enrollments',enId(student.uid,target.id));
-          batch.update(doc(db,'enrollments',student.id),{status:'transferred'});
-          batch.set(enrollment,{uid:student.uid,classId:target.id,studentName:student.realName||student.studentName,email:student.email||'',joinCode:target.joinCode,status:'active',joinedAt:serverTimestamp()});
-          batch.set(doc(db,'classes',cid,'members',student.uid),{uid:student.uid,name:student.publicName,status:'transferred'},{merge:true});
-          batch.set(doc(db,'classes',target.id,'members',student.uid),{uid:student.uid,name:student.publicName,status:'active',joinedAt:serverTimestamp()},{merge:true});
-          batch.update(doc(db,'users',student.uid),{assignedClassId:target.id});await batch.commit();toast('수강생의 반 이동이 완료되었습니다.');await showStudents(b);
-        }catch(e){toast(ex(e),true)}
+        try{await activateEnrollment(student,target.id);toast('수강생의 반 이동이 완료되었습니다.');await showStudents(b)}
+        catch(e){toast(ex(e),true)}
       });
       $$('[data-status-uid]',list).forEach(el=>el.onclick=async()=>{
         const student=students.find(x=>x.uid===el.dataset.statusUid);if(!student)return;
-        if(!await modalConfirm(`${student.studentName}님의 수강 상태를 변경하시겠습니까?`))return;
-        try{const next=student.status==='active'?'inactive':'active';await updateDoc(doc(db,'enrollments',student.id),{status:next});await setDoc(doc(db,'classes',cid,'members',student.uid),{uid:student.uid,name:student.publicName,status:next},{merge:true});student.status=next;$('#roster-count').textContent=students.filter(s=>s.status==='active').length;$('#roster-total').textContent=`${students.filter(s=>s.status==='active').length}명 수강 중 · 전체 ${students.length}명`;toast('수강 상태를 변경했습니다.');renderRows()}
-        catch(err){toast(ex(err),true)}
+        try{
+          if(student.status==='active'){
+            if(!await modalConfirm(`${student.studentName}님을 수강 중지할까요?\n학습 기록은 그대로 보존됩니다.`))return;
+            await updateDoc(doc(db,'enrollments',student.id),{status:'inactive'});
+            await setDoc(doc(db,'classes',cid,'members',student.uid),{uid:student.uid,name:student.publicName,status:'inactive'},{merge:true});
+            toast('수강을 중지했어요.');
+          }else{
+            // D4: 다른 반을 수강 중이면 그 반은 '반 이동'으로 바뀌고 이 반만 수강 중이 됩니다.
+            const others=await otherActiveClasses(student.uid,cid);
+            const message=others.length?`${student.studentName}님은 지금 ${others.map(c=>c.name).join(', ')}을(를) 수강 중이에요.\n이 반(${activeClass()?.name||''})으로 다시 옮길까요?`:`${student.studentName}님을 다시 수강 중으로 바꿀까요?`;
+            if(!await modalConfirm(message))return;
+            await activateEnrollment(student,cid);
+            toast('다시 수강 중으로 바꿨어요.');
+          }
+          await showStudents(b);
+        }catch(err){toast(ex(err),true)}
+      });
+      $$('[data-keep-class]',list).forEach(el=>el.onclick=async()=>{
+        const student=students.find(x=>x.uid===el.dataset.keepClass);if(!student)return;
+        if(!await modalConfirm(`${student.studentName}님의 다른 반 수강을 '반 이동'으로 정리하고 이 반만 남길까요?`))return;
+        try{await activateEnrollment(student,cid);toast('이 반만 수강 중으로 정리했어요.');await showStudents(b)}catch(err){toast(ex(err),true)}
       });
     }
     $('#roster-search').addEventListener('input',renderRows);
@@ -1299,7 +1497,7 @@ async function showStudents(b){
     },adminLiveError);
   }catch(err){loaded(list,`<div class="roster-error error">${esc(ex(err))}</div>`)}
 }
-if(CONFIGURED){onAuthStateChanged(auth,async user=>{try{if(!user){A.user=null;mountAuth(root,{signup:false});return}root.innerHTML='<div class="loading" style="min-height:95vh">강사 권한을 확인하고 있습니다</div>';A.user=user;const snap=await getDoc(doc(db,'users',user.uid));if(!snap.exists()||snap.data().role!=='admin'){root.innerHTML=`<div class="card" style="max-width:620px;margin:8vh auto"><div class="eyebrow">ACCESS CONTROL</div><h2>강사 권한이 필요합니다</h2><p style="margin-top:12px">관리자 계정은 가입만으로 생성되지 않습니다. Firebase Authentication에 강사 계정을 만든 뒤, Firestore <code>users/${esc(user.uid)}</code> 문서의 <code>role</code> 필드를 <code>admin</code>으로 등록해 주세요.</p><div class="subtle" style="margin-top:18px"><strong>현재 로그인 UID</strong><p style="overflow-wrap:anywhere">${esc(user.uid)}</p></div><div class="row" style="margin-top:18px"><button class="btn secondary" id="admin-signout">다른 계정으로 로그인</button><a class="btn soft" href="index.html">수강생 페이지</a></div></div>`;$('#admin-signout').onclick=()=>signOut(auth);return}A.profile=snap.data();await loadAdmin()}catch(err){root.innerHTML=`<div class="card" style="max-width:570px;margin:60px auto"><h3>관리자 페이지 불러오기 실패</h3><p class="error">${esc(ex(err))}</p><button class="btn secondary" onclick="location.reload()">새로고침</button></div>`}})}else mountAuth(root,{signup:false});
+if(CONFIGURED){onAuthStateChanged(auth,async user=>{try{if(!user){resetAdminSession();mountAuth(root,{signup:false});return}root.innerHTML='<div class="loading" style="min-height:95vh">강사 권한을 확인하고 있습니다</div>';A.user=user;const snap=await getDoc(doc(db,'users',user.uid));if(!snap.exists()||snap.data().role!=='admin'){root.innerHTML=`<div class="card" style="max-width:620px;margin:8vh auto"><div class="eyebrow">ACCESS CONTROL</div><h2>강사 권한이 필요합니다</h2><p style="margin-top:12px">관리자 계정은 가입만으로 생성되지 않습니다. Firebase Authentication에 강사 계정을 만든 뒤, Firestore <code>users/${esc(user.uid)}</code> 문서의 <code>role</code> 필드를 <code>admin</code>으로 등록해 주세요.</p><div class="subtle" style="margin-top:18px"><strong>현재 로그인 UID</strong><p style="overflow-wrap:anywhere">${esc(user.uid)}</p></div><div class="row" style="margin-top:18px"><button class="btn secondary" id="admin-signout">다른 계정으로 로그인</button><a class="btn soft" href="index.html">수강생 페이지</a></div></div>`;$('#admin-signout').onclick=()=>{resetAdminSession();signOut(auth)};return}A.profile=snap.data();await loadAdmin()}catch(err){root.innerHTML=`<div class="card" style="max-width:570px;margin:60px auto"><h3>관리자 페이지 불러오기 실패</h3><p class="error">${esc(ex(err))}</p><button class="btn secondary" onclick="location.reload()">새로고침</button></div>`}})}else mountAuth(root,{signup:false});
 
 
 </script>
