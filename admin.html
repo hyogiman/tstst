@@ -15,8 +15,8 @@
 <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;1,9..144,500&display=swap">
 <!-- 배포할 때 CSS를 바꾸면 ?v= 값을 함께 올려 브라우저 캐시를 갱신하세요 -->
-<link rel="stylesheet" href="common.css?v=20261029f">
-<link rel="stylesheet" href="admin.css?v=20261029f">
+<link rel="stylesheet" href="common.css?v=20261029g">
+<link rel="stylesheet" href="admin.css?v=20261029g">
 </head>
 <body>
 <div id="root"></div>
@@ -36,14 +36,15 @@ window.__appStarted=true; // 모듈(외부 SDK 포함)을 모두 불러와 앱�
 import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import { doc, getDoc, getDocs, collection, query, where, setDoc, updateDoc, deleteDoc, serverTimestamp, arrayUnion, onSnapshot, writeBatch, runTransaction, deleteField } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
 import { ref as storageRef, deleteObject } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-storage.js';
-import { CONFIGURED, auth, db, storage, $, $$, esc, fmt, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, mountAuth, formatDuration, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalDialog, modalConfirm, modalInput, formatDateTime, todayKey, statusPill, paintPill, needsReply, byLastActivity, feedbackItems, reviewState, REVIEW_LABEL, openModalLayer, toDate, quizContentKey, answersFor, audioMarkup, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded, modalChoice, sessionState, sessionDateText, parseYouTube, SIZE_LABEL, uploadsInProgress } from './common.js?v=20261029f';
+import { CONFIGURED, auth, db, storage, $, $$, esc, fmt, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, mountAuth, formatDuration, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalDialog, modalConfirm, modalInput, formatDateTime, todayKey, statusPill, paintPill, needsReply, byLastActivity, feedbackItems, reviewState, REVIEW_LABEL, openModalLayer, toDate, quizContentKey, answersFor, audioMarkup, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded, modalChoice, sessionState, sessionDateText, parseYouTube, SIZE_LABEL, uploadsInProgress, wasActiveAt, daysBetween, partsInZone, attendanceValue, normalizeQuizQuestion, isCorrectAnswer } from './common.js?v=20261029g';
+import { computeDashboard, analyzeQuiz, WATCH_RULES, TREND_SESSIONS } from './dashboard.js?v=20261029g';
 
 
 // ===== ADMIN PAGE =====
 installOfflineBanner();
 const root=$('#root');
 // 로그아웃하면 이 초기값으로 되돌립니다(P0-09).
-const adminInitialState=()=>({user:null,profile:null,classes:[],classId:'',classFilter:'all',weeks:[],weekId:'',page:'overview',weekTab:'preview',feedbackTab:'submissions',preview:{},pendingDeletes:[],voiceDrafts:{},live:{},activeQuestionId:'',feedbackSelectedUid:'',feedbackSearch:'',feedbackFilter:'all',feedbackRenderToken:0,questionSearch:'',questionNameMap:new Map(),questionCache:new Map(),attendanceWeekId:'',weekBaseline:null,unsavedUploads:[],feedbackDrafts:{}});
+const adminInitialState=()=>({user:null,profile:null,classes:[],classId:'',classFilter:'all',weeks:[],weekId:'',page:'overview',weekTab:'preview',feedbackTab:'submissions',preview:{},pendingDeletes:[],voiceDrafts:{},live:{},activeQuestionId:'',feedbackSelectedUid:'',feedbackSearch:'',feedbackFilter:'all',feedbackRenderToken:0,questionSearch:'',questionFilter:'all',studentSearch:'',questionNameMap:new Map(),questionCache:new Map(),attendanceWeekId:'',weekBaseline:null,unsavedUploads:[],feedbackDrafts:{}});
 const A=adminInitialState();
 // 계정마다 마지막으로 본 반을 따로 기억합니다.
 const classPrefKey=()=>'spanish-lms-admin-class:'+(A.user?.uid||'');
@@ -87,7 +88,19 @@ window.addEventListener('popstate',async e=>{if(!A.user||!document.querySelector
   // 브라우저 뒤로 가기도 차시 편집 중이면 먼저 묻습니다(취소하면 제자리).
   if(A.page==='weeks'&&isWeekEditorDirty()){history.pushState({senorayu:true,page:'weeks'},'','#weeks');if(!(await confirmLeaveWeekEditor()))return}
   A.page=e.state?.senorayu?e.state.page:'overview';renderPage()});
-async function navigateAdminPage(key){if(A.page==='weeks'&&!(await confirmLeaveWeekEditor()))return;if(A.page!==key){A.page=key;history.pushState({senorayu:true,page:key},'','#'+key)}renderPage()}
+// opts(대시보드의 처리할 일 등에서 이동할 때): weekId · weekTab · feedbackTab · feedbackFilter · questionFilter · attendanceWeekId · studentSearch
+async function navigateAdminPage(key,opts={}){
+  if(A.page==='weeks'&&!(await confirmLeaveWeekEditor()))return;
+  if(opts.weekId&&A.weeks.some(w=>w.id===opts.weekId))A.weekId=opts.weekId;
+  if(opts.weekTab)A.weekTab=opts.weekTab;
+  if(opts.feedbackTab){A.feedbackTab=opts.feedbackTab;A.feedbackSelectedUid=''}
+  if(opts.feedbackFilter){A.feedbackFilter=opts.feedbackFilter;A.feedbackSearch=''}
+  if(opts.questionFilter){A.questionFilter=opts.questionFilter;A.questionSearch=''}
+  if(opts.attendanceWeekId)A.attendanceWeekId=opts.attendanceWeekId;
+  if(opts.studentSearch!==undefined)A.studentSearch=opts.studentSearch;
+  if(A.page!==key){A.page=key;history.pushState({senorayu:true,page:key},'','#'+key)}
+  renderPage();
+}
 
 const SIDE_ICONS={
  overview:'<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/>',
@@ -247,107 +260,199 @@ async function syncMemberDirectory(){
   const writes=members.filter(m=>m.uid && (prev.get(m.uid)?.name!==m.publicName||prev.get(m.uid)?.status!==m.status));
   for(let i=0;i<writes.length;i+=350){const batch=writeBatch(db);for(const m of writes.slice(i,i+350)){batch.set(doc(db,'classes',cid,'members',m.uid),{uid:m.uid,name:m.publicName,status:m.status,joinedAt:m.joinedAt||serverTimestamp()},{merge:true})}await batch.commit()}
 }
-// 대시보드에서는 작성·편집·복사 버튼을 제공하지 않습니다.
-// 각 기능은 클래스 관리 / 출석체크 / 차시별 학습자료 등 해당 메뉴에서만 다룹니다.
+// ===== 대시보드 (배치 09 · P2-01~04, D2 · D3 · D5) =====
+// 세 가지 질문에 답합니다: 오늘 처리할 일은? · 반 전체가 잘 따라오고 있나? · 누구를 챙겨야 하나?
+// 대시보드에는 작성·편집 기능을 두지 않습니다. 숫자를 누르면 필터가 적용된 관리 화면으로 이동합니다.
+// 집계 기준은 dashboard.js 머리말에 있고, 집계(computeDashboard)는 화면과 분리한 순수 함수입니다.
+const DASH_DEPS={sessionState,wasActiveAt,reviewState,needsReply,attendanceValue,daysBetween};
+const QUIZ_DEPS={normalizeQuizQuestion,isCorrectAnswer,answersFor};
+const pctText=v=>v===null||v===undefined?'—':Math.round(100*v)+'%';
+const clockText=d=>{const p=partsInZone(d);return String(p.hour).padStart(2,'0')+':'+String(p.minute).padStart(2,'0')};
+const monthDay=date=>date?`${Number(date.slice(5,7))}/${Number(date.slice(8,10))}`:'날짜 미정';
+const ENROLL_STATUS_TEXT={inactive:'수강 중지',transferred:'반 이동'};
+const goAttr=(page,opts)=>`data-go="${page}" data-go-opts="${esc(JSON.stringify(opts||{}))}"`;
+// 처리할 일 카드. 여러 차시에 걸치면 펼쳐서 차시별 건수를 보여 줍니다.
+function dashActionsMarkup(d){
+  const a=d.actions;
+  if(!a.total)return '<p class="dash-all-clear" role="status">처리할 일이 없어요 <span aria-hidden="true">✓</span></p>';
+  const card=(kind,icon,title,group,page,optsFor,detail,unit='건')=>{
+    if(!group.total)return '';
+    const rows=group.sessions||[];
+    const head=`<span class="dash-action-top">${sideIcon(icon)}<span>${title}</span></span><strong class="dash-action-count">${group.total}<small>${unit}</small></strong>`;
+    if(rows.length<=1)return `<button type="button" class="dash-action" ${goAttr(page,optsFor(rows[0]))}>${head}<span class="dash-action-sub">${esc(detail(rows[0]))}</span></button>`;
+    return `<div class="dash-action">${head}<details class="dash-action-more" data-action-kind="${kind}"><summary>${rows.length}개 차시 나눠 보기</summary><ul>${rows.map(r=>`<li><button type="button" ${goAttr(page,optsFor(r))}><span>${esc(detail(r))}</span>${unit==='건'?`<b>${r.count}건</b>`:''}</button></li>`).join('')}</ul></details></div>`;
+  };
+  const at=r=>`${r.short} · ${monthDay(r.date)}`;
+  return `<div class="dash-actions">${[
+    card('feedback','feedback','피드백 대기',a.feedback,'feedback',r=>({weekId:r.id,feedbackTab:'submissions',feedbackFilter:'unreviewed'}),r=>at(r)+' 과제'),
+    card('rereview','feedback','재검토 대기',a.rereview,'feedback',r=>({weekId:r.id,feedbackTab:'submissions',feedbackFilter:'rereview'}),r=>at(r)+' 다시 제출'),
+    card('questions','questions','답변 대기 질문',a.questions,'questions',()=>({questionFilter:'waiting'}),()=>'질문함 · 답변 대기만 보기'),
+    card('attendance','attendance','출결 미입력',a.attendance,'attendance',r=>({attendanceWeekId:r.id}),r=>at(r)+' 출석체크'),
+    card('publish','weeks','공개 누락',a.publish,'weeks',r=>({weekId:r.id,weekTab:'preview'}),r=>`${at(r)} 수업 · ${r.reason}`,'개 차시'),
+  ].join('')}</div>`;
+}
+// 핵심 지표 3개: 퍼센트 옆에 항상 건수를 쓰고, ⓘ로 기준을 보여 줍니다.
+function dashKpisMarkup(d){
+  const {attendance:att,assignment:asg,quiz:qz}=d.kpi;
+  const now=c=>c?`${c.state==='today'?'오늘':'이번'} 차시(${c.short})`:'';
+  const tile=(key,title,value,count,lines,def,extra='')=>`<article class="dash-kpi"><div class="dash-kpi-head"><h3>${title}</h3><button type="button" class="dash-info" data-kpi-info="${key}" aria-expanded="false" aria-controls="dash-def-${key}" aria-label="${title} 기준 보기">ⓘ</button></div><p class="dash-kpi-value">${value}${count?`<small>${count}</small>`:''}</p>${lines.filter(Boolean).map(l=>`<p class="dash-kpi-sub">${esc(l)}</p>`).join('')}${extra}<p class="dash-kpi-def" id="dash-def-${key}" hidden>${esc(def)}</p></article>`;
+  return `<section class="dash-kpis" aria-label="핵심 지표">${[
+    tile('attendance','출석률',pctText(att.rate),att.recorded?`${att.present}/${att.recorded}건`:'',
+      [att.expected?`입력 ${att.recorded}/${att.expected}건${att.inputRate===null?'':` (${pctText(att.inputRate)})`}`:'완료한 차시가 아직 없어요',!att.recorded&&att.expected?'입력된 출결이 없어요':''],
+      '완료한 차시마다 그날 수강 중이던 학생을 대상으로 출석 ÷ (출석 + 불참)을 계산해요. 미입력은 빼고, 입력률(입력된 건수 ÷ 대상 학생 × 완료 차시)로 따로 보여 줘요. 오늘 차시는 수업이 끝나기 전이라 빼요. 처리할 일의 출결 미입력은 지금 수강 중인 학생만 셉니다(출석체크 화면에 보이는 학생).'),
+    tile('assignment','과제 제출률',pctText(asg.rate),asg.expected?`${asg.submitted}/${asg.expected}건`:'',
+      [asg.expected?'':'완료한 차시에 공개된 과제가 없어요',asg.current?`${now(asg.current)} ${asg.current.submitted}/${asg.current.targets}명 제출`:''],
+      '학생에게 공개된 과제(공개된 차시에서 과제가 켜진 경우)마다, 그 차시에 수강 중이던 학생 중 지금까지 제출한 비율이에요. 제출 권장일이 지나 제출해도 제출로 셉니다. 합계는 완료한 차시만 더하고, 이번 차시는 오늘이나 가장 최근 차시의 실시간 현황이에요.'),
+    tile('quiz','첫 응시 정답률',qz.average===null?'—':Math.round(qz.average)+'%',qz.firstN?`첫 응시 ${qz.firstN}건 평균`:'',
+      [qz.expected?`응시 ${qz.attempted}/${qz.expected}건 (${pctText(qz.participation)})`:'완료한 차시에 공개된 복습이 없어요',qz.current?`${now(qz.current)} ${qz.current.attempted}/${qz.current.targets}명 응시`:'',qz.legacy?`첫 응시를 알 수 없는 이전 기록 ${qz.legacy}건은 뺐어요`:''],
+      '공개된 복습마다 학생의 첫 응시 점수만 평균해요(다시 푼 점수는 넣지 않아요). 응시하지 않은 학생을 0점으로 계산하지 않고, 응시 비율로 따로 보여 줘요. 첫 응시를 알 수 없는 이전 기록은 빼고 건수를 표시해요.',
+      d.sessions.some(s=>s.hasQuiz&&s.state!=='upcoming')?'<button type="button" class="linkbutton dash-kpi-link" id="dash-jump-items">문항별 분석 보기 ↓</button>':''),
+  ].join('')}</section>`;
+}
+// 차시별 추이: 최근 완료 8차시. 한 축(0~100%) 가로 막대, 옆에 n. 기록이 없으면 0으로 그리지 않습니다.
+function dashTrendsMarkup(d){
+  const rows=d.recent.map(id=>d.sessions.find(s=>s.id===id));
+  if(!rows.length)return '<section class="dash-panel dash-section"><p class="dash-unavailable">아직 완료한 차시가 없어요. 수업 날짜가 지나면 차시별 추이가 표시됩니다.</p></section>';
+  const bar=(s,value,emptyText,nText,title)=>`<li class="dash-bar-row" title="${esc(title)}"><span class="dash-bar-label">${esc(s.short)}<small>${esc(monthDay(s.date))}</small></span>${value===null?`<span class="dash-bar-none">${esc(emptyText)}</span>`:`<span class="dash-bar-track" aria-hidden="true"><span class="dash-bar-fill" style="width:${Math.round(value*100)}%"></span></span>`}<span class="dash-bar-value">${value===null?'—':pctText(value)}${nText?`<small>${esc(nText)}</small>`:''}</span></li>`;
+  const panel=(title,sub,items)=>`<section class="dash-panel"><div class="dash-panel-head"><div><h3>${title}</h3><p>${esc(sub)}</p></div></div><ol class="dash-bars">${items}</ol></section>`;
+  const attendance=rows.map(s=>{const a=s.attendance,rec=a.present+a.absent;return bar(s,rec?a.present/rec:null,'기록 없음',[rec?`${a.present}/${rec}`:'',a.missing?`미입력 ${a.missing}`:''].filter(Boolean).join(' · '),`${s.label} · 출석 ${a.present} · 불참 ${a.absent} · 미입력 ${a.missing} (대상 ${s.targets}명)`)}).join('');
+  const assignment=rows.map(s=>!s.assignment?bar(s,null,'과제 없음','',`${s.label} · 공개된 과제 없음`):!s.assignment.targets?bar(s,null,'대상 없음','',`${s.label} · 대상 학생 없음`):bar(s,s.assignment.submitted/s.assignment.targets,'',`${s.assignment.submitted}/${s.assignment.targets}명`,`${s.label} · 제출 ${s.assignment.submitted}명 / 대상 ${s.assignment.targets}명`)).join('');
+  const quiz=rows.map(s=>{const q=s.quiz;if(!q)return bar(s,null,'복습 없음','',`${s.label} · 공개된 복습 없음`);
+    const n=`응시 ${q.attempted}/${q.targets}명`;
+    return q.firstN?bar(s,q.firstSum/q.firstN/100,'',n,`${s.label} · 첫 응시 ${q.firstN}명 평균${q.legacy?` · 이전 기록 ${q.legacy}명 제외`:''}`):bar(s,null,q.attempted?'첫 응시 기록 없음':'응시 기록 없음',n,`${s.label} · ${n}`)}).join('');
+  return `<div class="dash-panels">${panel('출석률',`최근 완료 ${rows.length}차시 · 출석 ÷ (출석 + 불참)`,attendance)}${panel('과제 제출률',`최근 완료 ${rows.length}차시 · 공개된 과제 · 늦은 제출 포함`,assignment)}${panel('첫 응시 정답률',`최근 완료 ${rows.length}차시 · 응시한 학생의 첫 점수 평균`,quiz)}</div>`;
+}
+// 학생 × 차시 진행표: 색 + 기호 + 글자(화면 읽기 도구용)를 함께 씁니다. 빈칸은 그 차시에 수강 중이 아니었다는 뜻입니다.
+const GRID_ATT={present:['is-good','●','출석'],absent:['is-bad','○','불참'],missing:['is-none','·','미입력']};
+const GRID_ASG={submitted:['is-good','✓','과제 제출'],missing:['is-bad','✕','과제 미제출'],none:['is-none','–','과제 없음']};
+function dashGridMarkup(d){
+  const g=d.grid;
+  if(!g.sessions.length||!g.rows.length)return '';
+  const td=(cls,symbol,label,c,first)=>`<td class="dash-cell ${cls}${c.outside?' is-outside':''}${c.estimated?' is-estimated':''}${first?' dash-group-start':''}" title="${esc(label+(c.outside?' · 수강 기간 밖의 기록':'')+(c.estimated?' · 수강 기간 추정':''))}"><span aria-hidden="true">${esc(symbol)}</span><span class="sr-only">${esc(label)}</span></td>`;
+  const blank=first=>`<td class="dash-cell is-blank${first?' dash-group-start':''}"><span class="sr-only">대상 아님</span></td>`;
+  const cells=c=>{
+    if(!c||(!c.target&&!c.outside))return blank(true)+blank()+blank();
+    const att=c.attendance?td(...GRID_ATT[c.attendance],c,true):blank(true);
+    const asg=c.assignment?td(...GRID_ASG[c.assignment],c,false):blank();
+    const q=c.quiz;
+    const quiz=!q?blank():q==='none'?td('is-none','–','복습 없음',c):q==='missing'?td('is-none','미응시','복습 미응시',c):q.kind==='first'?td('is-score',Math.round(q.pct)+'%',`복습 첫 응시 ${Math.round(q.pct)}%`,c):td('is-score','응시','복습 응시(첫 응시를 알 수 없는 이전 기록)',c);
+    return att+asg+quiz;
+  };
+  return `<section class="dash-panel dash-section" aria-labelledby="dash-grid-title"><div class="dash-panel-head"><div><h3 id="dash-grid-title">학생 × 차시 진행표</h3><p>최근 완료 ${g.sessions.length}차시 · 이름을 누르면 수강생 관리로 이동해요</p></div></div>
+   <div class="dash-grid-scroll" tabindex="0" aria-label="학생 × 차시 진행표 (가로로 스크롤)"><table class="dash-grid"><thead><tr><th scope="col" rowspan="2" class="dash-grid-name">학생</th>${g.sessions.map(s=>`<th scope="colgroup" colspan="3" class="dash-group-start" title="${esc(s.label)}">${esc(s.short)}<small>${esc(monthDay(s.date))}</small></th>`).join('')}</tr><tr>${g.sessions.map(()=>'<th scope="col" class="dash-sub dash-group-start">출결</th><th scope="col" class="dash-sub">과제</th><th scope="col" class="dash-sub">복습</th>').join('')}</tr></thead>
+   <tbody>${g.rows.map(r=>`<tr><th scope="row" class="dash-grid-name"><button type="button" data-student="${esc(r.name)}">${esc(r.name)}</button>${r.status!=='active'?`<small>${esc(ENROLL_STATUS_TEXT[r.status]||'수강 종료')}</small>`:''}</th>${r.cells.map(cells).join('')}</tr>`).join('')}</tbody></table></div>
+   <p class="dash-legend"><span>출결 <b class="is-good">●</b> 출석 <b class="is-bad">○</b> 불참 <b class="is-none">·</b> 미입력</span><span>과제 <b class="is-good">✓</b> 제출 <b class="is-bad">✕</b> 미제출 <b class="is-none">–</b> 과제 없음</span><span>복습 첫 응시 점수(%) · 미응시</span><span>빈칸 그 차시에 수강 중이 아님</span>${d.estimated?'<span>* 수강 기간 추정</span>':''}</p></section>`;
+}
+// 챙겨 볼 학생: 설명할 수 있는 규칙(dashboard.js WATCH_RULES)만 씁니다. 점수·순위·낙인 표현은 쓰지 않고, 강사에게만 보입니다.
+function dashWatchMarkup(d){
+  if(!d.done.length)return '';
+  const R=WATCH_RULES,rules=`최근 완료 ${R.absenceWindow}차시 중 불참 ${R.absenceMin}회 이상 · 공개된 과제 ${R.missedAssignments}회 연속 미제출 · 공개된 복습 ${R.missedQuizzes}회 연속 미응시`;
+  return `<section class="dash-panel dash-section" aria-labelledby="dash-watch-title"><div class="dash-panel-head"><div><h3 id="dash-watch-title">챙겨 볼 학생 <small>${d.watch.length}명</small></h3><p>규칙: ${esc(rules)} · 강사에게만 보여요</p></div></div>${d.watch.length?`<ul class="dash-watch">${d.watch.map(w=>`<li><button type="button" data-student="${esc(w.name)}"><strong>${esc(w.name)}</strong> — ${esc(w.reasons.map(r=>r.text).join(', '))}</button></li>`).join('')}</ul>`:'<p class="dash-unavailable">지금은 규칙에 해당하는 학생이 없어요.</p>'}</section>`;
+}
+// 복습 문항 분석 틀(D5 · P4-01). 내용은 문제 버전 사본을 읽은 뒤 drawItems가 채웁니다.
+function dashItemsShell(d,selectedId){
+  const list=d.sessions.filter(s=>s.hasQuiz&&s.state!=='upcoming');
+  if(!list.length)return '';
+  return `<section class="dash-panel dash-section" id="dash-items" aria-labelledby="dash-items-title"><div class="dash-panel-head"><div><h3 id="dash-items-title">복습 문항 분석</h3><p>첫 응시만 · 같은 문제 버전만 · 정답률이 낮은 문항부터</p></div><div class="dash-item-tools"><label class="sr-only" for="dash-item-session">분석할 차시</label><select id="dash-item-session" class="input">${list.map(s=>`<option value="${esc(s.id)}" ${s.id===selectedId?'selected':''}>${esc(s.label)} · 응시 ${s.quiz.attempted}명</option>`).join('')}</select><span id="dash-item-version-host"></span></div></div><div id="dash-item-body"></div></section>`;
+}
+function dashItemsMarkup(a){
+  const others=Object.entries(a.otherVersions).map(([v,n])=>`버전 ${v} ${n}명`).join(', ');
+  const apart=[others&&`다른 문제 버전의 첫 응시(${others})`,a.unversioned&&`문제 버전 기록이 없는 첫 응시 ${a.unversioned}명`,a.legacy&&`첫 응시를 알 수 없는 이전 기록 ${a.legacy}명`].filter(Boolean);
+  const note=`<p class="dash-note">${apart.length?esc(apart.join(' · '))+'은 이 분석에 합치지 않았어요. ':''}복수정답 문항은 정답을 모두 골라야 정답이고, 보기별 비율의 합이 100%를 넘을 수 있어요. 인원이 적으면 한 명이 비율을 크게 바꿔요. 변별도(상·하위 집단 비교)는 소규모 반에서 불안정해 계산하지 않아요.</p>`;
+  if(!a.n)return `<p class="dash-unavailable">이 문제 버전으로 첫 응시한 학생이 아직 없어요.</p>${note}`;
+  const item=it=>{
+    const opts=it.options.map((text,i)=>{
+      const correct=it.correctIndices.includes(i),top=it.topWrong.includes(i),c=it.optionCounts[i],share=it.n?c/it.n:0;
+      return `<li class="dash-option${correct?' is-correct':top?' is-top-wrong':''}"><span class="dash-opt-mark" aria-hidden="true">${correct?'✓':top?'!':''}</span><span class="dash-opt-text">${esc(text||'(빈 보기)')}${correct?'<em>정답</em>':top?'<em>가장 많이 고른 오답</em>':''}</span><span class="dash-opt-track" aria-hidden="true"><span style="width:${Math.round(share*100)}%"></span></span><span class="dash-opt-count">${c}명<small>${Math.round(share*100)}%</small></span></li>`;
+    }).join('');
+    return `<li class="dash-item"><div class="dash-item-head"><span class="dash-item-no">${it.index+1}번</span><p class="dash-item-stem">${esc(it.stem||'(문제 없음)')}${it.type==='multiple'?' <span class="dash-tag">복수정답</span>':''}</p><span class="dash-item-p">${it.p===null?'응답 없음':'정답률 '+pctText(it.p)}<small>${it.correct}/${it.n}명</small></span></div><ul class="dash-options" aria-label="${it.index+1}번 보기별 선택">${opts}</ul></li>`;
+  };
+  return `<p class="dash-item-meta">문제 버전 ${esc(a.version)} · 첫 응시 ${a.n}명</p><ol class="dash-items">${a.items.map(item).join('')}</ol>${note}`;
+}
 async function showOverview(b){
- const selected=activeClass(),cid=A.classId;
- b.innerHTML=`<section class="dashboard-hero" aria-label="쎄뇨라유 스페인어 브랜드"><img src="senorayu-hero-banner.jpg" alt="당신의 스페인어 가이드, 쎄뇨라유"><div class="dashboard-hero-mobile"><img src="senorayu-mark-white.svg" alt=""><div><small>당신의 스페인어 가이드</small><strong>쎄뇨라유</strong><span>¡Hablemos juntos en español!</span></div></div></section>
- <header class="insight-heading"><div><p class="eyebrow">CLASS INSIGHTS · 학습 현황</p><h1>운영 대시보드 <span class="insight-current-class">${esc(selected?.name||'선택된 클래스 없음')}</span></h1><p>수강생의 학습 진행과 출석 기록을 한눈에 확인합니다.</p></div><div class="insight-overall"><strong>${A.classes.filter(c=>!c.archived).length}<small>개</small></strong><span>운영 클래스</span></div></header>
- <div id="insight-content" aria-live="polite"><div class="insight-loading"><span class="loading">학습 현황을 집계하는 중입니다</span></div></div>`;
+ const selected=activeClass(),cid=A.classId,today=todayKey();
+ b.innerHTML=`<header class="dash-head"><div><p class="eyebrow">CLASS INSIGHTS · 학습 현황</p><h1>운영 대시보드</h1><p class="dash-context">${esc(selected?.name||'선택된 반 없음')} · 기준 ${esc(sessionDateText(today))}<span class="dash-updated" id="dash-updated"></span></p></div><span class="dash-classes">운영 중인 반 ${A.classes.filter(c=>!c.archived).length}개</span></header>
+ <div id="insight-content" aria-busy="true"><div class="dash-loading"><span class="loading">학습 현황을 집계하는 중입니다</span></div></div>`;
  const host=$('#insight-content');
- if(!cid){loaded(host,`<section class="insight-empty">${empty('집계할 클래스가 없습니다','클래스 관리 메뉴에서 클래스가 개설되면 출석·학습 현황이 이곳에 표시됩니다.')}</section>`);return;}
- const weeks=[...A.weeks].sort((a,b)=>(a.order||0)-(b.order||0));
- const state={members:null,questions:null,weeks:new Map(),failed:new Set()};
- for(const w of weeks)state.weeks.set(w.id,{attendance:null,submissions:null,quizResults:null});
- let renderTimer=null;
+ if(!cid){host.removeAttribute('aria-busy');loaded(host,empty('집계할 반이 없습니다','클래스 관리에서 반을 개설하면 출석·학습 현황이 이곳에 표시됩니다.'));return}
+ const sessions=[...A.weeks].sort((x,y)=>(Number(x.order)||0)-(Number(y.order)||0)).map(w=>({...w,date:sessionDateOf(w)}));
+ const data={enrollments:null,questions:null,events:undefined,names:{},attendance:{},submissions:{},quizResults:{}};
+ const failed=new Set(),ui={openDefs:new Set(),openActions:new Set(),itemSession:'',itemVersion:null},versionCache=new Map();
+ let lastUpdate=null,timer=null,eventsBlocked=false;const eventsBy={};
  const isCurrent=()=>A.page==='overview'&&A.classId===cid&&host.isConnected;
- const hasAll=()=>state.members!==null&&state.questions!==null&&[...state.weeks.values()].every(x=>['attendance','submissions','quizResults'].every(k=>x[k]!==null));
- const toDocuments=snap=>snap.docs.map(d=>({id:d.id,...d.data()}));
- const showError=(key,error)=>{console.error('대시보드 현황 조회 오류',key,error);state.failed.add(key);scheduleDraw()};
- function scheduleDraw(){if(!isCurrent())return;clearTimeout(renderTimer);renderTimer=setTimeout(draw,90)}
+ const toDocs=snap=>snap.docs.map(x=>({id:x.id,...x.data()}));
+ const schedule=()=>{if(!isCurrent())return;clearTimeout(timer);timer=setTimeout(draw,90)};
+ const touch=()=>{lastUpdate=new Date();schedule()};
+ const fail=(key,err)=>{console.error('대시보드 현황 조회 오류',key,err);failed.add(err);schedule()};
+ // 3-6: 실시간 구독은 최근 완료 8차시 + 오늘 차시만(차시당 3개). 나머지 지난 차시는 화면에 들어올 때 한 번 읽고,
+ // 다가오는 차시는 미리 낸 과제의 피드백 대기만 세려고 제출 목록만 한 번 읽습니다. 날짜 없는 차시는 출결 기록으로 완료를 판단하므로 모두 읽습니다.
+ const plain=sessions.map(w=>({w,state:sessionState(w,today)}));
+ const live=new Set([...plain.filter(x=>x.state==='done').slice(-TREND_SESSIONS),...plain.filter(x=>x.state==='today')].map(x=>x.w.id));
+ const need=new Map(plain.map(({w,state})=>[w.id,state==='upcoming'&&w.date?['submissions']:['attendance','submissions','quizResults']]));
+ const ready=()=>data.enrollments&&data.questions&&data.events!==undefined&&[...need].every(([wid,kinds])=>kinds.every(k=>data[k][wid]));
+ // 수강 기간 기록: 등록마다 한 번 읽습니다. 게시된 규칙이 읽기를 막으면(v3 이전) 등록일 기준으로 추정합니다.
+ function loadEvents(rows){
+  if(eventsBlocked){data.events=null;return}
+  const todo=rows.filter(e=>!(e.id in eventsBy));
+  if(!todo.length){data.events={...eventsBy};return}
+  Promise.all(todo.map(e=>getDocs(collection(db,'enrollments',e.id,'events')).then(snap=>{eventsBy[e.id]=snap.docs.map(x=>x.data())})))
+   .then(()=>{data.events={...eventsBy};touch()},err=>{if(err?.code==='permission-denied'){eventsBlocked=true;data.events=null;touch()}else fail('overview-events',err)});
+ }
  function draw(){
   if(!isCurrent())return;
-  if(state.failed.size){loaded(host,`<div class="insight-error" role="alert"><strong>통계 일부를 조회하지 못했습니다.</strong><p>계정 권한 또는 Firestore 연결을 확인해 주세요. 읽지 못한 데이터는 0으로 계산하지 않습니다.</p><small>${esc([...state.failed].join(', '))}</small><button type="button" class="btn secondary small" data-retry-overview>다시 시도</button></div>`);$('[data-retry-overview]',host).onclick=()=>showOverview(b);return;}
-  if(!hasAll())return;
-  const members=state.members.filter(s=>s.status==='active'),active=new Set(members.map(s=>s.uid||s.id));
-  const questionWait=state.questions.filter(needsReply).length;
-  const attendance={present:0,late:0,absent:0,excused:0,total:0};
-  let assignmentDone=0,assignmentTotal=0,firstQuizTotal=0,firstQuizPercentSum=0,repeatTotal=0;
-  let weekRows=[];
-  for(const w of weeks){
-   const d=state.weeks.get(w.id);const row={week:w,attended:0,attTotal:0,absent:0,late:0,excused:0,assignmentDone:0,assignmentTotal:0,quizFirst:[],quizRepeat:0};
-   // D2: 출석·불참 두 가지로 집계합니다(이전 형식의 지각=출석, 인정결석=불참).
-   for(const a of d.attendance){if(!active.has(a.id))continue;
-     const v=attendanceValue(a.status);
-     if(v==='present'){attendance.present++;attendance.total++;row.attended++;row.attTotal++}
-     if(v==='absent'){attendance.absent++;attendance.total++;row.absent++;row.attTotal++}
-   }
-   if(w.published&&w.assignment?.enabled){
-     row.assignmentTotal=members.length;row.assignmentDone=d.submissions.filter(x=>active.has(x.id)).length;
-     assignmentTotal+=row.assignmentTotal;assignmentDone+=row.assignmentDone;
-   }
-   if(w.published&&w.quiz?.enabled){
-     for(const r of d.quizResults){if(!active.has(r.id))continue;
-       const raw=r.firstAttempt||r;
-       const score=Number(raw.score),total=Number(raw.total);
-       if(Number.isFinite(score)&&Number.isFinite(total)&&total>0){const pct=Math.max(0,Math.min(100,100*score/total));row.quizFirst.push(pct);firstQuizPercentSum+=pct;firstQuizTotal++}
-       if((Number(r.attemptCount)||1)>1){row.quizRepeat++;repeatTotal++}
-     }
-   }
-   weekRows.push(row);
-  }
-  const attendanceDen=attendance.present+attendance.absent;
-  const attendancePct=attendanceDen?Math.round(100*attendance.present/attendanceDen):null;
-  const assignmentPct=assignmentTotal?Math.round(assignmentDone/assignmentTotal*100):null;
-  const firstQuizPct=firstQuizTotal?Math.round(firstQuizPercentSum/firstQuizTotal):null;
-  const displayPct=value=>value===null?'—':value+'%';
-  const kpi=(label,value,caption,kind,percent)=>`<article class="insight-kpi"><div class="insight-kpi-top"><span>${label}</span><span class="insight-kpi-symbol ${kind}" aria-hidden="true">${kind==='users'?'♙':kind==='attendance'?'✓':kind==='assignment'?'▤':'◈'}</span></div><strong>${value}</strong><small>${esc(caption)}</small>${percent!==null?`<div class="insight-kpi-track" role="meter" aria-label="${label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}"><span style="width:${percent}%"></span></div>`:''}</article>`;
-  const published=weeks.filter(w=>w.published).length;
-  // 차시별 차트는 이미 진행한 차시(오늘까지의 날짜, 날짜가 없으면 출결 기록이 있는 차시) 중 최근 8개를 보여 줍니다.
-  const today=todayKey(),sessionDay=w=>w.sessionDate||selected?.schedule?.find(x=>x.weekId===w.id)?.date||'';
-  const recent=weekRows.filter(r=>{const day=sessionDay(r.week);return day?day<=today:r.attTotal>0}).slice(-8);
-  const rowLabel=(w)=>`${esc(w.label||'차시')}<small>${esc(w.sessionDate||selected?.schedule?.find(x=>x.weekId===w.id)?.date||'날짜 미설정')}</small>`;
-  const attendanceRows=recent.map(row=>{
-   const done=row.attended+row.absent;
-   const pct=done?Math.round(row.attended/done*100):null;
-   return `<div class="insight-bar-row"><div class="insight-row-name">${rowLabel(row.week)}</div><div class="insight-bar-track" role="img" aria-label="${esc(row.week.label||'차시')} ${pct===null?'출석 미기록':'출석률 '+pct+'%'}">${pct===null?'<span class="insight-no-record">기록 전</span>':`<span class="insight-bar-fill" style="width:${pct}%"></span>`}</div><strong>${pct===null?'—':pct+'%'}</strong></div>`;
-  }).join('');
-  const submitRows=recent.filter(r=>r.week.published&&r.week.assignment?.enabled).map(row=>{
-   const pct=row.assignmentTotal?Math.round(100*row.assignmentDone/row.assignmentTotal):null;
-   return `<div class="insight-bar-row"><div class="insight-row-name">${rowLabel(row.week)}</div><div class="insight-bar-track is-muted">${pct===null?'<span class="insight-no-record">수강생 없음</span>':`<span class="insight-bar-fill is-assignment" style="width:${pct}%"></span>`}</div><strong>${pct===null?'—':pct+'%'}</strong></div>`;
-  }).join('');
-  const hasAttendance=weekRows.filter(x=>x.attTotal>0).length;
-  const summaryItems=[
-   ['공개된 차시',`${published} / ${weeks.length}`,'전체 등록 차시 중 공개된 차시'],
-   ['출결 기록이 있는 차시',`${hasAttendance} / ${weeks.length}`,'출석 또는 불참이 입력된 차시'],
-   ['답변 대기 질문',`${questionWait}건`,'현재 클래스의 미답변 질문'],
-   ['복습 재응시 학생·차시',`${repeatTotal}건`,'첫 응시 이후 다시 푼 기록이 있는 학생·차시']
-  ];
-  loaded(host,`<section class="insight-kpis" aria-label="주요 학습 지표">
-    ${kpi('수강 중인 학생',`${members.length}명`,`현재 선택한 클래스`,'users',null)}
-    ${kpi('출석률',displayPct(attendancePct),attendanceDen?`출석 ${attendance.present} · 불참 ${attendance.absent}`:'기록된 출결이 없습니다','attendance',attendancePct)}
-    ${kpi('과제 제출률',displayPct(assignmentPct),assignmentTotal?`${assignmentDone} / ${assignmentTotal} 제출`:'공개된 과제 또는 수강생 없음','assignment',assignmentPct)}
-    ${kpi('복습 첫 정답률',displayPct(firstQuizPct),firstQuizTotal?`첫 응시 ${firstQuizTotal}건 평균`:'첫 응시 기록 없음','quiz',firstQuizPct)}
-   </section>
-   <div class="insight-layout"><section class="insight-panel"><div class="insight-panel-head"><div><span class="eyebrow">ATTENDANCE TREND</span><h2>차시별 출석률</h2></div><span class="insight-tag">최근 ${recent.length}개 차시</span></div><div class="insight-chart">${attendanceRows||'<p class="insight-unavailable">등록된 차시가 없습니다.</p>'}</div><div class="insight-legend"><span><i></i> 출석</span><span>전체 입력 출결 대비</span></div></section>
-   <section class="insight-panel"><div class="insight-panel-head"><div><span class="eyebrow">CLASS PULSE</span><h2>운영 현황</h2></div><span class="insight-tag">${esc(selected?.name||'')}</span></div><div class="insight-pulse">${summaryItems.map(([label,num,desc])=>`<div class="insight-pulse-item"><div><strong>${esc(label)}</strong><small>${esc(desc)}</small></div><b>${esc(num)}</b></div>`).join('')}</div></section></div>
-   <section class="insight-panel insight-wide"><div class="insight-panel-head"><div><span class="eyebrow">HOMEWORK PROGRESS</span><h2>차시별 과제 제출률</h2></div><span class="insight-tag">공개된 과제 기준</span></div><div class="insight-chart insight-chart-assignments">${submitRows||'<p class="insight-unavailable">최근 차시에 공개된 과제가 없습니다.</p>'}</div></section>
-   <p class="insight-method">집계 기준 · 출석률: 출석 ÷ (출석+불참), 미입력 제외 · 차시별 차트: 오늘까지 진행한 차시 중 최근 8개 · 과제: 공개 과제에 대한 현재 수강생의 제출 건수 · 복습: 첫 응시 정답률의 평균 · 과거 수강생·회차별 등록 변동은 소급 반영하지 않습니다. 최근 16차시 데이터는 실시간 갱신되며 이전 차시는 화면 진입 시 조회합니다.</p>`);
+  if(failed.size){host.removeAttribute('aria-busy');showLoadFailed(host,()=>{adminClearLive();showOverview(b)},[...failed][0]);return}
+  if(!ready())return;
+  const d=computeDashboard({sessions,enrollments:data.enrollments,events:data.events,names:data.names,attendance:data.attendance,submissions:data.submissions,quizResults:data.quizResults,questions:data.questions},today,DASH_DEPS);
+  const quizList=d.sessions.filter(s=>s.hasQuiz&&s.state!=='upcoming');
+  if(!quizList.some(s=>s.id===ui.itemSession))ui.itemSession=([...quizList].reverse().find(s=>s.state==='done'&&s.quiz.attempted)||quizList.at(-1))?.id||'';
+  const scrollLeft=$('.dash-grid-scroll',host)?.scrollLeft||0;
+  host.removeAttribute('aria-busy');
+  loaded(host,`<section class="dash-section" aria-labelledby="dash-actions-title"><h2 class="dash-section-title" id="dash-actions-title">처리할 일${d.actions.total?` <small>${d.actions.total}건</small>`:''}</h2>${dashActionsMarkup(d)}</section>
+   ${d.eventsUnavailable?'<p class="notice dash-section">수강 기간 기록을 읽지 못해 등록일 기준으로 대상 학생을 추정했어요. 최신 보안 규칙을 게시하면 정확해져요.</p>':''}
+   ${dashKpisMarkup(d)}${dashTrendsMarkup(d)}${dashGridMarkup(d)}${dashWatchMarkup(d)}${dashItemsShell(d,ui.itemSession)}`);
+  $('#dash-updated').textContent=lastUpdate?` · 마지막 갱신 ${clockText(lastUpdate)}`:'';
+  // 실시간으로 다시 그려도 펼쳐 둔 설명·차시 목록과 진행표 스크롤은 그대로 둡니다.
+  for(const key of ui.openDefs){const def=$('#dash-def-'+key,host);if(def){def.hidden=false;$(`[data-kpi-info="${key}"]`,host)?.setAttribute('aria-expanded','true')}}
+  for(const kind of ui.openActions){const box=$(`details[data-action-kind="${kind}"]`,host);if(box)box.open=true}
+  const grid=$('.dash-grid-scroll',host);if(grid)grid.scrollLeft=scrollLeft;
+  $$('[data-go]',host).forEach(el=>el.onclick=()=>navigateAdminPage(el.dataset.go,JSON.parse(el.dataset.goOpts||'{}')));
+  $$('[data-student]',host).forEach(el=>el.onclick=()=>navigateAdminPage('students',{studentSearch:el.dataset.student}));
+  $$('[data-kpi-info]',host).forEach(el=>el.onclick=()=>{const key=el.dataset.kpiInfo,def=$('#dash-def-'+key,host),open=def.hidden;def.hidden=!open;el.setAttribute('aria-expanded',String(open));if(open)ui.openDefs.add(key);else ui.openDefs.delete(key)});
+  $$('details[data-action-kind]',host).forEach(el=>el.addEventListener('toggle',()=>{if(el.open)ui.openActions.add(el.dataset.actionKind);else ui.openActions.delete(el.dataset.actionKind)}));
+  $('#dash-jump-items',host)?.addEventListener('click',()=>$('#dash-items')?.scrollIntoView({behavior:'smooth',block:'start'}));
+  const pick=$('#dash-item-session',host);if(pick){pick.onchange=()=>{ui.itemSession=pick.value;ui.itemVersion=null;drawItems()};drawItems()}
  }
- // 현재 선택 클래스의 질문, 등록정보 및 최근 16차시는 실시간 반영됩니다.
- const liveWeeks=new Set(weeks.slice(-16).map(w=>w.id));
- const attach=(key,ref,onData)=>{
-   A.live[key]=onSnapshot(ref,snap=>{if(!isCurrent())return;onData(toDocuments(snap));scheduleDraw()},err=>showError(key,err));
- };
- attach('overview-students',query(collection(db,'enrollments'),where('classId','==',cid)),rows=>state.members=rows);
- attach('overview-questions',collection(db,'classes',cid,'questions'),rows=>state.questions=rows);
- for(const w of weeks){for(const kind of ['attendance','submissions','quizResults']){
-   const ref=collection(db,'classes',cid,'weeks',w.id,kind),key=`overview-${w.id}-${kind}`;
-   if(liveWeeks.has(w.id))attach(key,ref,rows=>state.weeks.get(w.id)[kind]=rows);
-   else getDocs(ref).then(snap=>{if(!isCurrent())return;state.weeks.get(w.id)[kind]=toDocuments(snap);scheduleDraw()}).catch(err=>showError(key,err));
- }}
- // 기록이 전혀 없는 새로운 클래스도 빈 차트가 정상 출력됩니다.
- scheduleDraw();
+ // 문항 분석: 같은 버전의 첫 응시만 모읍니다. 문항은 그 버전의 강사 전용 사본(quizVersions)에서 읽습니다.
+ async function drawItems(){
+  const body=$('#dash-item-body',host),versionHost=$('#dash-item-version-host',host);if(!body)return;
+  const w=sessions.find(x=>x.id===ui.itemSession);if(!w){body.innerHTML='';return}
+  const results=data.quizResults[w.id]||[],current=Number(w.quiz?.version)||null;
+  const versions=[...new Set([current,...results.map(r=>Number(r.firstAttempt?.quizVersion))].filter(v=>Number.isInteger(v)&&v>0))].sort((x,y)=>x-y);
+  const v=versions.includes(ui.itemVersion)?ui.itemVersion:current||versions.at(-1)||null;
+  versionHost.innerHTML=versions.length>1?`<label class="sr-only" for="dash-item-version">문제 버전</label><select id="dash-item-version" class="input">${versions.map(x=>`<option value="${x}" ${x===v?'selected':''}>문제 버전 ${x}${x===current?' (지금 문제)':''}</option>`).join('')}</select>`:'';
+  const vs=$('#dash-item-version',versionHost);if(vs)vs.onchange=()=>{ui.itemVersion=Number(vs.value);drawItems()};
+  if(!v){body.innerHTML='<p class="dash-unavailable">문제 버전 기록이 없는 복습이라 문항별로 나눌 수 없어요. 이 차시의 퀴즈를 저장하면 이후 응시부터 분석할 수 있어요.</p>';return}
+  const key=w.id+':'+v;
+  if(!versionCache.has(key)){
+   body.innerHTML='<div class="loading">문제 사본을 불러오는 중입니다</div>';
+   const copies=await loadQuizVersions(cid,w.id,[v]);
+   versionCache.set(key,copies.get(v)||(v===current?w.quiz?.questions||[]:null));
+   if(!isCurrent()||ui.itemSession!==w.id||!body.isConnected)return;
+  }
+  const questions=versionCache.get(key);
+  if(!questions){body.innerHTML=`<p class="dash-unavailable">문제 버전 ${v}의 사본이 없어 분석할 수 없어요.</p>`;return}
+  body.innerHTML=dashItemsMarkup(analyzeQuiz({questions,version:v,results},QUIZ_DEPS));
+ }
+ const attach=(key,ref,set)=>{A.live[key]=onSnapshot(ref,snap=>{if(!isCurrent())return;set(toDocs(snap));touch()},err=>fail(key,err))};
+ const once=(key,ref,set)=>getDocs(ref).then(snap=>{if(!isCurrent())return;set(toDocs(snap));touch()}).catch(err=>fail(key,err));
+ attach('overview-enrollments',query(collection(db,'enrollments'),where('classId','==',cid)),rows=>{data.enrollments=rows;loadEvents(rows)});
+ attach('overview-questions',collection(db,'classes',cid,'questions'),rows=>{data.questions=rows});
+ for(const [wid,kinds] of need)for(const kind of kinds){
+  const ref=collection(db,'classes',cid,'weeks',wid,kind),key=`overview-${wid}-${kind}`,set=rows=>{data[kind][wid]=rows};
+  if(live.has(wid))attach(key,ref,set);else once(key,ref,set);
+ }
+ // 진행표·챙겨 볼 학생에 쓰는 이름은 최신 프로필 기준(수강생 관리와 같은 이름)으로 한 번 읽습니다.
+ roster().then(list=>{if(!isCurrent())return;data.names=Object.fromEntries(list.map(m=>[m.uid,m.studentName]));schedule()}).catch(err=>console.warn('대시보드 이름 조회 실패',err));
 }
 function showClasses(b){
   const classes=A.classFilter==='archived'?A.classes.filter(c=>c.archived):A.classes;
@@ -826,7 +931,7 @@ async function drawFeedbackList(){
     const rereviewCount=active.filter(s=>stateOf(map.get(s.uid))==='rereview').length;
     if(!active.some(s=>s.uid===A.feedbackSelectedUid))A.feedbackSelectedUid='';
     out.classList.remove('loading');
-    out.innerHTML=`<div class="feedback-workspace"><section class="feedback-directory"><div class="feedback-directory-head"><div class="between"><h3>수강생 목록</h3><span class="pill brand">${done}/${active.length} ${kind==='submissions'?'제출':'응시'}</span></div><p class="hint" style="margin-top:5px">피드백 완료 ${feedbackDone}명${rereviewCount?` · 재검토 대기 ${rereviewCount}명`:''} · 이름을 눌러 상세보기</p><div class="feedback-tools"><div class="field"><input id="feedback-person-search" aria-label="수강생 검색" placeholder="이름·이메일 검색" value="${esc(A.feedbackSearch)}"></div><div class="field" style="flex:0 1 140px"><select id="feedback-status-filter" aria-label="제출 상태 필터"><option value="all" ${A.feedbackFilter==='all'?'selected':''}>전체 학생</option><option value="done" ${A.feedbackFilter==='done'?'selected':''}>${kind==='submissions'?'제출 완료':'응시 완료'}</option><option value="pending" ${A.feedbackFilter==='pending'?'selected':''}>${kind==='submissions'?'미제출':'미응시'}</option><option value="unreviewed" ${A.feedbackFilter==='unreviewed'?'selected':''}>피드백 대기(재검토 포함)</option>${kind==='submissions'?`<option value="rereview" ${A.feedbackFilter==='rereview'?'selected':''}>재검토 대기</option>`:''}</select></div></div></div><div id="feedback-directory-list" class="feedback-directory-list"></div></section><section id="feedback-inspector" class="feedback-inspector" aria-live="polite"></section></div>`;
+    out.innerHTML=`<div class="feedback-workspace"><section class="feedback-directory"><div class="feedback-directory-head"><div class="between"><h3>수강생 목록</h3><span class="pill brand">${done}/${active.length} ${kind==='submissions'?'제출':'응시'}</span></div><p class="hint" style="margin-top:5px">피드백 완료 ${feedbackDone}명${rereviewCount?` · 재검토 대기 ${rereviewCount}명`:''} · 이름을 눌러 상세보기</p><div class="feedback-tools"><div class="field"><input id="feedback-person-search" aria-label="수강생 검색" placeholder="이름·이메일 검색" value="${esc(A.feedbackSearch)}"></div><div class="field" style="flex:0 1 140px"><select id="feedback-status-filter" aria-label="제출 상태 필터"><option value="all" ${A.feedbackFilter==='all'?'selected':''}>전체 학생</option><option value="done" ${A.feedbackFilter==='done'?'selected':''}>${kind==='submissions'?'제출 완료':'응시 완료'}</option><option value="pending" ${A.feedbackFilter==='pending'?'selected':''}>${kind==='submissions'?'미제출':'미응시'}</option><option value="unreviewed" ${A.feedbackFilter==='unreviewed'?'selected':''}>피드백 대기</option>${kind==='submissions'?`<option value="rereview" ${A.feedbackFilter==='rereview'?'selected':''}>재검토 대기</option>`:''}</select></div></div></div><div id="feedback-directory-list" class="feedback-directory-list"></div></section><section id="feedback-inspector" class="feedback-inspector" aria-live="polite"></section></div>`;
     const rosterEl=$('#feedback-directory-list',out),panel=$('#feedback-inspector',out);
     const renderDetail=()=>{
       const s=active.find(x=>x.uid===A.feedbackSelectedUid);
@@ -886,7 +991,8 @@ async function drawFeedbackList(){
         if(term&&!`${s.studentName} ${s.email||''}`.toLocaleLowerCase().includes(term))return false;
         if(A.feedbackFilter==='done'&&!submitted)return false;
         if(A.feedbackFilter==='pending'&&submitted)return false;
-        if(A.feedbackFilter==='unreviewed'&&!['pending','rereview'].includes(state))return false;
+        // 피드백 대기(첫 피드백 전)와 재검토 대기(피드백 뒤 다시 제출)는 겹치지 않게 나눕니다(대시보드 카드 건수와 같음).
+        if(A.feedbackFilter==='unreviewed'&&state!=='pending')return false;
         if(A.feedbackFilter==='rereview'&&state!=='rereview')return false;
         return true;
       });
@@ -914,7 +1020,7 @@ async function drawFeedbackList(){
 function questionBadge(q,attrs=''){return needsReply(q)?statusPill('warning','답변 대기',attrs):statusPill('success','답변 완료',attrs)}
 function showAdminQuestions(body){
   adminStopLive('questions');adminStopLive('replies');adminStopLive('questionNames');
-  body.innerHTML=`<div class="section-title"><div><div class="eyebrow">PREGUNTAS · 질문</div><h1>수강생 질문함 <span class="current-class">(${esc(activeClass()?.name||"선택된 반")})</span></h1><p>이름을 중심으로 질문을 확인하고, 수강생별 대화를 이어가세요.</p></div></div><div class="questions-workspace"><section class="questions-directory"><div class="questions-directory-head"><div class="between" style="margin-bottom:12px"><strong>질문 목록</strong><span class="pill neutral" id="admin-question-pending">불러오는 중</span></div><input id="admin-question-search" class="input" aria-label="질문 학생 검색" placeholder="학생 이름·질문 검색" value="${esc(A.questionSearch)}"></div><div id="admin-questions-list" class="questions-directory-list"><div class="loading">질문을 확인하고 있습니다</div></div></section><section id="admin-question-detail" class="question-inspector"><p class="muted">왼쪽에서 학생 이름을 선택해 주세요.</p></section></div>`;
+  body.innerHTML=`<div class="section-title"><div><div class="eyebrow">PREGUNTAS · 질문</div><h1>수강생 질문함 <span class="current-class">(${esc(activeClass()?.name||"선택된 반")})</span></h1><p>이름을 중심으로 질문을 확인하고, 수강생별 대화를 이어가세요.</p></div></div><div class="questions-workspace"><section class="questions-directory"><div class="questions-directory-head"><div class="between" style="margin-bottom:12px"><strong>질문 목록</strong><span class="pill neutral" id="admin-question-pending">불러오는 중</span></div><div class="question-tools"><input id="admin-question-search" class="input" aria-label="질문 학생 검색" placeholder="학생 이름·질문 검색" value="${esc(A.questionSearch)}"><select id="admin-question-filter" class="input" aria-label="질문 상태 필터"><option value="all" ${A.questionFilter!=='waiting'?'selected':''}>전체 질문</option><option value="waiting" ${A.questionFilter==='waiting'?'selected':''}>답변 대기</option></select></div></div><div id="admin-questions-list" class="questions-directory-list"><div class="loading">질문을 확인하고 있습니다</div></div></section><section id="admin-question-detail" class="question-inspector"><p class="muted">왼쪽에서 학생 이름을 선택해 주세요.</p></section></div>`;
   const currentCid=A.classId;
   let questions=[];
   A.questionCache=new Map();
@@ -937,8 +1043,9 @@ function showAdminQuestions(body){
     paintPill($('#admin-question-pending'),pending?'warning':'neutral',`답변 대기 ${pending}건`);
     renderList=()=>{
       const term=A.questionSearch.trim().toLocaleLowerCase();
-      const filtered=questions.filter(q=>!term||`${liveDisplayName(q)} ${q.title||''} ${q.content||''}`.toLocaleLowerCase().includes(term));
-      loaded(list,filtered.map(q=>`<button type="button" class="question-thread ${A.activeQuestionId===q.id?'thread-open':''}" data-admin-qid="${esc(q.id)}" aria-pressed="${A.activeQuestionId===q.id}"><div class="between" style="align-items:center;gap:8px"><span class="question-person-main"><span class="person-avatar" aria-hidden="true">${esc(liveDisplayName(q).slice(0,1))}</span><strong>${esc(liveDisplayName(q))}</strong></span>${questionBadge(q,'style="flex-shrink:0"')}</div><div class="question-item-title">${esc(q.title||'제목 없음')}</div><p class="question-item-excerpt">${esc(String(q.content||'').replace(/\s+/g,' ').slice(0,110))}</p><p class="question-item-meta">${esc(formatDateTime(q.lastMessageAt||q.createdAt))}${needsReply(q)&&q.answeredAt?' · 학생 추가 질문':''}</p></button>`).join('')||empty(term?'검색 결과가 없습니다':'아직 질문이 없습니다',term?'다른 학생 이름이나 질문을 입력해 보세요.':'학생이 질문을 등록하면 실시간으로 표시됩니다.'));
+      const waitingOnly=A.questionFilter==='waiting';
+      const filtered=questions.filter(q=>(!waitingOnly||needsReply(q))&&(!term||`${liveDisplayName(q)} ${q.title||''} ${q.content||''}`.toLocaleLowerCase().includes(term)));
+      loaded(list,filtered.map(q=>`<button type="button" class="question-thread ${A.activeQuestionId===q.id?'thread-open':''}" data-admin-qid="${esc(q.id)}" aria-pressed="${A.activeQuestionId===q.id}"><div class="between" style="align-items:center;gap:8px"><span class="question-person-main"><span class="person-avatar" aria-hidden="true">${esc(liveDisplayName(q).slice(0,1))}</span><strong>${esc(liveDisplayName(q))}</strong></span>${questionBadge(q,'style="flex-shrink:0"')}</div><div class="question-item-title">${esc(q.title||'제목 없음')}</div><p class="question-item-excerpt">${esc(String(q.content||'').replace(/\s+/g,' ').slice(0,110))}</p><p class="question-item-meta">${esc(formatDateTime(q.lastMessageAt||q.createdAt))}${needsReply(q)&&q.answeredAt?' · 학생 추가 질문':''}</p></button>`).join('')||(term?empty('검색 결과가 없습니다','다른 학생 이름이나 질문을 입력해 보세요.'):waitingOnly&&questions.length?empty('답변을 기다리는 질문이 없어요','모든 질문에 답했어요. 전체 질문을 보려면 위에서 \'전체 질문\'을 고르세요.'):empty('아직 질문이 없습니다','학생이 질문을 등록하면 실시간으로 표시됩니다.')));
       $$('[data-admin-qid]',list).forEach(el=>el.onclick=()=>{
         A.activeQuestionId=el.dataset.adminQid;
         $$('[data-admin-qid]',list).forEach(button=>{button.classList.toggle('thread-open',button.dataset.adminQid===A.activeQuestionId);button.setAttribute('aria-pressed',String(button.dataset.adminQid===A.activeQuestionId))});
@@ -948,6 +1055,7 @@ function showAdminQuestions(body){
       });
     };
     $('#admin-question-search').oninput=e=>{A.questionSearch=e.target.value;renderList()};
+    $('#admin-question-filter').onchange=e=>{A.questionFilter=e.target.value;renderList()};
     renderList();
     if(A.activeQuestionId&&!questions.some(q=>q.id===A.activeQuestionId)){A.activeQuestionId='';adminStopLive('replies');$('#admin-question-detail').innerHTML='<p class="muted">학생을 선택해 주세요.</p>'}
     else if(A.activeQuestionId)paintQuestionHeader(A.questionCache.get(A.activeQuestionId)); // 열린 상세의 배지·버튼도 최신 상태로
@@ -992,9 +1100,8 @@ function showAdminQuestionThread(q){
   };
   A.live.replies=onSnapshot(collection(db,'classes',cid,'questions',qid,'replies'),snap=>{if(A.activeQuestionId!==qid)return;const list=$('#admin-replies');if(!list)return;const replies=snap.docs.map(d=>d.data()).sort((a,b)=>(a.createdAt?.seconds||0)-(b.createdAt?.seconds||0));loaded(list,replies.map(r=>`<div class="reply-bubble ${r.role==='admin'?'teacher':'student'}"><p class="hint"><span data-reply-uid="${esc(r.uid||'')}">${esc(r.role==='student'?(A.questionNameMap.get(r.uid)||r.author||'수강생'):(r.author||''))}</span> · ${esc(formatDateTime(r.createdAt))}</p><p style="white-space:pre-wrap">${esc(r.text)}</p></div>`).join('')||'<p class="hint">아직 댓글이 없습니다.</p>')},adminLiveError);
 }
-// D2: 출석은 '출석'·'불참' 두 가지만 씁니다. 이전 형식의 지각은 출석, 인정결석은 불참으로 읽습니다.
+// D2: 출석은 '출석'·'불참' 두 가지만 씁니다(이전 형식 읽기는 common.js의 attendanceValue).
 const attendanceOptions=[['unchecked','미입력'],['present','출석'],['absent','불참']];
-const attendanceValue=status=>status==='present'||status==='late'?'present':status==='absent'||status==='excused'?'absent':'';
 const attendanceLabel=v=>v==='present'?'출석':v==='absent'?'불참':'미입력';
 // 오늘 차시 → 오늘 이전 가장 최근 차시 → 첫 차시 순으로 기본 선택합니다.
 function defaultSessionId(list){
@@ -1130,6 +1237,7 @@ async function showStudents(b){
   <div class="roster-summary"><div class="roster-summary-left"><div id="roster-count" class="roster-count">—</div><div><strong id="roster-total">수강생 불러오는 중</strong><small>${esc(activeClass()?.name||'선택된 반')}</small></div></div><div class="roster-tools"><input id="roster-search" type="search" placeholder="이름 또는 이메일 검색" aria-label="수강생 검색"><select id="roster-status" aria-label="수강 상태 필터"><option value="all">전체 학생</option><option value="active">수강 중</option><option value="inactive">수강 중지</option><option value="transferred">반 이동</option></select></div></div>
   <div class="card roster-card"><div id="roster-list" class="roster-content loading">학생 목록 확인 중</div></div><p class="hint" style="margin-top:15px">※ 이름은 계정의 최신 프로필을 기준으로 표시합니다. 이름이 등록되지 않은 학생은 강사가 수정할 수 있습니다.</p>`;
   $('#students-back').onclick=()=>{A.classFilter='all';navigateAdminPage('classes')};
+  if(A.studentSearch){$('#roster-search').value=A.studentSearch;A.studentSearch=''} // 대시보드에서 학생 이름을 눌러 온 경우
   const list=$('#roster-list');
   try{
     const cid=A.classId;let students=await roster();

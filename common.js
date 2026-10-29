@@ -191,6 +191,19 @@ export function answersFor(entry, questions) {
     return byId && key in byId ? parseAnswer(byId[key]) : parseAnswer(entry?.answers?.[i]);
   });
 }
+// 학생 화면의 채점 기준(학생 채점과 강사 문항 분석이 함께 씁니다). 구버전 {correctIndex} 문항도 읽습니다.
+export function normalizeQuizQuestion(q = {}, index = 0) {
+  const type = ['single', 'multiple', 'ox'].includes(q.type) ? q.type : 'single';
+  const options = type === 'ox' ? ['O', 'X'] : (q.options || []);
+  let correctIndices = Array.isArray(q.correctIndices) ? q.correctIndices.map(Number) : [Number(q.correctIndex ?? 0)];
+  correctIndices = [...new Set(correctIndices.filter(i => i >= 0 && i < options.length))];
+  return { ...q, id: questionKey(q, index), type, options, correctIndices };
+}
+// 복수정답은 정답을 모두, 정답만 골라야 정답입니다.
+export function isCorrectAnswer(q, answer) {
+  const a = Array.isArray(answer) ? answer : answer === null || answer === undefined ? [] : [answer];
+  return a.length === q.correctIndices.length && a.every(i => q.correctIndices.includes(Number(i)));
+}
 // 퀴즈 버전 비교용: 제목·문항 ID 생성 방식과 무관한 문항 내용만 남깁니다.
 export function quizContentKey(questions = []) {
   return JSON.stringify(questions.map(q => ({
@@ -198,6 +211,10 @@ export function quizContentKey(questions = []) {
     correctIndices: [...(q.correctIndices || [])].map(Number).sort((a, b) => a - b), explanation: q.explanation || '',
   })));
 }
+
+// ---------- 출결 (D2) ----------
+// 출석은 '출석'·'불참' 두 가지만 씁니다. 이전 형식의 지각은 출석, 인정결석은 불참으로 읽고, 기록이 없으면 ''(미입력).
+export const attendanceValue = status => status === 'present' || status === 'late' ? 'present' : status === 'absent' || status === 'excused' ? 'absent' : '';
 
 // ---------- 수강 기간 (P1-04) ----------
 // 그 날짜(운영 시간대 'YYYY-MM-DD')에 수강 중이었는지 판정합니다. 근거가 부족하면 estimated: true.

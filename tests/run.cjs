@@ -3,6 +3,7 @@
 // 규칙 흉내: 'v1'(처음 받은 규칙) · 'v2'(2026-10-29 게시) · 'v3'(이번 수정안). 기본은 v3.
 'use strict';
 const { launch, openApp, lastToast, pause } = require('./lib/harness.cjs');
+const { makeSeed, kstDate, DAY } = require('./fixtures/seed.cjs');
 
 const FILTER = process.argv[2] ? new RegExp(process.argv[2]) : null;
 const tests = [];
@@ -835,6 +836,201 @@ test('S06 차시 편집: 학생에게 보이는 범위 요약과 수업 흐름 �
   const tabs = await page.$$eval('[data-week-tab]', els => els.map(e => e.textContent));
   assert(JSON.stringify(tabs) === JSON.stringify(['수업 전 · 예습', '수업 후 · 과제', '수업 후 · 복습']), '탭: ' + tabs.join('|'));
   assert((await page.innerText('[data-week-panel="preview"] .notice')).includes('수업(') , '예습 탭 안내 없음');
+});
+
+// ----- 배치 09: 대시보드 -----
+const eq = (a, b, m) => assert(JSON.stringify(a) === JSON.stringify(b), `${m}: ${JSON.stringify(a)} ≠ ${JSON.stringify(b)}`);
+const firstLine = els => els.map(e => e.firstChild.textContent.trim());
+
+test('B14 대시보드: 차시별 추이·진행표에 오늘·미래 차시(5~12차시)가 없음', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  await pause(page, 600);
+  for (const panel of [1, 2, 3]) {
+    const labels = await page.$$eval(`.dash-panels .dash-panel:nth-child(${panel}) .dash-bar-label`, firstLine);
+    eq(labels, ['1차시', '2차시', '3차시', '4차시'], `추이 ${panel}번째 차트`);
+  }
+  eq(await page.$$eval('.dash-grid thead th[colspan]', firstLine), ['1차시', '2차시', '3차시', '4차시'], '진행표 차시');
+  const live = await page.evaluate(() => window.__mock.listenerCount());
+  assert(live > 0 && live <= 50, '실시간 구독 수: ' + live);
+});
+
+test('B14b 대시보드: 중도 등록 학생은 등록 전 차시 분모에서 빠지고, 기록은 수강 기간 밖으로 표시', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  await pause(page, 600);
+  // 박서연(s3)은 20일 전에 반을 옮겨 와 1·2차시(28·21일 전) 대상이 아님. 1차시 인정결석 기록은 출석률에 넣지 않음
+  const first = await page.$eval('.dash-panels .dash-panel:nth-child(1) .dash-bar-row:first-child .dash-bar-value', e => e.innerText.replace(/\s+/g, ' '));
+  eq(first, '100% 3/3', '1차시 출석률');
+  const kpi = await page.$eval('.dash-kpi', e => e.innerText.replace(/\s+/g, ' '));
+  assert(kpi.includes('90% 9/10건') && kpi.includes('입력 10/13건'), '출석률 지표: ' + kpi);
+  const row = await page.$$eval('.dash-grid tbody tr', trs => trs.map(tr => [tr.querySelector('th').innerText.split('\n')[0], [...tr.querySelectorAll('td')].slice(0, 3).map(td => td.className.includes('is-outside'))]));
+  eq(row.find(r => r[0] === '박서연')[1], [true, true, true], '박서연 1차시 칸');
+  // 수강 중지(12일 전) 최도윤: 4차시(7일 전)는 빈칸
+  const doyun = await page.$$eval('.dash-grid tbody tr', trs => { const tr = trs.find(t => t.innerText.startsWith('최도윤')); return [...tr.querySelectorAll('td')].slice(9).map(td => td.className.includes('is-blank')); });
+  eq(doyun, [true, true, true], '최도윤 4차시 칸');
+});
+
+test('B14c 대시보드: 수강 기간 기록을 읽지 못하면(이전 규칙) 등록일 기준으로 추정하고 안내', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  await page.evaluate(() => window.__mock.failReads('^enrollments/[^/]+/events'));
+  await page.click('[data-page="classes"]'); await pause(page, 400);
+  await page.click('[data-page="overview"]'); await pause(page, 900);
+  assert((await page.innerText('#insight-content')).includes('수강 기간 기록을 읽지 못해'), '안내 없음');
+  // 수강 중지 학생은 중지 시점을 몰라 4차시까지 대상으로 추정(*)
+  const est = await page.$$eval('.dash-grid tbody tr', trs => { const tr = trs.find(t => t.innerText.startsWith('최도윤')); return tr.querySelectorAll('td.is-estimated').length; });
+  assert(est === 12, '추정 표시 칸 수: ' + est);
+  assert(!(await page.$('.load-failed')), '오류 화면이 뜸');
+});
+
+test('DB01 computeDashboard: 대상자·출석률·입력률·제출률·참여율·첫 응시 정답률(이전 기록 제외)·처리할 일', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  const r = await page.evaluate(async () => {
+    const { computeDashboard } = await import('/dashboard.js');
+    const c = await import('/common.js?v=test');
+    const today = c.todayKey(), at = n => new Date(Date.now() + n * 86400000), day = n => c.todayKey(at(n));
+    const quiz = { enabled: true, questions: [{ id: 'q1', type: 'single', options: ['a', 'b'], correctIndices: [0] }] };
+    const off = { enabled: false };
+    const sessions = [
+      { id: 's1', label: '1차시 · 인사', date: day(-14), published: true, assignment: { enabled: true }, quiz, preview: { enabled: true } },
+      { id: 's2', label: '2차시', date: day(-7), published: true, assignment: { enabled: true }, quiz, preview: { enabled: true } },
+      { id: 's3', label: '3차시', date: today, published: true, assignment: { enabled: true }, quiz: off, preview: off },
+      { id: 's4', label: '4차시', date: day(2), published: false, assignment: off, quiz: off, preview: off },
+      { id: 's5', label: '5차시', date: day(10), published: false, assignment: off, quiz: off, preview: off },
+    ];
+    const enrollments = [
+      { id: 'A_c', uid: 'A', status: 'active', joinedAt: at(-30) },
+      { id: 'B_c', uid: 'B', status: 'active', joinedAt: at(-30) },
+      { id: 'C_c', uid: 'C', status: 'active', joinedAt: at(-10) },   // 중도 등록: 1차시(14일 전) 대상 아님
+      { id: 'D_c', uid: 'D', status: 'inactive', joinedAt: at(-30) }, // 9일 전 수강 중지: 2차시(7일 전) 대상 아님
+    ];
+    const events = { D_c: [{ type: 'joined', at: at(-30) }, { type: 'stopped', at: at(-9) }] };
+    const reviewed = forRevision => ({ feedbacks: [{ id: 'f', text: '좋아요', forRevision }] });
+    const first = (score, total) => ({ firstAttempt: { score, total, legacy: false, quizVersion: 1 } });
+    const input = {
+      sessions, enrollments, events, names: { A: '가', B: '나', C: '다', D: '라' },
+      attendance: {
+        s1: [{ id: 'A', status: 'present' }, { id: 'B', status: 'late' }, { id: 'C', status: 'excused' }, { id: 'D', status: 'absent' }],
+        s2: [{ id: 'A', status: 'present' }, { id: 'C', status: 'present' }],
+      },
+      submissions: {
+        s1: [{ id: 'A' }, { id: 'C' }, { id: 'D' }],
+        s2: [{ id: 'A', revision: 2, ...reviewed(1) }, { id: 'C', revision: 1, ...reviewed(1) }],
+        s3: [{ id: 'A' }],
+      },
+      quizResults: {
+        s1: [{ id: 'A', ...first(2, 4) }, { id: 'B', score: 1, total: 4 }, { id: 'D', ...first(4, 4) }], // B: 첫 응시 정보 없는 이전 기록
+        s2: [{ id: 'A', ...first(3, 3) }, { id: 'C', ...first(1, 2) }],
+      },
+      questions: [{ needsTeacherReply: true }, { status: 'answered' }, { status: 'open' }],
+    };
+    const deps = { sessionState: c.sessionState, wasActiveAt: c.wasActiveAt, reviewState: c.reviewState, needsReply: c.needsReply, attendanceValue: c.attendanceValue, daysBetween: c.daysBetween };
+    const d = computeDashboard(input, today, deps);
+    const s = id => d.sessions.find(x => x.id === id);
+    const rows = g => g.sessions.map(x => x.id + ':' + x.count);
+    return {
+      recent: d.recent, targets: [s('s1').targets, s('s2').targets], s1: s('s1').attendance, s2: s('s2').attendance,
+      outside: s('s1').cells.get('C'), kpi: d.kpi, estimated: d.estimated,
+      actions: [rows(d.actions.feedback), d.actions.rereview.total, d.actions.questions.total, rows(d.actions.attendance), d.actions.publish.sessions.map(x => x.id + ':' + x.reason), d.actions.total],
+      watch: d.watch.map(w => w.name + ':' + w.reasons.map(x => x.text).join(',')),
+    };
+  });
+  eq(r.recent, ['s1', 's2'], '추이 차시(오늘·미래 제외)');
+  eq(r.targets, [3, 3], '차시 대상자 수');
+  eq(r.s1, { present: 2, absent: 1, missing: 0 }, '1차시 출결(지각=출석, 대상 아닌 C의 인정결석 제외)');
+  eq(r.s2, { present: 2, absent: 0, missing: 1 }, '2차시 출결');
+  assert(r.outside.target === false && r.outside.outside === true, '중도 등록 학생 1차시 칸: ' + JSON.stringify(r.outside));
+  const { attendance: att, assignment: asg, quiz: qz } = r.kpi;
+  eq([att.present, att.recorded, att.expected, Math.round(att.rate * 100), Math.round(att.inputRate * 100)], [4, 5, 6, 80, 83], '출석률·입력률');
+  eq([asg.submitted, asg.expected, Math.round(asg.rate * 100)], [4, 6, 67], '과제 제출률(실시간)');
+  eq([asg.current.id, asg.current.state, asg.current.submitted, asg.current.targets], ['s3', 'today', 1, 3], '오늘 차시 제출 현황');
+  eq([qz.attempted, qz.expected, qz.firstN, qz.average, qz.legacy], [5, 6, 4, 75, 1], '복습 참여·첫 응시 정답률(이전 기록 제외)');
+  eq(r.actions, [['s1:2', 's3:1'], 1, 2, ['s2:1'], ['s3:예습 꺼짐', 's4:비공개'], 9], '처리할 일(피드백·재검토·질문·출결·공개 누락·합계)');
+  eq(r.watch, ['나:1·2차시 과제 미제출'], '챙겨 볼 학생');
+  assert(r.estimated === false, '추정 표시');
+});
+
+test('DB02 analyzeQuiz: 같은 버전 첫 응시만 · 문항별 정답률 · 보기별 선택 수 · 가장 많이 고른 오답', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  const r = await page.evaluate(async () => {
+    const { analyzeQuiz } = await import('/dashboard.js');
+    const c = await import('/common.js?v=test');
+    const questions = [
+      { id: 'q1', type: 'single', stem: '1', options: ['a', 'b', 'c', 'd'], correctIndices: [0] },
+      { id: 'q2', type: 'multiple', stem: '2', options: ['p', 'q', 'r'], correctIndices: [0, 2] },
+      { id: 'q3', type: 'ox', stem: '3', options: ['O', 'X'], correctIndices: [1] },
+    ];
+    const fa = x => ({ firstAttempt: { legacy: false, score: 0, total: 3, ...x } });
+    const results = [
+      fa({ quizVersion: 2, answersById: { q1: [0], q2: [0, 2], q3: [1] } }),
+      fa({ quizVersion: 2, answersById: { q1: [1], q2: [0], q3: [1] } }),
+      fa({ quizVersion: 2, answers: ['1', '0,1', '0'] }),                    // 문항 ID 없이 순서로 저장된 답
+      fa({ quizVersion: 1, answersById: { q1: [0], q2: [0, 2], q3: [1] } }), // 다른 버전 → 분리
+      { firstAttempt: { legacy: true, score: 1, total: 3, answers: ['0'] } }, // 이전 기록에서 가져온 첫 결과 → 분리
+      { score: 2, total: 3, answers: [0, 0, 1] },                            // 첫 응시 정보 없음 → 분리
+      fa({ answers: ['0', '0,2', '1'] }),                                    // 버전 기록 없음 → 분리
+    ];
+    const a = analyzeQuiz({ questions, version: 2, results }, { normalizeQuizQuestion: c.normalizeQuizQuestion, isCorrectAnswer: c.isCorrectAnswer, answersFor: c.answersFor });
+    return { n: a.n, other: a.otherVersions, legacy: a.legacy, unversioned: a.unversioned, items: a.items.map(i => [i.id, i.n, i.correct, Math.round(i.p * 1000) / 1000, i.optionCounts, i.topWrong]) };
+  });
+  eq([r.n, r.other, r.legacy, r.unversioned], [3, { 1: 1 }, 2, 1], '집계 대상·분리한 기록');
+  eq(r.items, [['q1', 3, 1, 0.333, [1, 2, 0, 0], [1]], ['q2', 3, 1, 0.333, [3, 1, 1], [1]], ['q3', 3, 2, 0.667, [1, 2], [0]]], '문항별(정답률 낮은 순)');
+});
+
+test('DB03 처리할 일 카드: 누르면 해당 화면·차시·필터가 적용된 상태로 열림', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  await pause(page, 600);
+  const back = async () => { await page.click('[data-page="overview"]'); await pause(page, 900); };
+  const uids = () => page.$$eval('[data-feedback-uid]', els => els.map(e => e.dataset.feedbackUid).sort());
+  // 피드백 대기: 1·3차시에 걸쳐 있어 펼친 뒤 3차시
+  await page.click('details[data-action-kind="feedback"] summary'); await pause(page, 150);
+  await page.click('details[data-action-kind="feedback"] [data-go]:has-text("3차시")'); await pause(page, 900);
+  eq([await page.inputValue('#admin-week-picker'), await page.inputValue('#feedback-status-filter'), await uids()], ['w3', 'unreviewed', ['s1', 's3']], '피드백 대기');
+  await back();
+  await page.click('button.dash-action:has-text("재검토 대기")'); await pause(page, 900);
+  eq([await page.inputValue('#admin-week-picker'), await page.inputValue('#feedback-status-filter'), await uids()], ['w2', 'rereview', ['s1']], '재검토 대기');
+  await back();
+  await page.click('button.dash-action:has-text("답변 대기 질문")'); await pause(page, 900);
+  eq([await page.inputValue('#admin-question-filter'), await page.$$eval('[data-admin-qid]', els => els.map(e => e.dataset.adminQid))], ['waiting', ['q2']], '답변 대기 질문');
+  await back();
+  await page.click('button.dash-action:has-text("출결 미입력")'); await pause(page, 900);
+  eq(await page.inputValue('#quick-session'), 'w4', '출결 미입력 차시');
+  await back();
+  await page.click('.dash-watch button:has-text("이준호")'); await pause(page, 900);
+  eq(await page.inputValue('#roster-search'), '이준호', '수강생 관리 검색어');
+});
+
+test('DB04 공개 누락: 3일 안에 수업인데 비공개·예습 꺼짐 → 차시별 학습자료의 그 차시 예습 탭', async b => {
+  const seed = makeSeed();
+  seed.docs['classes/c1/weeks/w5'].preview.enabled = false;                    // 오늘 수업, 예습 꺼짐
+  seed.docs['classes/c1/weeks/w6'].sessionDate = kstDate(Date.now() + 2 * DAY); // 이틀 뒤 수업, 비공개
+  const { page } = await openApp(b, { file: 'admin.html', user: 'admin1', seed });
+  await pause(page, 1200);
+  const card = await page.innerText('.dash-action:has-text("공개 누락")');
+  assert(/2\s*개 차시/.test(card), '공개 누락 카드: ' + card);
+  await page.click('details[data-action-kind="publish"] summary'); await pause(page, 150);
+  const rows = await page.$$eval('details[data-action-kind="publish"] [data-go]', els => els.map(e => e.innerText.replace(/\s+/g, ' ')));
+  assert(rows.length === 2 && rows[0].includes('5차시') && rows[0].includes('예습 꺼짐') && rows[1].includes('6차시') && rows[1].includes('비공개'), '차시별: ' + rows.join(' | '));
+  await page.click('details[data-action-kind="publish"] [data-go]:has-text("6차시")'); await pause(page, 900);
+  eq([await page.getAttribute('[data-week-open="w6"]', 'aria-current'), await page.getAttribute('[data-week-tab="preview"]', 'aria-pressed')], ['true', 'true'], '열린 차시·탭');
+});
+
+test('DB05 대시보드: 0건이면 "처리할 일이 없어요", 문항 분석은 정답률 낮은 문항부터·가장 많이 고른 오답 강조', async b => {
+  const seed = makeSeed();
+  for (const [path, d] of Object.entries(seed.docs)) {
+    if (/\/submissions\/[^/]+$/.test(path)) d.feedbacks = [{ id: 'x', text: '확인', forRevision: 9, createdAt: new Date().toISOString() }];
+    if (/\/questions\/[^/]+$/.test(path)) d.status = 'answered';
+  }
+  seed.docs['classes/c1/weeks/w4/attendance/s2'] = { status: 'absent', note: '' };
+  const { page } = await openApp(b, { file: 'admin.html', user: 'admin1', seed });
+  await pause(page, 1200);
+  assert((await page.innerText('.dash-all-clear')).includes('처리할 일이 없어요'), '0건 안내 없음');
+  await page.selectOption('#dash-item-session', 'w1'); await pause(page, 500);
+  const meta = await page.innerText('.dash-item-meta');
+  assert(meta.includes('첫 응시 2명'), '문항 분석 n: ' + meta);
+  // 1차시 첫 응시(버전 1): 김민지 [1],[0,2],[0] · 이준호 [0],[0],[0] → 1번 0/2 · 2번 1/2(복수정답) · 3번 2/2
+  const order = await page.$$eval('.dash-item', els => els.map(e => e.querySelector('.dash-item-no').textContent + ' ' + e.querySelector('.dash-item-p').innerText.replace(/\s+/g, ' ')));
+  eq(order, ['1번 정답률 0% 0/2명', '2번 정답률 50% 1/2명', '3번 정답률 100% 2/2명'], '정답률 낮은 순');
+  assert((await page.innerText('.dash-item:first-child .is-top-wrong')).includes('가장 많이 고른 오답'), '오답 강조 없음');
+  assert((await page.innerText('#dash-item-body')).includes('첫 응시를 알 수 없는 이전 기록 1명'), '이전 기록 분리 안내 없음');
 });
 
 test('기본: 학생 과제 텍스트 제출, 퀴즈 3/3, 강사 화면 주요 메뉴 오류 없음', async b => {

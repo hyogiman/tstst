@@ -81,7 +81,9 @@ Storage
 
 **보관된 반(2026-10-29 요청):** 수강 등록이 active인 학생은 반이 보관된 뒤에도 그 반의 기록을 읽을 수 있습니다(읽기 전용, 강의 영상 제외). 규칙의 `enrolled(cid)`(읽기)와 `member(cid)`(쓰기, 운영 중인 반)를 구분해 씁니다.
 
-**공통 판정 함수(common.js):** `formatDateTime`·`toDate`·`todayKey`·`daysBetween`(D10 시간대), `needsReply`·`byLastActivity`(질문), `reviewState`·`feedbackItems`(과제 피드백), `statusPill`(상태 배지), `answersFor`·`parseAnswer`·`quizContentKey`(퀴즈 답·버전), `wasActiveAt`(그 날짜에 수강 중이었는지, 근거 부족 시 estimated), `readAudioDuration`·`audioMarkup`(음성 길이).
+**공통 판정 함수(common.js):** `formatDateTime`·`toDate`·`todayKey`·`daysBetween`(D10 시간대), `sessionState`(차시 예정·오늘·완료), `attendanceValue`(D2 출결 읽기: 지각→출석, 인정결석→불참), `needsReply`·`byLastActivity`(질문), `reviewState`·`feedbackItems`(과제 피드백), `statusPill`(상태 배지), `answersFor`·`parseAnswer`·`quizContentKey`(퀴즈 답·버전), `normalizeQuizQuestion`·`isCorrectAnswer`(학생 채점 기준 — 학생 채점과 문항 분석이 함께 씀), `wasActiveAt`(그 날짜에 수강 중이었는지, 근거 부족 시 estimated), `readAudioDuration`·`audioMarkup`(음성 길이).
+
+**대시보드 집계(dashboard.js, 배치 09):** `computeDashboard(input, today, deps)`·`analyzeQuiz(...)`는 화면과 분리한 순수 함수입니다. Firebase를 불러오지 않고 위 판정 함수를 `deps`로 받습니다(이 파일이 `common.js`를 다른 `?v=` 주소로 불러오면 모듈이 두 번 실행되어 Firebase가 두 번 초기화되기 때문). 기준 정의는 파일 머리말과 `09-dashboard.md` 3-2를 따릅니다.
 
 ---
 

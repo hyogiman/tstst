@@ -15,8 +15,8 @@
 <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;1,9..144,500&display=swap">
 <!-- 배포할 때 CSS를 바꾸면 ?v= 값을 함께 올려 브라우저 캐시를 갱신하세요 -->
-<link rel="stylesheet" href="common.css?v=20261029f">
-<link rel="stylesheet" href="student.css?v=20261029f">
+<link rel="stylesheet" href="common.css?v=20261029g">
+<link rel="stylesheet" href="student.css?v=20261029g">
 </head>
 <body>
 <div id="root"></div>
@@ -35,7 +35,7 @@ window.__appStarted=true; // 모듈(외부 SDK 포함)을 모두 불러와 앱�
 
 import { onAuthStateChanged, updateProfile, signOut } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import { doc, getDoc, getDocs, collection, query, where, addDoc, setDoc, updateDoc, serverTimestamp, onSnapshot, runTransaction, writeBatch } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
-import { CONFIGURED, auth, db, $, $$, esc, fmt, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, ensureProfile, mountAuth, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalConfirm, formatDateTime, statusPill, paintPill, needsReply, byLastActivity, feedbackItems, reviewState, toDate, todayKey, daysBetween, audioMarkup, parseAnswer, encodeAnswer, questionKey, setErrorAudience, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded, sessionState, sessionDateText, youtubeEmbedUrl } from './common.js?v=20261029f';
+import { CONFIGURED, auth, db, $, $$, esc, fmt, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, ensureProfile, mountAuth, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalConfirm, formatDateTime, statusPill, paintPill, needsReply, byLastActivity, feedbackItems, reviewState, toDate, todayKey, daysBetween, audioMarkup, parseAnswer, encodeAnswer, normalizeQuizQuestion, isCorrectAnswer, setErrorAudience, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded, sessionState, sessionDateText, youtubeEmbedUrl } from './common.js?v=20261029g';
 
 
 // ===== INDEX PAGE =====
@@ -419,17 +419,6 @@ async function saveSubmission(wid,{text,audioPath,audioDuration=null}){
   });
 }
 // 이전 4지선다 문제도 자동으로 단일 정답형으로 처리합니다.
-function normalizeQuestion(q={},index=0){
-  const type=['single','multiple','ox'].includes(q.type)?q.type:'single';
-  const options=type==='ox'?['O','X']:(q.options||[]);
-  let correctIndices=Array.isArray(q.correctIndices)?q.correctIndices.map(Number):[Number(q.correctIndex??0)];
-  correctIndices=[...new Set(correctIndices.filter(i=>i>=0&&i<options.length))];
-  return {...q,id:questionKey(q,index),type,options,correctIndices};
-}
-function isCorrect(q,answer){
-  const a=Array.isArray(answer)?answer:answer===null||answer===undefined?[]:[answer];
-  return a.length===q.correctIndices.length&&a.every(i=>q.correctIndices.includes(Number(i)));
-}
 function answerLabel(q,answer){
   const a=Array.isArray(answer)?answer:answer===null||answer===undefined?[]:[answer];
   return a.length?a.map(i=>q.options[Number(i)]||'?').join(', '):'미응답';
@@ -449,7 +438,7 @@ async function renderQuiz(body){const w=week();body.innerHTML=weekHeader('단어
   const last=snap.exists()?snap.data():null;
   body.insertAdjacentHTML('beforeend',`<div class="card" id="quiz-stage"><div class="between"><div><h2>${esc(w.quiz.title||'이번 주 단어 퀴즈')}</h2></div><span class="pill brand">${w.quiz.questions.length}문항</span></div><div id="quiz-last-status">${last?`<p class="notice" style="margin-top:17px">최근 점수: ${last.score??0}/${last.total??0}점 · 다시 풀 수 있습니다.</p>`:''}</div><div id="quiz-live-feedback">${feedbackMarkup(last)}</div><div style="margin-top:19px" id="quiz-content"></div></div>`);
   // P1-02: 응시를 시작할 때의 문항과 버전을 고정합니다. 풀던 중 강사가 퀴즈를 바꿔도 시작한 버전으로 채점·저장합니다.
-  const qs=w.quiz.questions.map(normalizeQuestion);
+  const qs=w.quiz.questions.map(normalizeQuizQuestion);
   const progressKey=S.past?'':draftKey(S.user.uid,S.classId,w.id,'quiz',Number(w.quiz.version)||0);
   S.quiz={id:w.id,version:Number(w.quiz.version)||null,questions:qs,shuffled:qs.map(shuffleQuestion),answers:Array(qs.length).fill(null),index:0,last,progressKey};
   useMediaPaths(body);markFeedbackSeen('quizResults',w.id,last);
@@ -505,12 +494,12 @@ function showQuestion(){const z=S.quiz;if(!z)return;const node=$('#quiz-content'
 async function finishQuiz(){const z=S.quiz;if(!z)return;
   if(S.past){
     // 지난 반은 연습 모드: 채점 결과만 보여 주고 저장하지 않습니다.
-    const score=z.questions.filter((q,i)=>isCorrect(q,z.answers[i])).length;
+    const score=z.questions.filter((q,i)=>isCorrectAnswer(q,z.answers[i])).length;
     z.finished=true;showQuizResult($('#quiz-content'),z,score,'연습 결과는 저장되지 않아요.');
     return;
   }
   if(!S.weeks.some(w=>w.id===z.id)){toast('이 차시가 비공개로 바뀌어 지금은 결과를 저장할 수 없어요. 선생님께 문의해 주세요.',true);return}
-  const score=z.questions.filter((q,i)=>isCorrect(q,z.answers[i])).length,target=$('#quiz-content');loading(target);
+  const score=z.questions.filter((q,i)=>isCorrectAnswer(q,z.answers[i])).length,target=$('#quiz-content');loading(target);
   try{
     const resultRef=doc(db,'classes',S.classId,'weeks',z.id,'quizResults',S.user.uid);
     const attemptRef=doc(collection(db,'classes',S.classId,'weeks',z.id,'quizResults',S.user.uid,'attempts'));
@@ -533,7 +522,7 @@ async function finishQuiz(){const z=S.quiz;if(!z)return;
 function showQuizResult(target,z,score,note=''){
     if(!target)return;
     const pct=Math.round(score/z.questions.length*100);target.classList.remove('loading');
-    target.innerHTML=`<div style="text-align:center"><div class="eyebrow">QUIZ COMPLETE ✨</div><h2>복습을 완료했어요!</h2><div class="score-ring" style="--angle:${pct}%"><div class="score-ring-inner"><div><strong>${score} / ${z.questions.length}</strong><br><span>정답 ${pct}%</span></div></div></div><p class="muted">복수정답은 정답을 모두 선택해야 1점입니다.</p>${note?`<p class="notice quiz-note">${esc(note)}</p>`:''}</div><div class="separator"></div>${z.questions.map((q,i)=>{const good=isCorrect(q,z.answers[i]);return `<div class="review-line"><div class="between"><strong>${i+1}. ${esc(q.stem)}</strong>${good?statusPill('success','정답'):statusPill('danger','오답')}</div><p class="hint" style="margin-top:7px">내 답: ${esc(answerLabel(q,z.answers[i]))} · 정답: ${esc(answerLabel(q,q.correctIndices))}</p>${q.explanation?`<p class="hint" style="margin-top:5px">💡 ${esc(q.explanation)}</p>`:''}</div>`}).join('')}${feedbackMarkup(z.last)}<button id="quiz-retry" class="btn secondary full" style="margin-top:20px">다시 풀기</button>`;
+    target.innerHTML=`<div style="text-align:center"><div class="eyebrow">QUIZ COMPLETE ✨</div><h2>복습을 완료했어요!</h2><div class="score-ring" style="--angle:${pct}%"><div class="score-ring-inner"><div><strong>${score} / ${z.questions.length}</strong><br><span>정답 ${pct}%</span></div></div></div><p class="muted">복수정답은 정답을 모두 선택해야 1점입니다.</p>${note?`<p class="notice quiz-note">${esc(note)}</p>`:''}</div><div class="separator"></div>${z.questions.map((q,i)=>{const good=isCorrectAnswer(q,z.answers[i]);return `<div class="review-line"><div class="between"><strong>${i+1}. ${esc(q.stem)}</strong>${good?statusPill('success','정답'):statusPill('danger','오답')}</div><p class="hint" style="margin-top:7px">내 답: ${esc(answerLabel(q,z.answers[i]))} · 정답: ${esc(answerLabel(q,q.correctIndices))}</p>${q.explanation?`<p class="hint" style="margin-top:5px">💡 ${esc(q.explanation)}</p>`:''}</div>`}).join('')}${feedbackMarkup(z.last)}<button id="quiz-retry" class="btn secondary full" style="margin-top:20px">다시 풀기</button>`;
     useMediaPaths(target);$('#quiz-retry').onclick=()=>renderBody();
 }
 // D8: N차시 문서의 예습 = N차시 수업 전에 볼 자료. 수업 날짜는 차시 문서 → 반 일정 사본 순으로 찾습니다.

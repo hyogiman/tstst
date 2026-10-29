@@ -1,5 +1,5 @@
 // 정적 검사: node tests/lint.cjs
-// 두 HTML의 <script type="module">과 common.js에서 정의되지 않은 이름(import 누락 등)과 쓰지 않는 import를 찾습니다.
+// 두 HTML의 <script type="module">과 common.js · dashboard.js에서 정의되지 않은 이름(import 누락 등)과 쓰지 않는 import를 찾습니다.
 // ESLint가 필요합니다: npm i -g eslint 또는 ESLINT_PATH=/경로/node_modules/eslint
 'use strict';
 const fs = require('fs');
@@ -31,7 +31,7 @@ for (const file of ['index.html', 'admin.html']) {
     n++;
   }
 }
-for (const file of ['common.js']) sources.push({ name: file, code: fs.readFileSync(path.join(ROOT, file), 'utf8') });
+for (const file of ['common.js', 'dashboard.js']) sources.push({ name: file, code: fs.readFileSync(path.join(ROOT, file), 'utf8') });
 
 (async () => {
   const eslint = new ESLint({
