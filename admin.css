@@ -230,6 +230,18 @@
 .inspector-empty strong{display:block;color:var(--ink);margin-bottom:4px}
 .feedback-answer{padding:16px;border-radius:var(--r-md);background:var(--surface-2);border:1px solid var(--line);overflow-wrap:anywhere}
 .feedback-answer p{max-height:300px;overflow:auto}
+/* 제출 회차 탭 · 이전 제출과 비교(P1-01) */
+.revision-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:10px}
+.revision-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.revision-tab{min-height:36px;padding:6px 12px;border:1px solid var(--line-strong);border-radius:var(--r-pill);background:var(--surface);color:var(--ink-2);font-size:13px;font-weight:700}
+.revision-tab[aria-pressed="true"]{border-color:var(--wine-600);background:var(--wine-50);color:var(--wine-700)}
+.revision-compare-head{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.revision-compare-head label{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--ink-2)}
+.revision-compare-head select{width:auto;min-height:36px;padding:4px 32px 4px 10px}
+.revision-compare{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.revision-compare>div{padding:12px;border-radius:var(--r-sm);background:var(--surface);border:1px solid var(--line);min-width:0}
+.feedback-group-title{margin-top:4px;color:var(--muted);font-size:12px;font-weight:800;letter-spacing:.02em}
+@media (max-width:700px){.revision-compare{grid-template-columns:1fr}}
 .feedback-target{font-size:13px;font-weight:700;color:var(--olive-800)}
 .feedback-target:empty{display:none}
 .question-person-main{display:flex;align-items:center;gap:9px;min-width:0}

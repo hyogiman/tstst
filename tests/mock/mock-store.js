@@ -172,6 +172,13 @@ export function checkWrite(op) {
   const s = op.path.split('/');
   const admin = isAdmin();
   const after = op.type === 'delete' ? null : op.after;
+  if (s[0] === 'enrollments' && s.length > 2) {
+    // P1-04 수강 기간 기록: v3 규칙부터. 학생은 자기 등록의 'joined' 기록만
+    if (!rulesAt('v3')) throw permissionError('enrollment events (before v3 rules)');
+    if (admin) return;
+    if (!s[1].startsWith(u + '_') || after?.type !== 'joined' || after?.by !== u || before) throw permissionError('student enrollment event');
+    return;
+  }
   if (s[0] === 'enrollments') {
     const creating = !before && op.type !== 'delete';
     if (admin) {
@@ -224,7 +231,18 @@ export function computeAfter(op) {
   }
   throw new Error('unknown op ' + op.type);
 }
+// 실제 Firestore SDK처럼 배열 안에 배열을 바로 넣는 쓰기를 거부합니다("Nested arrays are not supported").
+function assertNoNestedArrays(value, path) {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      if (Array.isArray(item)) throw Object.assign(new Error(`Function setDoc() called with invalid data. Nested arrays are not supported (found in document ${path})`), { code: 'invalid-argument' });
+      assertNoNestedArrays(item, path);
+    }
+  } else if (isPlainObject(value)) for (const k of Object.keys(value)) assertNoNestedArrays(value[k], path);
+  else if (value && typeof value === 'object' && value[SENTINEL] === 'union') value.values.forEach(v => assertNoNestedArrays(v, path));
+}
 export function commit(ops, { skipRules = false, source = 'local' } = {}) {
+  if (!skipRules) for (const op of ops) if (op.data) assertNoNestedArrays(op.data, op.path);
   const prepared = ops.map(op => ({ ...op, after: undefined }));
   // 규칙 검사는 일괄 쓰기 전 상태 기준(실제 규칙의 getAfter 일부 무시)
   for (const op of prepared) { op.after = computeAfter(op); if (!skipRules) checkWrite(op); }

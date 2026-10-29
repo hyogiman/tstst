@@ -15,8 +15,8 @@
 <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;1,9..144,500&display=swap">
 <!-- 배포할 때 CSS를 바꾸면 ?v= 값을 함께 올려 브라우저 캐시를 갱신하세요 -->
-<link rel="stylesheet" href="common.css?v=20261029c">
-<link rel="stylesheet" href="student.css?v=20261029c">
+<link rel="stylesheet" href="common.css?v=20261029d">
+<link rel="stylesheet" href="student.css?v=20261029d">
 </head>
 <body>
 <div id="root"></div>
@@ -25,13 +25,13 @@
 
 import { onAuthStateChanged, updateProfile, signOut } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import { doc, getDoc, getDocs, collection, query, where, addDoc, setDoc, updateDoc, serverTimestamp, onSnapshot, runTransaction, writeBatch } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
-import { CONFIGURED, auth, db, $, $$, esc, fmt, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, ensureProfile, mountAuth, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalConfirm, formatDateTime, statusPill, paintPill, needsReply, byLastActivity, feedbackItems, reviewState } from './common.js?v=20261029c';
+import { CONFIGURED, auth, db, $, $$, esc, fmt, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, ensureProfile, mountAuth, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalConfirm, formatDateTime, statusPill, paintPill, needsReply, byLastActivity, feedbackItems, reviewState, toDate, todayKey, daysBetween, audioMarkup, parseAnswer, encodeAnswer, questionKey } from './common.js?v=20261029d';
 
 
 // ===== INDEX PAGE =====
 const root=$('#root');
 // 로그아웃하면 이 초기값으로 되돌립니다(P0-09).
-const studentInitialState=()=>({user:null,profile:null,classes:[],classId:'',weeks:[],weekId:'',tab:'assignment',quiz:null,live:{},activeQuestionId:'',directory:[],enrollmentRealName:'',enrollments:[],hadEnrollment:false,audioDrafts:{},joining:false,pastClasses:[],past:null});
+const studentInitialState=()=>({user:null,profile:null,classes:[],classId:'',weeks:[],weekId:'',tab:'assignment',quiz:null,live:{},activeQuestionId:'',directory:[],enrollmentRealName:'',enrollments:[],hadEnrollment:false,audioDrafts:{},joining:false,pastClasses:[],past:null,seenMarked:{}});
 const S=studentInitialState();
 const NAV=[['assignment','pencil','과제'],['quiz','review','복습'],['preview','book','다음차시'],['questions','chat','질문'],['classmates','people','우리 반'],['mypage','user','내 정보']];
 // 하단 메뉴 아이콘: 강사 화면 사이드바와 같은 선 아이콘(기기마다 모양이 달라지는 이모지 대신)
@@ -191,7 +191,7 @@ function wireJoin(){const form=$('#join-form');form?.addEventListener('submit',a
     if(previous)throw Error(previous.status==='active'?'이미 등록된 반입니다. 화면을 새로고침해 주세요.':'이 반은 이전에 등록한 기록이 있어요. 선생님께 다시 등록을 요청해 주세요.');
     const entry={uid:S.user.uid,classId:cid,studentName:((S.profile.displayName==='수강생'&&S.user.displayName)?S.user.displayName:S.profile.displayName)||S.user.email,email:S.user.email||'',joinCode:code,status:'active',joinedAt:serverTimestamp()};
     S.joining=true;
-    try{await setDoc(doc(db,'enrollments',enId(S.user.uid,cid)),entry)}
+    try{await createEnrollment(cid,entry)}
     catch(err){if(err?.code==='permission-denied')throw Error('지금은 이 반에 입장할 수 없어요. 이전 반 수강이 아직 진행 중이라면 선생님께 문의해 주세요.');throw err}
     try{await setDoc(doc(db,'classes',cid,'members',S.user.uid),{uid:S.user.uid,name:entry.studentName,status:'active',joinedAt:serverTimestamp()},{merge:true})}catch(err){console.warn('반 명단 업데이트 실패',err)}
     try{await updateDoc(doc(db,'users',S.user.uid),{assignedClassId:cid});S.profile.assignedClassId=cid}catch(err){console.warn('소속반 정보 저장 실패',err)}
@@ -199,6 +199,20 @@ function wireJoin(){const form=$('#join-form');form?.addEventListener('submit',a
   }catch(err){toast(err?.code?'수강 코드로 입장할 수 없습니다. '+ex(err):ex(err),true)}
   finally{S.joining=false;if(btn?.isConnected)btn.disabled=false}
 })}
+// P1-04: 입장 기록('joined')을 등록과 같은 일괄 쓰기로 남깁니다.
+// 이 기록을 허용하는 보안 규칙이 아직 게시되지 않았으면 등록만 저장합니다(입장은 막지 않고, 수강 기간은 joinedAt으로 추정).
+async function createEnrollment(cid,entry){
+  const ref=doc(db,'enrollments',enId(S.user.uid,cid));
+  const batch=writeBatch(db);
+  batch.set(ref,entry);
+  batch.set(doc(collection(ref,'events')),{type:'joined',at:serverTimestamp(),by:S.user.uid,toClassId:cid});
+  try{await batch.commit()}
+  catch(err){
+    if(err?.code!=='permission-denied')throw err;
+    console.warn('입장 기록을 남기지 못해 수강 등록만 저장합니다(보안 규칙 확인 필요).',err);
+    await setDoc(ref,entry);
+  }
+}
 async function loadStudent(){
   const snaps=await getDocs(query(collection(db,'enrollments'),where('uid','==',S.user.uid)));
   S.enrollments=snaps.docs.map(d=>({id:d.id,...d.data()}));
@@ -253,58 +267,120 @@ function feedbackMarkup(obj){
   if(!comments.length)return '';
   // 수정본을 낸 과제는 피드백마다 몇 차 제출에 대한 것인지 표시합니다(P0-04).
   const revised=(Number(obj?.revision)||1)>1;
-  return `<div class="student-feedback"><h3 style="margin-bottom:12px">💬 선생님의 피드백 (${comments.length})</h3><div class="stack">${comments.map(f=>`<div class="feedback"><strong>선생님 · ${esc(formatDateTime(f.createdAt))}${revised?` · ${Number(f.forRevision)||1}차 제출에 대한 피드백`:''}</strong>${f.text?`<div style="white-space:pre-wrap">${esc(f.text)}</div>`:''}${f.audioPath?`<div style="margin-top:10px"><audio controls preload="none" data-media-path="${esc(f.audioPath)}"></audio></div>`:''}</div>`).join('')}</div></div>`;
+  return `<div class="student-feedback"><h3 style="margin-bottom:12px">💬 선생님의 피드백 (${comments.length})</h3><div class="stack">${comments.map(f=>`<div class="feedback"><strong>선생님 · ${esc(formatDateTime(f.createdAt))}${revised?` · ${Number(f.forRevision)||1}차 제출에 대한 피드백`:''}</strong>${f.text?`<div style="white-space:pre-wrap">${esc(f.text)}</div>`:''}${f.audioPath?`<div style="margin-top:10px">${audioMarkup(f.audioPath,f.audioDuration)}</div>`:''}</div>`).join('')}</div></div>`;
 }
-async function renderAssignment(body){const w=week();body.innerHTML=weekHeader('과제',S.past?'제출한 답안과 선생님의 피드백을 다시 볼 수 있어요.':'말하기와 쓰기를 차근차근 연습해 보세요.');weeklyPicker();
+// 제출 권장일(D3: 통계 마감이 아니라 안내용이고, 지난 뒤에 내도 똑같이 인정합니다)
+function dueLine(assignment){
+  const due=toDate(assignment?.dueAtTs||assignment?.dueAt);
+  if(!due)return '';
+  const when=formatDateTime(due);
+  if(S.past)return `<p class="hint due-line">⏰ 제출 권장일 ${esc(when)}</p>`;
+  const days=daysBetween(todayKey(),todayKey(due));
+  if(days<0)return `<p class="hint due-line">⏰ 제출 권장일 ${esc(when)} · 권장일이 지났지만 지금 제출해도 괜찮아요</p>`;
+  return `<p class="hint due-line">⏰ 제출 권장일 ${esc(when)} · ${days===0?'오늘까지':`D-${days}`}</p>`;
+}
+// 이전 제출 보기(P1-01): 펼칠 때 제출 이력을 불러옵니다.
+function revisionHistoryMarkup(data){
+  const latest=Number(data?.revision)||1;
+  if(latest<2)return '';
+  return `<details class="revision-history" data-revision-history><summary>이전 제출 보기 (${latest-1}개)</summary><div class="stack" data-revision-list><p class="hint">펼치면 불러옵니다.</p></div></details>`;
+}
+function wireRevisionHistory(container,wid,latest){
+  const box=$('[data-revision-history]',container);if(!box)return;
+  box.addEventListener('toggle',async()=>{
+    if(!box.open||box.dataset.loaded)return;
+    const list=$('[data-revision-list]',box);loading(list);
+    try{
+      const snap=await getDocs(collection(db,'classes',S.classId,'weeks',wid,'submissions',S.user.uid,'revisions'));
+      const items=snap.docs.map(d=>d.data()).filter(r=>Number(r.revision)<latest).sort((a,b)=>b.revision-a.revision);
+      box.dataset.loaded='1';
+      loaded(list,items.map(r=>`<div class="revision-item"><p class="hint">${Number(r.revision)}차 제출 · ${esc(formatDateTime(r.submittedAt))}</p>${r.text?`<p class="revision-text">${esc(r.text)}</p>`:''}${r.audioPath?audioMarkup(r.audioPath,r.audioDuration):''}</div>`).join('')||'<p class="hint">이전 제출 기록이 없어요.</p>');
+      useMediaPaths(list);
+    }catch(e){console.error('이전 제출 조회 실패',e);loaded(list,'<p class="error">이전 제출을 불러오지 못했어요.</p>')}
+  });
+}
+// 피드백을 본 시각(P1-05): 마지막으로 본 뒤 새 피드백이 있을 때만 한 번 기록합니다(새 소식 배지의 기준).
+async function markFeedbackSeen(kind,wid,data){
+  if(S.past||!data)return;
+  const items=feedbackItems(data);if(!items.length)return;
+  const newest=Math.max(...items.map(f=>toDate(f.createdAt)?.getTime()||0));
+  const seen=toDate(data.studentSeenFeedbackAt)?.getTime()||0,key=`${S.classId}:${wid}:${kind}`;
+  if(newest<=seen||S.seenMarked[key]>=newest)return;
+  S.seenMarked[key]=newest;
+  try{await updateDoc(doc(db,'classes',S.classId,'weeks',wid,kind,S.user.uid),{studentSeenFeedbackAt:serverTimestamp()})}
+  catch(e){console.warn('피드백 확인 시각 저장 실패',e)}
+}
+async function renderAssignment(body){
+  const w=week();
+  body.innerHTML=weekHeader('과제',S.past?'제출한 답안과 선생님의 피드백을 다시 볼 수 있어요.':'말하기와 쓰기를 차근차근 연습해 보세요.');weeklyPicker();
   if(!w.assignment?.enabled){body.insertAdjacentHTML('beforeend',empty('이 주차의 과제는 아직 열리지 않았습니다','강사가 과제를 공개하면 여기서 제출할 수 있습니다.'));return}
-  body.insertAdjacentHTML('beforeend',`<div class="card stack"><div class="between"><div><h2>${esc(w.assignment.title||'스페인어 과제')}</h2></div><span class="pill brand">TAREA</span></div><div class="subtle article" style="white-space:pre-wrap">${esc(w.assignment.instructions||'과제 내용을 확인해 주세요.')}</div>${w.assignment.dueAt?`<p class="hint">⏰ 제출 권장일: ${esc(formatDateTime(w.assignment.dueAt))}</p>`:''}<div id="assignment-form-area" class="stack"><div class="loading">제출 기록 확인 중</div></div></div>`);
+  body.insertAdjacentHTML('beforeend',`<div class="card stack"><div class="between"><div><h2>${esc(w.assignment.title||'스페인어 과제')}</h2></div><span class="pill brand">TAREA</span></div><div class="subtle article" style="white-space:pre-wrap">${esc(w.assignment.instructions||'과제 내용을 확인해 주세요.')}</div>${dueLine(w.assignment)}<div id="assignment-form-area" class="stack"><div class="loading">제출 기록 확인 중</div></div></div>`);
   const snap=await getDoc(doc(db,'classes',S.classId,'weeks',w.id,'submissions',S.user.uid));if(S.weekId!==w.id||S.tab!=='assignment')return;const data=snap.exists()?snap.data():null;const draftKey=assignmentDraftKey(w.id);
   const area=$('#assignment-form-area');if(!area)return;
+  const revision=Number(data?.revision)||1;
   if(S.past){
     // 지난 반: 제출한 답안과 피드백만 보여 주고 새로 제출할 수 없습니다.
-    area.innerHTML=`${data?`<div class="past-answer"><p class="hint">내가 제출한 답안 · ${fmt(data.submittedAt)}</p>${data.text?`<p class="past-answer-text">${esc(data.text)}</p>`:''}${data.audioPath?`<audio controls preload="none" data-media-path="${esc(data.audioPath)}"></audio>`:''}</div>`:'<p class="notice">이 차시에는 제출 기록이 없어요.</p>'}<div id="student-assignment-feedback">${feedbackMarkup(data)}</div>`;
-    useMediaPaths(area);
+    area.innerHTML=`${data?`<div class="past-answer"><p class="hint">내가 제출한 답안 · ${revision>1?`${revision}차 제출 · `:''}${esc(formatDateTime(data.latestSubmittedAt||data.submittedAt))}</p>${data.text?`<p class="past-answer-text">${esc(data.text)}</p>`:''}${data.audioPath?audioMarkup(data.audioPath,data.audioDuration):''}</div>`:'<p class="notice">이 차시에는 제출 기록이 없어요.</p>'}${revisionHistoryMarkup(data)}<div id="student-assignment-feedback">${feedbackMarkup(data)}</div>`;
   }else{
-  const revision=Number(data?.revision)||1,waiting=revision>1&&['pending','rereview'].includes(reviewState(data));
-  area.innerHTML=`${data?(waiting?`<p class="notice warn">✏️ 수정본을 제출했어요 · 선생님 확인 대기 · ${revision}차 제출 · ${esc(formatDateTime(data.latestSubmittedAt||data.submittedAt))}</p>`:`<p class="notice">✅ 제출 기록이 있습니다 · ${revision>1?`${revision}차 제출 · `:''}${esc(formatDateTime(data.latestSubmittedAt||data.submittedAt))} · 다시 제출하면 최신 내용으로 갱신됩니다.</p>`):''}${w.assignment.allowText!==false?`<div class="field"><label>작성 과제</label><textarea id="assignment-text" rows="8" maxlength="20000" placeholder="여기에 스페인어로 답안을 작성해 주세요." data-saved="${esc(data?.text||'')}">${esc(data?.text||'')}</textarea></div>`:''}${w.assignment.allowAudio!==false?`<div class="field"><span class="field-label">말하기 과제</span><div id="student-audio-ui">${makeMediaUi('audio')}</div>${data?.audioPath?`<div><p class="hint">이전 녹음</p><audio controls data-media-path="${esc(data.audioPath)}"></audio></div>`:''}</div>`:''}<div class="between"><p id="assignment-progress" class="hint">답안은 본인과 강사만 열람할 수 있습니다.</p><button class="btn" id="submit-assignment">과제 제출하기 →</button></div><div id="student-assignment-feedback">${feedbackMarkup(data)}</div>`;
-  // P0-02: 음성 초안은 이 차시에만 붙습니다(반·차시·학생 키).
-  if(w.assignment.allowAudio!==false)wireMediaUi($('#student-audio-ui'),f=>{if(f)S.audioDrafts[draftKey]=f;else delete S.audioDrafts[draftKey]},{label:`${w.label} 과제`,initialFile:S.audioDrafts[draftKey]});useMediaPaths(area);
+    const waiting=revision>1&&['pending','rereview'].includes(reviewState(data));
+    area.innerHTML=`${data?(waiting?`<p class="notice warn">✏️ 수정본을 제출했어요 · 선생님 확인 대기 · ${revision}차 제출 · ${esc(formatDateTime(data.latestSubmittedAt||data.submittedAt))}</p>`:`<p class="notice">✅ 제출 기록이 있습니다 · ${revision>1?`${revision}차 제출 · `:''}${esc(formatDateTime(data.latestSubmittedAt||data.submittedAt))} · 다시 제출하면 수정본으로 기록되고, 이전 답안도 남아요.</p>`):''}${w.assignment.allowText!==false?`<div class="field"><label for="assignment-text">작성 과제</label><textarea id="assignment-text" rows="8" maxlength="20000" placeholder="여기에 스페인어로 답안을 작성해 주세요." data-saved="${esc(data?.text||'')}">${esc(data?.text||'')}</textarea></div>`:''}${w.assignment.allowAudio!==false?`<div class="field"><span class="field-label">말하기 과제</span><div id="student-audio-ui">${makeMediaUi('audio')}</div>${data?.audioPath?`<div><p class="hint">지금 제출된 녹음</p>${audioMarkup(data.audioPath,data.audioDuration)}</div>`:''}</div>`:''}<div class="between"><p id="assignment-progress" class="hint">답안은 본인과 강사만 열람할 수 있습니다.</p><button class="btn" id="submit-assignment">과제 제출하기 →</button></div>${revisionHistoryMarkup(data)}<div id="student-assignment-feedback">${feedbackMarkup(data)}</div>`;
+    // P0-02: 음성 초안은 이 차시에만 붙습니다(반·차시·학생 키).
+    if(w.assignment.allowAudio!==false)wireMediaUi($('#student-audio-ui'),f=>{if(f)S.audioDrafts[draftKey]=f;else delete S.audioDrafts[draftKey]},{label:`${w.label} 과제`,initialFile:S.audioDrafts[draftKey]});
   }
+  useMediaPaths(area);wireRevisionHistory(area,w.id,revision);markFeedbackSeen('submissions',w.id,data);
   S.live.assignment=onSnapshot(doc(db,'classes',S.classId,'weeks',w.id,'submissions',S.user.uid),snapshot=>{
     if(S.tab!=='assignment'||S.weekId!==w.id)return;
     const el=$('#student-assignment-feedback');if(!el)return;
-    const html=feedbackMarkup(snapshot.exists()?snapshot.data():null);
+    const latest=snapshot.exists()?snapshot.data():null;
+    markFeedbackSeen('submissions',w.id,latest);
+    const html=feedbackMarkup(latest);
     if(el.dataset.rendered===html)return;
     el.innerHTML=html;el.dataset.rendered=html;useMediaPaths(el);
   },onLiveError);
   if(S.past)return;
 
-  $('#submit-assignment').addEventListener('click',async e=>{const btn=e.currentTarget;const text=$('#assignment-text')?.value?.trim()||'';const file=S.audioDrafts[draftKey];
+  $('#submit-assignment').addEventListener('click',async e=>{
+    const btn=e.currentTarget;const text=$('#assignment-text')?.value?.trim()||'';const file=S.audioDrafts[draftKey];
     if(!S.weeks.some(x=>x.id===w.id)){toast('이 차시가 비공개로 바뀌어 지금은 제출할 수 없어요. 선생님께 문의해 주세요.',true);return}
-    if(!text&&!file&&!data?.audioPath){toast('텍스트나 음성 중 하나를 제출해 주세요.',true);return}btn.disabled=true;try{let path=data?.audioPath||'';if(file){path=`classes/${S.classId}/submissions/${w.id}/${S.user.uid}/${makeId()}-${file.name.replace(/[^\w.\-]/g,'_')}`;await uploadMedia(file,path,'audio',$('#assignment-progress'))}await saveSubmission(w.id,{text,audioPath:path});delete S.audioDrafts[draftKey];toast('과제를 제출했습니다!');await renderAssignment(body)}catch(err){toast(ex(err),true)}finally{btn.disabled=false}})
+    if(!text&&!file&&!data?.audioPath){toast('텍스트나 음성 중 하나를 제출해 주세요.',true);return}
+    btn.disabled=true;
+    try{
+      // 새 음성을 올리지 않으면 지금 제출된 녹음을 그대로 유지합니다(이전 파일은 이력으로 남김).
+      let path=data?.audioPath||'',duration=data?.audioDuration??null;
+      if(file){path=`classes/${S.classId}/submissions/${w.id}/${S.user.uid}/${makeId()}-${file.name.replace(/[^\w.\-]/g,'_')}`;await uploadMedia(file,path,'audio',$('#assignment-progress'));duration=file.durationSec??null}
+      await saveSubmission(w.id,{text,audioPath:path,audioDuration:duration});
+      delete S.audioDrafts[draftKey];toast('과제를 제출했습니다!');await renderAssignment(body);
+    }catch(err){toast(ex(err),true)}finally{btn.disabled=false}
+  });
 }
-// P0-04: 다시 제출해도 처음 제출 시각은 지키고, 제출 회차(revision)를 올립니다.
-// revision이 없는 이전 문서에 다시 제출하면 2차 제출로 봅니다.
-async function saveSubmission(wid,{text,audioPath}){
+// P0-04·P1-01: 다시 제출해도 처음 제출 시각은 지키고, 제출 회차(revision)를 올립니다.
+// 제출 1회 = revisions/{회차} 문서 1개(변경 불가 이력). 요약 문서는 최신 제출과 회차 정보를 담습니다.
+// revision이 없는 이전 문서에 처음 다시 제출하면, 그 내용을 1차 기록으로 먼저 보존하고 새 제출을 2차로 저장합니다.
+async function saveSubmission(wid,{text,audioPath,audioDuration=null}){
   const ref=doc(db,'classes',S.classId,'weeks',wid,'submissions',S.user.uid);
   const studentName=((S.profile.displayName==='수강생'&&S.user.displayName)?S.user.displayName:S.profile.displayName)||S.user.email;
   await runTransaction(db,async tx=>{
     const snap=await tx.get(ref),old=snap.exists()?snap.data():null;
-    const revision=old?(Number.isInteger(old.revision)?old.revision+1:2):1;
+    const legacy=old&&!Number.isInteger(old.revision);
+    const revision=old?(legacy?2:old.revision+1):1;
+    if(legacy&&(old.text||old.audioPath)){
+      tx.set(doc(ref,'revisions','1'),{revision:1,text:old.text||'',audioPath:old.audioPath||'',audioDuration:old.audioDuration??null,submittedAt:old.submittedAt,studentName:old.studentName||studentName,legacy:true});
+    }
+    tx.set(doc(ref,'revisions',String(revision)),{revision,text,audioPath,audioDuration,submittedAt:serverTimestamp(),studentName});
     tx.set(ref,{
-      userId:S.user.uid,studentName,email:S.user.email||'',text,audioPath,
+      userId:S.user.uid,studentName,email:S.user.email||'',text,audioPath,audioDuration,
       submittedAt:serverTimestamp(),latestSubmittedAt:serverTimestamp(),revision,
       firstSubmittedAt:old?(old.firstSubmittedAt||old.submittedAt||serverTimestamp()):serverTimestamp(),
     },{merge:true});
   });
 }
 // 이전 4지선다 문제도 자동으로 단일 정답형으로 처리합니다.
-function normalizeQuestion(q={}){
+function normalizeQuestion(q={},index=0){
   const type=['single','multiple','ox'].includes(q.type)?q.type:'single';
   const options=type==='ox'?['O','X']:(q.options||[]);
   let correctIndices=Array.isArray(q.correctIndices)?q.correctIndices.map(Number):[Number(q.correctIndex??0)];
   correctIndices=[...new Set(correctIndices.filter(i=>i>=0&&i<options.length))];
-  return {...q,type,options,correctIndices};
+  return {...q,id:questionKey(q,index),type,options,correctIndices};
 }
 function isCorrect(q,answer){
   const a=Array.isArray(answer)?answer:answer===null||answer===undefined?[]:[answer];
@@ -325,13 +401,15 @@ async function renderQuiz(body){const w=week();body.innerHTML=weekHeader('단어
   const snap=await getDoc(doc(db,'classes',S.classId,'weeks',w.id,'quizResults',S.user.uid));if(S.weekId!==w.id||S.tab!=='quiz')return;
   const last=snap.exists()?snap.data():null;
   body.insertAdjacentHTML('beforeend',`<div class="card" id="quiz-stage"><div class="between"><div><h2>${esc(w.quiz.title||'이번 주 단어 퀴즈')}</h2></div><span class="pill brand">${w.quiz.questions.length}문항</span></div><div id="quiz-last-status">${last?`<p class="notice" style="margin-top:17px">최근 점수: ${last.score??0}/${last.total??0}점 · 다시 풀 수 있습니다.</p>`:''}</div><div id="quiz-live-feedback">${feedbackMarkup(last)}</div><div style="margin-top:19px" id="quiz-content"></div></div>`);
-  const qs=w.quiz.questions.map(normalizeQuestion);S.quiz={id:w.id,questions:qs,shuffled:qs.map(shuffleQuestion),answers:Array(qs.length).fill(null),index:0,last};
-  useMediaPaths(body);showQuestion();
+  // P1-02: 응시를 시작할 때의 문항과 버전을 고정합니다. 풀던 중 강사가 퀴즈를 바꿔도 시작한 버전으로 채점·저장합니다.
+  const qs=w.quiz.questions.map(normalizeQuestion);S.quiz={id:w.id,version:Number(w.quiz.version)||null,questions:qs,shuffled:qs.map(shuffleQuestion),answers:Array(qs.length).fill(null),index:0,last};
+  useMediaPaths(body);showQuestion();markFeedbackSeen('quizResults',w.id,last);
   S.live.quiz=onSnapshot(doc(db,'classes',S.classId,'weeks',w.id,'quizResults',S.user.uid),snapshot=>{
     if(S.tab!=='quiz'||S.weekId!==w.id)return;
     const d=snapshot.exists()?snapshot.data():null;
     const status=$('#quiz-last-status'),feedback=$('#quiz-live-feedback');
     if(status)status.innerHTML=d?`<p class="notice" style="margin-top:17px">최근 점수 ${Number(d.score)||0}/${Number(d.total)||0} · 첫 응시 ${Number(d.firstAttempt?.score??d.score)||0}/${Number(d.firstAttempt?.total??d.total)||0}</p>`:'';
+    markFeedbackSeen('quizResults',w.id,d);
     if(feedback){const html=feedbackMarkup(d);if(feedback.dataset.rendered!==html){feedback.innerHTML=html;feedback.dataset.rendered=html;useMediaPaths(feedback)}}
   },onLiveError);
 
@@ -364,13 +442,16 @@ async function finishQuiz(){const z=S.quiz;if(!z)return;
   try{
     const resultRef=doc(db,'classes',S.classId,'weeks',z.id,'quizResults',S.user.uid);
     const attemptRef=doc(collection(db,'classes',S.classId,'weeks',z.id,'quizResults',S.user.uid,'attempts'));
+    // Firestore는 배열 안의 배열을 저장하지 못하므로(복수정답 [0,2]) 문항 ID별 맵과 문자열 목록으로 저장합니다(P1-02).
+    const answersById=Object.fromEntries(z.questions.map((q,i)=>[q.id,parseAnswer(z.answers[i])]));
+    const record={answers:z.answers.map(encodeAnswer),answersById,questionIds:z.questions.map(q=>q.id),quizVersion:z.version};
     await runTransaction(db,async tx=>{
       const oldSnap=await tx.get(resultRef),old=oldSnap.exists()?oldSnap.data():null;
-      const first=old?.firstAttempt || (old?{score:Number(old.score)||0,total:Number(old.total)||0,submittedAt:old.submittedAt||null,answers:old.answers||[],legacy:true}:{score,total:z.questions.length,submittedAt:new Date().toISOString(),legacy:false});
+      const first=old?.firstAttempt || (old?{score:Number(old.score)||0,total:Number(old.total)||0,submittedAt:old.submittedAt||null,answers:(old.answers||[]).map(encodeAnswer),legacy:true}:{score,total:z.questions.length,submittedAt:new Date().toISOString(),answers:record.answers,answersById,quizVersion:z.version,legacy:false});
       const count=Math.max(0,Number(old?.attemptCount)|| (old?1:0))+1;
       const name=((S.profile.displayName==='수강생'&&S.user.displayName)?S.user.displayName:S.profile.displayName)||S.user.email;
-      tx.set(attemptRef,{userId:S.user.uid,answers:z.answers,score,total:z.questions.length,attemptNumber:count,submittedAt:serverTimestamp()});
-      tx.set(resultRef,{userId:S.user.uid,studentName:name,email:S.user.email||'',answers:z.answers,score,total:z.questions.length,submittedAt:serverTimestamp(),firstAttempt:first,attemptCount:count},{merge:true});
+      tx.set(attemptRef,{userId:S.user.uid,...record,score,total:z.questions.length,attemptNumber:count,submittedAt:serverTimestamp()});
+      tx.set(resultRef,{userId:S.user.uid,studentName:name,email:S.user.email||'',...record,score,total:z.questions.length,submittedAt:serverTimestamp(),firstAttempt:first,attemptCount:count},{merge:true});
     });
     z.finished=true;
     if(S.weekId!==z.id||S.tab!=='quiz')return;
@@ -440,6 +521,7 @@ function renderQuestions(body){
     $('#question-count').textContent=docs.length+'건';list.classList.remove('loading');
     list.innerHTML=docs.map(q=>`<button class="question-thread ${S.activeQuestionId===q.id?'thread-open':''}" type="button" data-qid="${esc(q.id)}" style="text-align:left"><div class="between"><strong>${esc(q.title)}</strong>${studentQuestionBadge(q)}</div><p class="hint" style="margin-top:5px">${esc(formatDateTime(q.lastMessageAt||q.createdAt))}</p><p class="muted" style="font-size:13px;margin-top:7px">${esc(q.content.slice(0,110))}</p></button>`).join('')||empty('아직 질문이 없습니다','첫 질문을 남겨 보세요.');
     $$('[data-qid]',list).forEach(el=>el.onclick=()=>{S.activeQuestionId=el.dataset.qid;$$('[data-qid]',list).forEach(b=>b.classList.toggle('thread-open',b===el));showStudentThread(docs.find(q=>q.id===S.activeQuestionId))});
+    if(S.activeQuestionId)markQuestionSeen(docs.find(q=>q.id===S.activeQuestionId)); // 대화를 연 채로 새 답변이 오면 확인한 것으로
     if(S.activeQuestionId&&!docs.some(q=>q.id===S.activeQuestionId)){S.activeQuestionId='';stopLive('replies');$('#student-thread').innerHTML=''}
     else if(S.activeQuestionId && !S.live.replies)showStudentThread(docs.find(q=>q.id===S.activeQuestionId));
   },onLiveError);
@@ -449,7 +531,15 @@ function studentQuestionBadge(q){
   if(needsReply(q))return statusPill('warning','답변 대기');
   return statusPill('success',q.lastSenderRole==='admin'?'답변 도착':'답변 완료');
 }
-function showStudentThread(q){if(!q)return;stopLive('replies');const holder=$('#student-thread');if(!holder)return;
+// 질문 대화를 연 시각(P1-05): 마지막으로 연 뒤 새 대화가 있을 때만 기록합니다(새 답변 배지의 기준).
+function markQuestionSeen(q){
+  if(S.past||!q)return;
+  const last=toDate(q.lastMessageAt||q.createdAt)?.getTime()||0,seen=toDate(q.studentSeenAt)?.getTime()||0,key='q:'+q.id;
+  if(!last||last<=seen||S.seenMarked[key]>=last)return;
+  S.seenMarked[key]=last;
+  updateDoc(doc(db,...questionPath(q.id)),{studentSeenAt:serverTimestamp()}).catch(e=>console.warn('질문 확인 시각 저장 실패',e));
+}
+function showStudentThread(q){if(!q)return;stopLive('replies');const holder=$('#student-thread');if(!holder)return;markQuestionSeen(q);
   holder.innerHTML=`<div class="card stack"><div class="between"><div><h3>${esc(q.title)}</h3><p class="hint">${fmt(q.createdAt)}</p></div><button class="btn ghost small" type="button" id="close-thread">닫기 ×</button></div><div class="subtle" style="white-space:pre-wrap">${esc(q.content)}</div><h3>대화</h3><div id="student-replies" class="stack"><div class="loading">답변 확인 중</div></div>${S.past?'':`<form id="student-reply-form" class="stack"><div class="field"><label>추가 질문 또는 답장</label><textarea name="text" rows="3" required maxlength="8000" placeholder="선생님께 전할 말을 작성해 주세요."></textarea></div><button class="btn" type="submit">답장 보내기</button></form>`}</div>`;
   $('#close-thread').onclick=()=>{S.activeQuestionId='';stopLive('replies');holder.innerHTML='';$$('[data-qid]').forEach(b=>b.classList.remove('thread-open'))};
   if($('#student-reply-form'))$('#student-reply-form').onsubmit=async e=>{e.preventDefault();const form=e.currentTarget,text=String(new FormData(form).get('text')||'').trim();if(!text)return;const btn=$('button[type="submit"]',form);btn.disabled=true;try{

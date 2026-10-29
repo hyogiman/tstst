@@ -210,6 +210,17 @@ a.media-item:hover{border-color:var(--wine-200);background:var(--wine-50);color:
 .record-controls [data-record-start] span[aria-hidden]{color:var(--danger)}
 .file-note{font-size:13px;color:var(--muted)}
 .media-draft{display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid var(--olive-100);border-radius:12px;background:var(--olive-50)}
+/* 음성 + 길이(예: 0:42) */
+.audio-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.audio-row audio{flex:1 1 220px}
+.audio-duration{flex-shrink:0;padding:3px 9px;border-radius:var(--r-pill);background:var(--surface-3);color:var(--ink-2);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+/* 제출 이력(이전 제출 보기) */
+.revision-history{border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);padding:10px 14px}
+.revision-history summary{cursor:pointer;font-weight:700;color:var(--wine-600);font-size:14px}
+.revision-history[open] summary{margin-bottom:10px}
+.revision-item{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-top:1px solid var(--line)}
+.revision-item:first-child{border-top:0;padding-top:0}
+.revision-text{white-space:pre-wrap;overflow-wrap:anywhere}
 .media-draft audio{max-width:100%}
 .media-draft-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:13px;font-weight:600;color:var(--olive-800);overflow-wrap:anywhere}
 

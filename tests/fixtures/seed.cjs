@@ -210,22 +210,41 @@ function makeSeed(now = Date.now()) {
   put('classes/c1/weeks/w3/submissions/s3', { userId: 's3', studentName: '박서연', email: 'seoyeon@example.com', text: 'Estoy bien. ¿Y tú?', audioPath: '', submittedAt: ts(t(2, 2)) });
 
   // ----- 복습 퀴즈 결과 -----
+  // Firestore는 배열 안의 배열을 저장할 수 없어, 복수정답은 answersById(문항ID → 선택 목록)와 문자열 목록 answers로 저장합니다(배치 06).
+  const byId = (ids, list) => Object.fromEntries(ids.map((id, i) => [id, list[i]]));
+  const w1Ids = ['q11', 'q12', 'q13'];
+  const rec = (list, version = 1) => ({ answers: list.map(a => a.join(',')), answersById: byId(w1Ids, list), questionIds: w1Ids, quizVersion: version });
   put('classes/c1/weeks/w1/quizResults/s1', {
-    userId: 's1', studentName: '김민지', email: 'minji@example.com', answers: [2, [0, 2], 0], score: 3, total: 3, submittedAt: ts(t(0, 2)),
-    firstAttempt: { score: 2, total: 3, submittedAt: iso(t(0, 1)), answers: [1, [0, 2], 0], legacy: false }, attemptCount: 2,
+    userId: 's1', studentName: '김민지', email: 'minji@example.com', ...rec([[2], [0, 2], [0]]), score: 3, total: 3, submittedAt: ts(t(0, 2)),
+    firstAttempt: { score: 2, total: 3, submittedAt: iso(t(0, 1)), ...rec([[1], [0, 2], [0]]), legacy: false }, attemptCount: 2,
   });
-  put('classes/c1/weeks/w1/quizResults/s1/attempts/a1', { userId: 's1', answers: [1, [0, 2], 0], score: 2, total: 3, attemptNumber: 1, submittedAt: ts(t(0, 1)) });
-  put('classes/c1/weeks/w1/quizResults/s1/attempts/a2', { userId: 's1', answers: [2, [0, 2], 0], score: 3, total: 3, attemptNumber: 2, submittedAt: ts(t(0, 2)) });
+  put('classes/c1/weeks/w1/quizResults/s1/attempts/a1', { userId: 's1', ...rec([[1], [0, 2], [0]]), score: 2, total: 3, attemptNumber: 1, submittedAt: ts(t(0, 1)) });
+  put('classes/c1/weeks/w1/quizResults/s1/attempts/a2', { userId: 's1', ...rec([[2], [0, 2], [0]]), score: 3, total: 3, attemptNumber: 2, submittedAt: ts(t(0, 2)) });
   put('classes/c1/weeks/w1/quizResults/s2', {
-    userId: 's2', studentName: '이준호', email: 'junho@example.com', answers: [0, [0], 0], score: 1, total: 3, submittedAt: ts(t(0, 4)),
-    firstAttempt: { score: 1, total: 3, submittedAt: iso(t(0, 4)), legacy: false }, attemptCount: 1,
+    userId: 's2', studentName: '이준호', email: 'junho@example.com', ...rec([[0], [0], [0]]), score: 1, total: 3, submittedAt: ts(t(0, 4)),
+    firstAttempt: { score: 1, total: 3, submittedAt: iso(t(0, 4)), ...rec([[0], [0], [0]]), legacy: false }, attemptCount: 1,
   });
-  put('classes/c1/weeks/w1/quizResults/s2/attempts/a3', { userId: 's2', answers: [0, [0], 0], score: 1, total: 3, attemptNumber: 1, submittedAt: ts(t(0, 4)) });
-  put('classes/c1/weeks/w1/quizResults/s3', { userId: 's3', studentName: '박서연', email: 'seoyeon@example.com', answers: [2, [0], 0], score: 2, total: 3, submittedAt: ts(t(0, 2)) });
+  put('classes/c1/weeks/w1/quizResults/s2/attempts/a3', { userId: 's2', ...rec([[0], [0], [0]]), score: 1, total: 3, attemptNumber: 1, submittedAt: ts(t(0, 4)) });
+  // 버전·문항 ID가 없던 이전 형식 결과(단일 정답 답만 숫자로 저장된 기록)
+  put('classes/c1/weeks/w1/quizResults/s3', { userId: 's3', studentName: '박서연', email: 'seoyeon@example.com', answers: [2, 0, 0], score: 2, total: 3, submittedAt: ts(t(0, 2)) });
   put('classes/c1/weeks/w2/quizResults/s1', {
-    userId: 's1', studentName: '김민지', email: 'minji@example.com', answers: [0, [0, 2], 0], score: 3, total: 3, submittedAt: ts(t(1, 1)),
-    firstAttempt: { score: 3, total: 3, submittedAt: iso(t(1, 1)), legacy: false }, attemptCount: 1,
+    userId: 's1', studentName: '김민지', email: 'minji@example.com', answers: ['0', '0,2', '0'], answersById: { q21: [0], q22: [0, 2], q23: [0] }, questionIds: ['q21', 'q22', 'q23'], quizVersion: 1,
+    score: 3, total: 3, submittedAt: ts(t(1, 1)),
+    firstAttempt: { score: 3, total: 3, submittedAt: iso(t(1, 1)), answers: ['0', '0,2', '0'], answersById: { q21: [0], q22: [0, 2], q23: [0] }, quizVersion: 1, legacy: false }, attemptCount: 1,
   });
+  // 퀴즈 버전 사본(강사 전용): 차시 문서의 quiz.version과 함께 둡니다
+  ['w1', 'w2', 'w3', 'w4'].forEach(wid => {
+    docs[`classes/c1/weeks/${wid}`].quiz.version = 1;
+    put(`classes/c1/weeks/${wid}/quizVersions/1`, { version: 1, questions: quizzes[wid], savedAt: ts(now - 40 * DAY), savedBy: 'admin1' });
+  });
+
+  // ----- 수강 기간 기록(배치 06) -----
+  const ev = (eid, id, type, daysAgo, extra = {}) => put(`enrollments/${eid}/events/${id}`, { type, at: ts(now - daysAgo * DAY), by: 'admin1', ...extra });
+  ev('s3_c2', 'e1', 'joined', 34, { by: 's3', toClassId: 'c2' });
+  ev('s3_c2', 'e2', 'transferred_out', 20, { toClassId: 'c1' });
+  ev('s3_c1', 'e3', 'transferred_in', 20, { fromClassId: 'c2' });
+  ev('s4_c1', 'e4', 'joined', 30, { by: 's4', toClassId: 'c1' });
+  ev('s4_c1', 'e5', 'stopped', 12);
 
   // ----- 질문 -----
   put('classes/c1/questions/q1', {

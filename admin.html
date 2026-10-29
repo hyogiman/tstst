@@ -15,8 +15,8 @@
 <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;1,9..144,500&display=swap">
 <!-- 배포할 때 CSS를 바꾸면 ?v= 값을 함께 올려 브라우저 캐시를 갱신하세요 -->
-<link rel="stylesheet" href="common.css?v=20261029c">
-<link rel="stylesheet" href="admin.css?v=20261029c">
+<link rel="stylesheet" href="common.css?v=20261029d">
+<link rel="stylesheet" href="admin.css?v=20261029d">
 </head>
 <body>
 <div id="root"></div>
@@ -26,7 +26,7 @@
 import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import { doc, getDoc, getDocs, collection, query, where, addDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, arrayUnion, onSnapshot, writeBatch, runTransaction, deleteField } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
 import { ref as storageRef, deleteObject } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-storage.js';
-import { CONFIGURED, auth, db, storage, $, $$, esc, fmt, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, mountAuth, formatDuration, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalDialog, modalConfirm, modalInput, formatDateTime, todayKey, statusPill, paintPill, needsReply, byLastActivity, feedbackItems, reviewState, REVIEW_LABEL, openModalLayer } from './common.js?v=20261029c';
+import { CONFIGURED, auth, db, storage, $, $$, esc, fmt, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, mountAuth, formatDuration, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalDialog, modalConfirm, modalInput, formatDateTime, todayKey, statusPill, paintPill, needsReply, byLastActivity, feedbackItems, reviewState, REVIEW_LABEL, openModalLayer, toDate, quizContentKey, answersFor, audioMarkup } from './common.js?v=20261029d';
 
 
 // ===== ADMIN PAGE =====
@@ -319,22 +319,37 @@ function showClasses(b){
   $$('[data-archive-class]',list).forEach(el=>el.onclick=async()=>{const c=A.classes.find(x=>x.id===el.dataset.archiveClass);if(!await modalConfirm(c.archived?`${c.name} 반을 다시 운영할까요?\n학생들이 이 반에서 다시 과제를 제출하고 질문할 수 있게 됩니다.`:`${c.name} 반을 보관할까요?\n학습 기록은 그대로 남고, 학생은 지난 자료(과제·피드백·복습·질문·출석·수업 자료)를 읽기 전용으로 볼 수 있어요. 강의 영상은 볼 수 없어요.\n학생은 다음 반의 수강 코드로 새 반에 입장할 수 있어요.`,{title:c.archived?'반 다시 운영':'반 보관',confirmText:c.archived?'다시 운영하기':'보관하기'}))return;try{await updateDoc(doc(db,'classes',c.id),{archived:!c.archived,updatedAt:serverTimestamp()});toast(c.archived?'반을 복원했습니다.':'반을 보관했습니다.');await loadAdmin(c.id)}catch(e){toast(ex(e),true)}});
   $$('[data-delete-class]',list).forEach(el=>el.onclick=async()=>{const c=A.classes.find(x=>x.id===el.dataset.deleteClass);const answer=await modalDialog({title:'반 영구 삭제',message:`${c.name} 반에 속한 출석·과제·퀴즈·질문·학생 메모·수강 등록 및 연결된 파일이 삭제 대상입니다. 이 작업은 복원할 수 없습니다. 보관을 원하시면 취소 후 '보관'을 선택하세요.`,value:'',verify:c.name,verifyLabel:'삭제할 반 이름',danger:true,confirmText:'반과 관련 기록 영구 삭제'});if(answer===null)return;el.disabled=true;try{await deleteClassDeep(c);toast(`${c.name} 반 삭제가 완료되었습니다.`);await loadAdmin()}catch(e){toast('삭제 중 오류가 발생했습니다: '+ex(e)+' · 남은 기록을 확인하고 다시 시도해 주세요.',true)}finally{if(el.isConnected)el.disabled=false}});
 }
-// Firestore는 상위 문서만 삭제해도 하위 컬렉션이 지워지지 않습니다. 모든 알려진 하위 경로를 먼저 지웁니다.
+// Firestore는 상위 문서만 삭제해도 하위 컬렉션이 지워지지 않습니다. 알려진 하위 경로를 아래부터 먼저 지웁니다.
+async function purgeDocs(ref){const snap=await getDocs(ref);for(let i=0;i<snap.docs.length;i+=350){const batch=writeBatch(db);snap.docs.slice(i,i+350).forEach(x=>batch.delete(x.ref));await batch.commit()}return snap.docs}
+// 차시 하나의 학생 기록(제출·제출 이력·복습·응시·출결)과 퀴즈 버전 사본을 지우고, 정리할 파일 경로를 paths에 모읍니다.
+async function purgeWeekRecords(cid,wid,weekData,paths){
+  const p=weekData?.preview||{};
+  if(p.imagePath)paths.add(p.imagePath);
+  for(const item of [...(p.videos||[]),...(p.files||[])])if(item.path)paths.add(item.path);
+  const base=['classes',cid,'weeks',wid];
+  for(const kind of ['submissions','quizResults']){
+    const docs=await getDocs(collection(db,...base,kind));
+    for(const d of docs.docs){
+      const v=d.data();
+      if(v.audioPath)paths.add(v.audioPath);
+      if(v.feedback?.audioPath)paths.add(v.feedback.audioPath);
+      for(const fb of v.feedbacks||[])if(fb.audioPath)paths.add(fb.audioPath);
+      if(kind==='submissions'){
+        const revisions=await purgeDocs(collection(db,...base,kind,d.id,'revisions')); // P1-01: 제출 이력과 이력 속 음성
+        for(const r of revisions){const rv=r.data();if(rv.audioPath)paths.add(rv.audioPath)}
+      }
+      if(kind==='quizResults')await purgeDocs(collection(db,...base,kind,d.id,'attempts'));
+    }
+    await purgeDocs(collection(db,...base,kind));
+  }
+  await purgeDocs(collection(db,...base,'attendance'));
+  await purgeDocs(collection(db,...base,'quizVersions')); // P1-02
+}
 async function deleteClassDeep(c){
   const cid=c.id,paths=new Set();
   await updateDoc(doc(db,'classes',cid),{archived:true,updatedAt:serverTimestamp()});
-  async function purgeDocs(ref){const snap=await getDocs(ref);for(let i=0;i<snap.docs.length;i+=350){const batch=writeBatch(db);snap.docs.slice(i,i+350).forEach(x=>batch.delete(x.ref));await batch.commit()}return snap.docs}
   const weeks=await getDocs(collection(db,'classes',cid,'weeks'));
-  for(const w of weeks.docs){
-    const wd=w.data(),wid=w.id,p=wd.preview||{};
-    if(p.imagePath)paths.add(p.imagePath);(p.videos||[]).forEach(x=>x.path&&paths.add(x.path));(p.files||[]).forEach(x=>x.path&&paths.add(x.path));
-    for(const name of ['submissions','quizResults']){
-      const docs=await getDocs(collection(db,'classes',cid,'weeks',wid,name));
-      for(const d of docs.docs){const data=d.data();if(data.audioPath)paths.add(data.audioPath);if(data.feedback?.audioPath)paths.add(data.feedback.audioPath);(data.feedbacks||[]).forEach(f=>f.audioPath&&paths.add(f.audioPath));if(name==='quizResults')await purgeDocs(collection(db,'classes',cid,'weeks',wid,'quizResults',d.id,'attempts'))}
-      await purgeDocs(collection(db,'classes',cid,'weeks',wid,name));
-    }
-    await purgeDocs(collection(db,'classes',cid,'weeks',wid,'attendance'));
-  }
+  for(const w of weeks.docs)await purgeWeekRecords(cid,w.id,w.data(),paths);
   await purgeDocs(collection(db,'classes',cid,'weeks'));
   const questions=await getDocs(collection(db,'classes',cid,'questions'));
   for(const q of questions.docs)await purgeDocs(collection(db,'classes',cid,'questions',q.id,'replies'));
@@ -342,7 +357,10 @@ async function deleteClassDeep(c){
   await purgeDocs(collection(db,'classes',cid,'members'));
   await purgeDocs(collection(db,'classes',cid,'teacherNotes'));
   const enrollments=await getDocs(query(collection(db,'enrollments'),where('classId','==',cid)));
-  for(const e of enrollments.docs){const uid=e.data().uid;const ref=doc(db,'users',uid),snap=await getDoc(ref);if(snap.exists()&&snap.data().assignedClassId===cid)await updateDoc(ref,{assignedClassId:deleteField()})}
+  for(const e of enrollments.docs){
+    await purgeDocs(collection(db,'enrollments',e.id,'events')); // P1-04
+    const uid=e.data().uid;const ref=doc(db,'users',uid),snap=await getDoc(ref);if(snap.exists()&&snap.data().assignedClassId===cid)await updateDoc(ref,{assignedClassId:deleteField()});
+  }
   for(let i=0;i<enrollments.docs.length;i+=350){const batch=writeBatch(db);enrollments.docs.slice(i,i+350).forEach(e=>batch.delete(e.ref));await batch.commit()}
   if(c.joinCode)await deleteDoc(doc(db,'joinCodes',String(c.joinCode).toUpperCase()));
   // 직접 관리 중인 등록 파일을 정리합니다. 오래된 미참조 파일은 Storage에 잔존할 수 있습니다.
@@ -384,26 +402,14 @@ function showCreateWeek(){
   };
 }
 async function deleteWeekDeep(cid,wid){
-  const rootRef=doc(db,'classes',cid,'weeks',wid),ws=await getDoc(rootRef);if(!ws.exists())throw Error('이미 삭제된 주차입니다.');
-  // 문서만 삭제하면 하위 컬렉션이 남으므로 시도 기록 → 제출/퀴즈 → 출석 → 주차 순으로 삭제합니다.
-  const paths=new Set(),p=ws.data().preview||{};
-  if(p.imagePath)paths.add(p.imagePath);
-  for(const item of [...(p.videos||[]),...(p.files||[])])if(item.path)paths.add(item.path);
-  async function clearDocs(ref){const snap=await getDocs(ref);for(let i=0;i<snap.docs.length;i+=350){const batch=writeBatch(db);snap.docs.slice(i,i+350).forEach(x=>batch.delete(x.ref));await batch.commit()}return snap.docs}
-  for(const kind of ['submissions','quizResults']){
-    const data=await getDocs(collection(db,'classes',cid,'weeks',wid,kind));
-    for(const d of data.docs){const value=d.data();if(value.audioPath)paths.add(value.audioPath);if(value.feedback?.audioPath)paths.add(value.feedback.audioPath);
-      for(const fb of value.feedbacks||[])if(fb.audioPath)paths.add(fb.audioPath);
-      if(kind==='quizResults')await clearDocs(collection(db,'classes',cid,'weeks',wid,'quizResults',d.id,'attempts'));
-    }
-    await clearDocs(collection(db,'classes',cid,'weeks',wid,kind));
-  }
-  await clearDocs(collection(db,'classes',cid,'weeks',wid,'attendance'));
+  const rootRef=doc(db,'classes',cid,'weeks',wid),ws=await getDoc(rootRef);if(!ws.exists())throw Error('이미 삭제된 차시입니다.');
+  const paths=new Set();
+  await purgeWeekRecords(cid,wid,ws.data(),paths);
   const c=A.classes.find(x=>x.id===cid),schedule=classSchedule(c).filter(x=>x.weekId!==wid);
   const batch=writeBatch(db);batch.delete(rootRef);batch.update(doc(db,'classes',cid),{schedule,updatedAt:serverTimestamp()});await batch.commit();
   if(c)c.schedule=schedule;
   let failed=0;for(const path of paths){try{await deleteObject(storageRef(storage,path))}catch(e){if(e.code!=='storage/object-not-found'){failed++;console.warn('미디어 삭제 실패',path,e)}}}
-  if(failed)toast(`주차는 삭제됐지만 Storage 파일 ${failed}개는 별도 확인이 필요합니다.`,true);
+  if(failed)toast(`차시는 삭제됐지만 Storage 파일 ${failed}개는 별도 확인이 필요합니다.`,true);
 }
 // 구버전 {correctIndex} 데이터도 그대로 지원합니다.
 function normalizeQuestion(q={}){
@@ -508,18 +514,96 @@ async function saveWeek(){const w=activeWeek();if(!w)return;const btn=$('#save-w
   const questions=collectQs();if($('#quiz-enabled').checked)validateQuizQuestions(questions);
   if($('#assignment-enabled').checked&&!$('#allow-text').checked&&!$('#allow-audio').checked)throw Error('과제 제출 방식은 최소 하나가 필요합니다.');
   const assignment={enabled:$('#assignment-enabled').checked,title:$('#assignment-title').value.trim(),instructions:$('#assignment-instructions').value.trim(),dueAt:$('#assignment-due').value,allowText:$('#allow-text').checked,allowAudio:$('#allow-audio').checked};
-  const quiz={enabled:$('#quiz-enabled').checked,title:$('#quiz-title').value.trim(),questions};
+  // P1-03: 화면에 쓰는 문자열(dueAt)은 그대로 두고, 한국 시간으로 해석한 시각을 함께 저장합니다(학생 D-day·정렬용).
+  assignment.dueAtTs=assignment.dueAt?toDate(assignment.dueAt):null;
+  // P1-02: 문항 내용(순서·유형·문제·보기·정답·해설)이 바뀌면 버전을 올리고, 그 버전의 문항을 강사 전용 사본으로 남깁니다.
+  // 제목만 바뀐 경우는 버전을 올리지 않습니다. 이전 응시 기록은 응시 당시 버전으로 해석합니다.
+  const prevQuiz=w.quiz||{},prevVersion=Number(prevQuiz.version)||0;
+  const newVersion=questions.length&&(!prevVersion||quizContentKey(prevQuiz.questions||[])!==quizContentKey(questions))?prevVersion+1:0;
+  const quiz={enabled:$('#quiz-enabled').checked,title:$('#quiz-title').value.trim(),questions,...((newVersion||prevVersion)?{version:newVersion||prevVersion}:{})};
   const preview={enabled:$('#preview-enabled').checked,title:$('#preview-title').value.trim(),mode:$('#preview-mode').value,richHtml:sanitizeRich($('#preview-editor').innerHTML),imagePath:A.preview.imagePath||'',videos:A.preview.videos||[],files:A.preview.files||[]};
   if(preview.enabled&&preview.mode==='image'&&!preview.imagePath)throw Error('이미지 모드를 켰다면 안내 이미지를 업로드해 주세요.');
   if($('#week-published').checked&&!assignment.enabled&&!quiz.enabled&&!preview.enabled)throw Error('주차 공개 시 최소 한 가지 콘텐츠를 ON으로 설정해 주세요.');
   const label=$('#week-label').value.trim(),order=Number($('#week-order').value);if(!label||!Number.isInteger(order)||order<=0)throw Error('주차 이름과 정렬 번호를 확인해 주세요.');
-  status.textContent='저장하는 중...';const batch=writeBatch(db);batch.update(doc(db,weekKey(A.classId,w.id)),{label,order,published:$('#week-published').checked,assignment,quiz,preview,updatedAt:serverTimestamp()});const currentClass=activeClass(),schedule=classSchedule(currentClass);if(schedule.some(r=>r.weekId===w.id)){const updated=schedule.map(r=>r.weekId===w.id?{...r,label}:r);batch.update(doc(db,'classes',A.classId),{schedule:updated,updatedAt:serverTimestamp()});currentClass.schedule=updated}await batch.commit();for(const path of A.pendingDeletes){try{await deleteObject(storageRef(storage,path))}catch(e){console.warn('미디어 정리 실패',e)}}A.pendingDeletes=[];toast('주차 콘텐츠가 저장되었습니다.');await loadWeeks();showWeeks($('#admin-body'));
+  status.textContent='저장하는 중...';const batch=writeBatch(db);batch.update(doc(db,weekKey(A.classId,w.id)),{label,order,published:$('#week-published').checked,assignment,quiz,preview,updatedAt:serverTimestamp()});
+  if(newVersion)batch.set(doc(db,weekKey(A.classId,w.id),'quizVersions',String(newVersion)),{version:newVersion,questions,savedAt:serverTimestamp(),savedBy:A.user.uid});const currentClass=activeClass(),schedule=classSchedule(currentClass);if(schedule.some(r=>r.weekId===w.id)){const updated=schedule.map(r=>r.weekId===w.id?{...r,label}:r);batch.update(doc(db,'classes',A.classId),{schedule:updated,updatedAt:serverTimestamp()});currentClass.schedule=updated}await batch.commit();for(const path of A.pendingDeletes){try{await deleteObject(storageRef(storage,path))}catch(e){console.warn('미디어 정리 실패',e)}}A.pendingDeletes=[];toast('주차 콘텐츠가 저장되었습니다.');await loadWeeks();showWeeks($('#admin-body'));
 }catch(e){toast(ex(e),true);if(status)status.textContent='저장되지 않았습니다.'}finally{if(btn.isConnected)btn.disabled=false}}
+// 제출 내용 한 회차(요약 문서 또는 revisions 문서)
+function answerView(r,label){
+  return `<strong style="font-size:13px">${esc(label)}</strong>${r.text?`<p style="white-space:pre-wrap;margin-top:9px">${esc(r.text)}</p>`:'<p class="hint" style="margin-top:9px">텍스트 답안 없음</p>'}${r.audioPath?`<div style="margin-top:12px">${audioMarkup(r.audioPath,r.audioDuration)}</div>`:''}`;
+}
+// P1-01: 제출 회차 탭과 '이전 제출과 비교'. 이력은 학생 상세를 열 때만 불러옵니다.
+async function wireRevisionBar(bar,box,cid,wid,uid){
+  try{
+    const snap=await getDocs(collection(db,weekKey(cid,wid),'submissions',uid,'revisions'));
+    if(!bar.isConnected)return;
+    const revs=snap.docs.map(x=>x.data()).sort((a,b)=>a.revision-b.revision);
+    if(!revs.length){bar.innerHTML='<span class="hint">회차별 기록이 없어요(회차 기록을 남기기 전 제출).</span>';return}
+    let current=revs.at(-1).revision;
+    const label=r=>`${r.revision}차 제출 · ${formatDateTime(r.submittedAt)}`;
+    const show=html=>{box.innerHTML=html;useMediaPaths(box)};
+    const draw=()=>{
+      bar.innerHTML=`<div class="revision-tabs" role="group" aria-label="제출 회차">${revs.map(r=>`<button type="button" class="revision-tab" data-revision="${r.revision}" aria-pressed="${r.revision===current}">${esc(label(r))}</button>`).join('')}</div>${revs.length>1?'<button type="button" class="btn secondary small" data-compare>이전 제출과 비교</button>':''}`;
+      $$('[data-revision]',bar).forEach(b=>b.onclick=()=>{current=Number(b.dataset.revision);const r=revs.find(x=>x.revision===current);show(answerView(r,label(r)));draw()});
+      const cmp=$('[data-compare]',bar);
+      if(cmp)cmp.onclick=()=>{
+        // 기본은 고른 회차와 바로 앞 회차. 위의 선택 상자로 아무 두 회차(예: 1차와 3차)나 나란히 볼 수 있습니다.
+        const idx=revs.findIndex(x=>x.revision===current);
+        let left=revs[idx>0?idx-1:0].revision,right=(idx>0?revs[idx]:revs[1]).revision;
+        const options=sel=>revs.map(r=>`<option value="${r.revision}" ${r.revision===sel?'selected':''}>${r.revision}차 제출</option>`).join('');
+        const paint=()=>{
+          const a=revs.find(r=>r.revision===left),b=revs.find(r=>r.revision===right);
+          show(`<div class="revision-compare-head"><label>왼쪽 <select class="input" data-compare-left>${options(left)}</select></label><label>오른쪽 <select class="input" data-compare-right>${options(right)}</select></label></div><div class="revision-compare"><div>${answerView(a,label(a))}</div><div>${answerView(b,label(b))}</div></div>`);
+          $('[data-compare-left]',box).onchange=e=>{left=Number(e.target.value);paint()};
+          $('[data-compare-right]',box).onchange=e=>{right=Number(e.target.value);paint()};
+        };
+        paint();
+      };
+    };
+    draw();
+  }catch(e){console.error('제출 이력 조회 실패',e);if(bar.isConnected)bar.innerHTML='<span class="error">제출 이력을 불러오지 못했어요.</span>'}
+}
+// P1-02: 응시 기록 해석에 필요한 문제 버전 사본(강사 전용)
+async function loadQuizVersions(cid,wid,list){
+  const out=new Map();
+  for(const v of [...new Set(list.map(Number))]){
+    try{const d=await getDoc(doc(db,weekKey(cid,wid),'quizVersions',String(v)));if(d.exists())out.set(v,d.data().questions||[])}
+    catch(e){console.warn('퀴즈 버전 조회 실패',v,e)}
+  }
+  return out;
+}
+function attemptMarkup(x,versions,w){
+  const snapshot=x.quizVersion?versions.get(Number(x.quizVersion)):null;
+  const questions=(snapshot||w.quiz?.questions||[]).map((q,i)=>({...normalizeQuestion(q),id:q.id||'idx'+i}));
+  const answers=answersFor(x,questions);
+  const pct=Math.round((Number(x.score)||0)/Math.max(1,Number(x.total)||1)*100);
+  const note=x.legacy?'이전 기록에서 가져온 첫 결과 · 문제 버전 미상':!x.quizVersion?'이전 기록 · 문제 버전 미상':snapshot?`문제 버전 ${x.quizVersion}`:`문제 버전 ${x.quizVersion} 사본 없음`;
+  const lines=questions.map((q,i)=>{
+    const answer=answers[i],correct=answer.length===q.correctIndices.length&&answer.every(v=>q.correctIndices.includes(Number(v)));
+    const display=arr=>arr.length?arr.map(v=>q.options[Number(v)]||'?').join(', '):'미응답';
+    return `<p class="hint" style="padding:4px 0">${i+1}. ${esc(q.stem)} · 학생: ${esc(display(answer))} ${correct?'✓':'✗'} · 정답: ${esc(display(q.correctIndices))}</p>`;
+  }).join('');
+  return `<details style="padding:9px 0;border-bottom:1px solid var(--line)"><summary class="between" style="cursor:pointer;list-style:none"><div><strong>${Number(x.attemptNumber)||1}회차</strong><p class="hint">${x.legacy?'':esc(formatDateTime(x.submittedAt))+' · '}${esc(note)}</p></div><span class="pill brand">${x.attemptNumber===1?'첫 응시 · ':''}${Number(x.score)||0}/${Number(x.total)||0} · ${pct}%</span></summary><div style="margin-top:10px">${lines}${snapshot?'':'<p class="notice warn" style="margin-top:8px">현재 문제 기준 추정 · 응시 이후 문제가 바뀌었다면 해석이 다를 수 있어요.</p>'}</div></details>`;
+}
 function teacherComments(data,uid,kind){
   const lines=[...(data?.feedbacks||[])].map((f,i)=>({...f,_position:i}));
   if(data?.feedback?.text||data?.feedback?.audioPath)lines.unshift({...data.feedback,createdAt:data.feedback.updatedAt,_position:-1});
+  if(!lines.length)return '';
   const revised=kind==='submissions'&&(Number(data?.revision)||1)>1;
-  return lines.length?`<div class="stack" style="margin-top:15px;gap:10px"><strong style="font-size:13px">💬 강사 피드백 (${lines.length})</strong>${lines.map(f=>`<div class="feedback"><div class="between" style="margin-bottom:8px"><span class="hint">${esc(formatDateTime(f.createdAt))}${revised?` · ${Number(f.forRevision)||1}차 제출에 대한 피드백`:''}</span><div class="row"><button type="button" class="btn secondary small" data-edit-feedback="${esc(uid)}:${f._position}">수정</button><button type="button" class="btn danger small" data-delete-feedback="${esc(uid)}:${f._position}">삭제</button></div></div>${f.text?`<p style="white-space:pre-wrap">${esc(f.text)}</p>`:''}${f.audioPath?`<audio controls data-media-path="${esc(f.audioPath)}"></audio>`:''}</div>`).join('')}</div>`:'';
+  const seenAt=toDate(data?.studentSeenFeedbackAt);
+  const item=f=>{
+    // P1-05: 학생이 이 피드백 이후에 과제·복습 화면을 열었으면 확인 시각을 보여 줍니다.
+    const created=toDate(f.createdAt),seen=seenAt&&created&&seenAt>=created?` · 학생 확인 ${esc(formatDateTime(seenAt))}`:'';
+    return `<div class="feedback"><div class="between" style="margin-bottom:8px"><span class="hint">${esc(formatDateTime(f.createdAt))}${seen}</span><div class="row"><button type="button" class="btn secondary small" data-edit-feedback="${esc(uid)}:${f._position}">수정</button><button type="button" class="btn danger small" data-delete-feedback="${esc(uid)}:${f._position}">삭제</button></div></div>${f.text?`<p style="white-space:pre-wrap">${esc(f.text)}</p>`:''}${f.audioPath?audioMarkup(f.audioPath,f.audioDuration):''}</div>`;
+  };
+  // P1-01: 수정본이 있는 과제는 피드백을 대상 회차별로 묶어 보여 줍니다(forRevision이 없으면 1차).
+  let body;
+  if(revised){
+    const groups=new Map();
+    for(const f of lines){const r=Number(f.forRevision)||1;if(!groups.has(r))groups.set(r,[]);groups.get(r).push(f)}
+    body=[...groups.keys()].sort((a,b)=>a-b).map(r=>`<p class="feedback-group-title">${r}차 제출에 대한 피드백</p>${groups.get(r).map(item).join('')}`).join('');
+  }else body=lines.map(item).join('');
+  return `<div class="stack" style="margin-top:15px;gap:10px"><strong style="font-size:13px">💬 강사 피드백 (${lines.length})</strong>${body}</div>`;
 }
 async function updateFeedbackItem(cid,wid,kind,uid,position,operation){
   const ref=doc(db,weekKey(cid,wid),kind,uid);const current=await getDoc(ref);if(!current.exists())throw Error('피드백을 찾을 수 없습니다.');
@@ -593,8 +677,10 @@ async function drawFeedbackList(){
       const s=active.find(x=>x.uid===A.feedbackSelectedUid);
       if(!s){panel.innerHTML='<div class="inspector-empty"><div><strong>수강생을 선택해 주세요.</strong><p class="hint">왼쪽 목록에서 이름을 누르면 제출물과 피드백이 나타납니다.</p></div></div>';return}
       const d=map.get(s.uid);
-      const content=d?(kind==='submissions'?`<div class="feedback-answer"><strong style="font-size:13px">학생 답안</strong>${d.text?`<p style="white-space:pre-wrap;margin-top:9px">${esc(d.text)}</p>`:'<p class="hint" style="margin-top:9px">텍스트 답안 없음</p>'}${d.audioPath?`<div style="margin-top:12px"><audio controls preload="none" data-media-path="${esc(d.audioPath)}"></audio></div>`:''}</div>`:`<div class="feedback-answer"><div class="grid3" style="margin-bottom:13px"><div class="mini-stat"><strong>${scorePct(d.firstAttempt?.score??d.score,d.firstAttempt?.total??d.total)}%</strong><span>첫 응시</span></div><div class="mini-stat"><strong>${scorePct(d.score,d.total)}%</strong><span>최근 응시</span></div><div class="mini-stat"><strong>${Number(d.attemptCount)||1}회</strong><span>총 응시</span></div></div><details data-attempt-history="${esc(s.uid)}"><summary style="cursor:pointer;font-weight:750;color:var(--primary)">전체 응시 기록 확인</summary><div class="hint" data-attempt-content style="margin-top:11px">펼치면 응시별 결과를 불러옵니다.</div></details></div>`):'<div class="feedback-answer"><p class="hint">아직 제출하거나 응시하지 않았습니다. 제출 후 피드백을 작성할 수 있습니다.</p></div>';
+      const content=d?(kind==='submissions'?`<div class="feedback-answer" data-answer-box>${answerView(d,(Number(d.revision)||1)>1?`${Number(d.revision)}차 제출 (최신)`:'학생 답안')}</div>${(Number(d.revision)||1)>1?'<div class="revision-bar" data-revision-bar><span class="hint">제출 이력 불러오는 중…</span></div>':''}`:`<div class="feedback-answer"><div class="grid3" style="margin-bottom:13px"><div class="mini-stat"><strong>${scorePct(d.firstAttempt?.score??d.score,d.firstAttempt?.total??d.total)}%</strong><span>첫 응시</span></div><div class="mini-stat"><strong>${scorePct(d.score,d.total)}%</strong><span>최근 응시</span></div><div class="mini-stat"><strong>${Number(d.attemptCount)||1}회</strong><span>총 응시</span></div></div><details data-attempt-history="${esc(s.uid)}"><summary style="cursor:pointer;font-weight:750;color:var(--primary)">전체 응시 기록 확인</summary><div class="hint" data-attempt-content style="margin-top:11px">펼치면 응시별 결과를 불러옵니다.</div></details></div>`):'<div class="feedback-answer"><p class="hint">아직 제출하거나 응시하지 않았습니다. 제출 후 피드백을 작성할 수 있습니다.</p></div>';
       panel.innerHTML=`<div class="inspector-title"><div><div class="name">${esc(s.studentName)}</div><p class="hint">${esc(s.email||'')} ${d?'· '+esc(formatDateTime(d.latestSubmittedAt||d.submittedAt)) : ''}${d&&kind==='submissions'&&(Number(d.revision)||1)>1?` · ${Number(d.revision)}차 제출`:''}</p></div><div class="row">${d?statusPill('success',kind==='submissions'?'제출 완료':'응시 완료'):statusPill('neutral',kind==='submissions'?'미제출':'미응시')}${d?statusPill(...REVIEW_LABEL[stateOf(d)]):''}</div></div>${content}${d?teacherComments(d,s.uid,kind)+`<div class="separator"></div><div class="stack" style="gap:9px" data-comment-card="${esc(kind)}:${esc(s.uid)}"><div class="field"><label>새 피드백 댓글</label><textarea data-feedback-text rows="4" maxlength="10000" placeholder="좋았던 점과 다음에 개선할 점을 작성해 주세요."></textarea></div><div data-feedback-media>${makeMediaUi('audio','또는 피드백 음성 파일')}</div><p class="feedback-target" data-feedback-target></p><div class="between"><span class="hint" data-feedback-status>등록하면 학생에게 바로 공개됩니다.</span><button type="button" class="btn small" data-feedback-save>피드백 등록</button></div></div>`:''}`;
+      const bar=$('[data-revision-bar]',panel);
+      if(bar)wireRevisionBar(bar,$('[data-answer-box]',panel),cid,wid,s.uid);
       const attempt=$('[data-attempt-history]',panel);
       if(attempt)attempt.ontoggle=async()=>{
         if(!attempt.open)return;
@@ -602,7 +688,9 @@ async function drawFeedbackList(){
         try{const snap=await getDocs(collection(db,weekKey(cid,wid),'quizResults',uid,'attempts'));
           const history=snap.docs.map(x=>x.data()).sort((a,b)=>(a.attemptNumber||0)-(b.attemptNumber||0));
           const prev=map.get(uid);if(prev?.firstAttempt?.legacy&&!history.some(x=>x.attemptNumber===1))history.unshift({...prev.firstAttempt,attemptNumber:1,legacy:true});
-          loaded(holder,history.map(x=>`<details style="padding:9px 0;border-bottom:1px solid var(--line)"><summary class="between" style="cursor:pointer;list-style:none"><div><strong>${Number(x.attemptNumber)||1}회차</strong><p class="hint">${x.legacy?'이전 버전에서 제출된 기록':esc(formatDateTime(x.submittedAt))}</p></div><span class="pill brand">${x.attemptNumber===1?'첫 응시 · ':''}${Number(x.score)||0}/${Number(x.total)||0} · ${scorePct(x.score,x.total)}%</span></summary><div style="margin-top:10px">${(w.quiz?.questions||[]).map((raw,i)=>{const q=normalizeQuestion(raw),a=x.answers?.[i],answer=Array.isArray(a)?a:a===null||a===undefined?[]:[a],correct=answer.length===q.correctIndices.length&&answer.every(v=>q.correctIndices.includes(Number(v)));const display=arr=>arr.length?arr.map(v=>q.options[Number(v)]||'?').join(', '):'미응답';return `<p class="hint" style="padding:4px 0">${i+1}. ${esc(q.stem)} · 학생: ${esc(display(answer))} ${correct?'✓':'✗'} · 정답: ${esc(display(q.correctIndices))}</p>`}).join('')}<p class="hint" style="margin-top:8px">※ 퀴즈 문제 수정 시 과거 답안 해석이 달라질 수 있습니다.</p></div></details>`).join('')||'<p class="hint">저장된 응시 기록이 없습니다.</p>');
+          // P1-02: 각 응시를 그 응시의 문제 버전으로 해석합니다. 버전이 없는 이전 기록은 현재 문제로 추정해 표시합니다.
+          const versions=await loadQuizVersions(cid,wid,history.map(x=>x.quizVersion).filter(Boolean));
+          loaded(holder,history.map(x=>attemptMarkup(x,versions,w)).join('')||'<p class="hint">저장된 응시 기록이 없습니다.</p>');
         }catch(e){loaded(holder,`<p class="error">${esc(ex(e))}</p>`)}
       };
       $$('[data-edit-feedback],[data-delete-feedback]',panel).forEach(button=>button.onclick=async()=>{
@@ -625,6 +713,7 @@ async function drawFeedbackList(){
           try{let audioPath='';if(file){audioPath=`classes/${cid}/feedback/${wid}/${uid}/${makeId()}-${file.name.replace(/[^\w.\-]/g,'_')}`;await uploadMedia(file,audioPath,'audio',$('[data-feedback-status]',card))}
             // P0-04: 과제 피드백은 지금 화면에 보이는 제출 회차에 대한 것으로 기록합니다.
             const item={id:makeId(),text,audioPath,createdAt:new Date().toISOString(),author:A.profile.displayName||'선생님'};
+            if(audioPath)item.audioDuration=file.durationSec??null; // P1-06
             if(type==='submissions')item.forRevision=Number(d?.revision)||1;
             await updateDoc(doc(db,weekKey(cid,wid),type,uid),{feedbacks:arrayUnion(item)});
             delete A.voiceDrafts[key];toast('피드백을 등록했습니다.');await drawFeedbackList();
@@ -831,25 +920,40 @@ async function showAttendance(b){
 // 대상 반 등록을 수강 중으로 만들고, 그 학생의 다른 수강 중 등록은 '반 이동'으로 바꿉니다.
 // 보관된 반(수업이 끝난 반)의 등록은 그대로 둡니다. 학생이 지난 자료를 계속 볼 수 있게 하기 위해서입니다.
 const isArchivedClass=cid=>!!A.classes.find(c=>c.id===cid)?.archived;
+// P1-04: 수강 상태를 바꾸는 모든 경로에서 같은 일괄 쓰기로 기록(변경 불가)을 남깁니다. 차시 대상자 판정(wasActiveAt)에 씁니다.
+function addEnrollmentEvent(batch,enrollmentId,type,extra={}){
+  batch.set(doc(collection(db,'enrollments',enrollmentId,'events')),{type,at:serverTimestamp(),by:A.user.uid,...extra});
+}
 async function activateEnrollment(student,targetClassId){
   const uid=student.uid,target=A.classes.find(c=>c.id===targetClassId);
   if(!target)throw Error('반 정보를 찾을 수 없습니다.');
   const snap=await getDocs(query(collection(db,'enrollments'),where('uid','==',uid)));
   const targetId=enId(uid,targetClassId),batch=writeBatch(db);
   const publicName=student.publicName||student.studentName||'',realName=student.realName||student.studentName||'';
+  let fromClassId='';
   for(const d of snap.docs){
     const e=d.data();
     if(d.id!==targetId&&e.status==='active'&&!isArchivedClass(e.classId)){
       batch.update(d.ref,{status:'transferred'});
       batch.set(doc(db,'classes',e.classId,'members',uid),{uid,name:publicName,status:'transferred'},{merge:true});
+      addEnrollmentEvent(batch,d.id,'transferred_out',{toClassId:targetClassId});
+      fromClassId=fromClassId||e.classId;
     }
   }
-  if(snap.docs.some(d=>d.id===targetId))batch.update(doc(db,'enrollments',targetId),{status:'active'});
-  else batch.set(doc(db,'enrollments',targetId),{uid,classId:targetClassId,studentName:realName,email:student.email||'',joinCode:target.joinCode||'',status:'active',joinedAt:serverTimestamp()});
+  const existing=snap.docs.find(d=>d.id===targetId);
+  if(existing){
+    if(existing.data().status!=='active'){
+      batch.update(existing.ref,{status:'active'});
+      addEnrollmentEvent(batch,targetId,fromClassId?'transferred_in':'resumed',fromClassId?{fromClassId}:{});
+    }
+  }else{
+    batch.set(doc(db,'enrollments',targetId),{uid,classId:targetClassId,studentName:realName,email:student.email||'',joinCode:target.joinCode||'',status:'active',joinedAt:serverTimestamp()});
+    addEnrollmentEvent(batch,targetId,fromClassId?'transferred_in':'joined',fromClassId?{fromClassId}:{});
+  }
   batch.set(doc(db,'classes',targetClassId,'members',uid),{uid,name:publicName,status:'active',joinedAt:serverTimestamp()},{merge:true});
   batch.update(doc(db,'users',uid),{assignedClassId:targetClassId});
   try{await batch.commit()}
-  catch(e){if(e?.code==='permission-denied')throw Error('권한이 없어 반을 옮기지 못했어요. Firestore 규칙에서 강사의 수강 등록 생성을 허용해야 합니다(저장소의 firestore.rules 참고).');throw e}
+  catch(e){if(e?.code==='permission-denied')throw Error('권한이 없어 반을 옮기지 못했어요. 저장소의 최신 firestore.rules를 Firebase 콘솔에 게시했는지 확인해 주세요.');throw e}
 }
 async function otherActiveClasses(uid,exceptClassId){
   const snap=await getDocs(query(collection(db,'enrollments'),where('uid','==',uid)));
@@ -925,8 +1029,11 @@ async function showStudents(b){
         try{
           if(student.status==='active'){
             if(!await modalConfirm(`${student.studentName}님을 수강 중지할까요?\n학습 기록은 그대로 보존됩니다.`,{title:'수강 상태 변경',confirmText:'수강 중지',danger:true}))return;
-            await updateDoc(doc(db,'enrollments',student.id),{status:'inactive'});
-            await setDoc(doc(db,'classes',cid,'members',student.uid),{uid:student.uid,name:student.publicName,status:'inactive'},{merge:true});
+            const batch=writeBatch(db);
+            batch.update(doc(db,'enrollments',student.id),{status:'inactive'});
+            batch.set(doc(db,'classes',cid,'members',student.uid),{uid:student.uid,name:student.publicName,status:'inactive'},{merge:true});
+            addEnrollmentEvent(batch,student.id,'stopped');
+            await batch.commit();
             toast('수강을 중지했어요.');
           }else{
             // D4: 다른 반을 수강 중이면 그 반은 '반 이동'으로 바뀌고 이 반만 수강 중이 됩니다.

@@ -126,16 +126,20 @@ test('B04 반 이동 학생 재등록: 활성 반은 1개만', async b => {
   assert((await dump(page, 'users/s3')).assignedClassId === 'c2', 'assignedClassId가 갱신되지 않음');
 });
 
-test('B04b 반 이동(강사가 새 반 등록 생성) — v1 규칙에서는 친절한 오류, v2 이후 규칙에서는 성공', async b => {
-  for (const rules of ['v1', 'v2']) {
+test('B04b 반 이동(강사가 새 반 등록 + 수강 기간 기록) — 이전 규칙에서는 친절한 오류, v3 규칙에서는 성공', async b => {
+  for (const rules of ['v1', 'v2', 'v3']) {
     const { page } = await openAs(b, 'admin.html', 'admin1', { rules });
     await page.click('[data-page="classes"]'); await pause(page, 400);
     await page.click('[data-open-roster="c1"]'); await pause(page, 900);
     await page.click('[data-move-student="s1"]'); await pause(page, 300);
     await page.selectOption('.app-modal-input', 'c2'); await ok(page); await ok(page); await pause(page, 600);
     const e = await dump(page, 'enrollments/s1_c2');
-    if (rules === 'v1') assert(!e && (await lastToast(page)).includes('권한'), 'v1 규칙에서 안내 없이 실패/성공: ' + JSON.stringify(e));
-    else assert(e?.status === 'active' && (await dump(page, 'enrollments/s1_c1')).status === 'transferred', 'v2 규칙에서 반 이동 실패');
+    if (rules !== 'v3') assert(!e && (await lastToast(page)).includes('firestore.rules'), rules + ' 규칙에서 안내 없이 실패/성공: ' + JSON.stringify(e) + ' ' + await lastToast(page));
+    else {
+      assert(e?.status === 'active' && (await dump(page, 'enrollments/s1_c1')).status === 'transferred', 'v3 규칙에서 반 이동 실패');
+      const events = await page.evaluate(() => window.__mock.list('enrollments/s1_c').filter(p => p.includes('/events/')).map(p => p.split('/')[1] + ':' + window.__mock.dump(p).type));
+      assert(events.includes('s1_c1:transferred_out') && events.includes('s1_c2:transferred_in'), '수강 기간 기록: ' + events.join(','));
+    }
     await page.context().close();
   }
 });
@@ -387,7 +391,7 @@ test('B11 피드백·마감 시각은 브라우저 시간대와 상관없이 한
     await page.selectOption('#student-week-picker', 'w1'); await pause(page, 700);
     const text = await page.innerText('#student-body');
     assert(/선생님 · \d+월 \d+일 \(.\) 오전 10:00/.test(text), `${timezoneId}: 피드백 시각이 한국 시간 오전 10:00이 아님`);
-    assert(/제출 권장일: \d+월 \d+일 \(.\) 오후 11:59/.test(text), `${timezoneId}: 마감 표시가 한국 시간이 아님`);
+    assert(/제출 권장일 \d+월 \d+일 \(.\) 오후 11:59/.test(text), `${timezoneId}: 마감 표시가 한국 시간이 아님`);
     await context.close();
   }
 });
@@ -457,6 +461,156 @@ test('P0-07 상태 배지: 색 + 기호 + 글자 (정답·오답·출석·불참
   await page.click('[data-tab="mypage"]'); await pause(page, 800);
   const att = await page.$$eval('#attendance-overview .pill', els => els.map(e => e.className + '|' + e.textContent));
   assert(att.some(x => x.includes('danger') && x.includes('✕불참')) && att.some(x => x.includes('neutral') && x.includes('–미입력')), '출석 배지: ' + att.join(' / '));
+});
+
+// ---------- 배치 06: 데이터 구조 v2 ----------
+test('D01 복수정답 문항이 있는 퀴즈 결과 저장 (Firestore는 배열 안의 배열을 저장하지 못함)', async b => {
+  const { page } = await openAs(b, 'index.html', 's2', { viewport: { width: 390, height: 844 } });
+  await page.click('[data-tab="quiz"]'); await pause(page, 500);
+  await page.selectOption('#student-week-picker', 'w1'); await pause(page, 700);
+  await page.click('.answer-option:has-text("좋은 밤 되세요")'); await page.click('#quiz-next'); await pause(page, 200);
+  await page.click('.answer-option:has-text("Hola")'); await page.click('.answer-option:has-text("Buenos días")'); await page.click('#quiz-next'); await pause(page, 200);
+  await page.click('.answer-option:has-text("O")'); await page.click('#quiz-next'); await pause(page, 900);
+  const res = await dump(page, 'classes/c1/weeks/w1/quizResults/s2');
+  assert(res.score === 3 && res.attemptCount === 2, '복수정답 퀴즈 저장 실패: ' + (await lastToast(page)) + ' ' + JSON.stringify(res).slice(0, 200));
+  assert(JSON.stringify(res.answersById?.q12) === '[0,2]', '문항 ID별 답 저장 이상: ' + JSON.stringify(res.answersById));
+});
+
+test('D02 재제출 3회: 제출 이력 3개(이전 형식 → 1차 보존), 처음 제출 시각 불변, 강사 1차·3차 비교', async b => {
+  let r = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 } });
+  await r.page.selectOption('#student-week-picker', 'w1'); await pause(r.page, 700);
+  const before = await dump(r.page, 'classes/c1/weeks/w1/submissions/s1');
+  for (const text of ['두 번째 답안입니다.', '세 번째 답안입니다.']) {
+    await r.page.fill('#assignment-text', text); await r.page.click('#submit-assignment'); await pause(r.page, 900);
+  }
+  const revs = await r.page.evaluate(() => window.__mock.list('classes/c1/weeks/w1/submissions/s1/revisions/').map(p => window.__mock.dump(p)));
+  assert(revs.length === 3, '제출 이력 개수: ' + revs.length);
+  assert(revs[0].legacy === true && revs[0].text === before.text && JSON.stringify(revs[0].submittedAt) === JSON.stringify(before.submittedAt), '1차(이전 제출) 보존 이상: ' + JSON.stringify(revs[0]));
+  assert(revs[2].revision === 3 && revs[2].text === '세 번째 답안입니다.', '3차 기록 이상');
+  const sum = await dump(r.page, 'classes/c1/weeks/w1/submissions/s1');
+  assert(sum.revision === 3 && JSON.stringify(sum.firstSubmittedAt) === JSON.stringify(before.submittedAt), '요약 문서 회차/처음 제출 시각 이상');
+  await r.page.click('[data-revision-history] summary'); await pause(r.page, 600);
+  const hist = await r.page.innerText('[data-revision-list]');
+  assert(hist.includes('2차 제출') && hist.includes('1차 제출') && hist.includes(before.text.slice(0, 10)), '학생 이전 제출 보기: ' + hist);
+  // 같은 결과를 강사 화면에서 확인(모의 저장소는 페이지마다 따로이므로 이력을 옮겨 씀)
+  const docs = await r.page.evaluate(() => Object.fromEntries(window.__mock.list('classes/c1/weeks/w1/submissions/s1').map(p => [p, window.__mock.dump(p)])));
+  await r.context.close();
+  r = await openAs(b, 'admin.html', 'admin1');
+  await r.page.evaluate(docs => { for (const [p, d] of Object.entries(docs)) window.__mock.remoteWrite(p, d, { merge: false }); }, docs);
+  await r.page.click('[data-page="feedback"]'); await pause(r.page, 500);
+  await r.page.selectOption('#admin-week-picker', 'w1'); await pause(r.page, 700);
+  await r.page.click('[data-feedback-uid="s1"]'); await pause(r.page, 700);
+  assert((await r.page.$$('.revision-tab')).length === 3, '회차 탭 개수');
+  await r.page.click('[data-compare]'); await pause(r.page, 300);
+  await r.page.selectOption('[data-compare-left]', '1'); await pause(r.page, 200);
+  await r.page.selectOption('[data-compare-right]', '3'); await pause(r.page, 200);
+  const cmp = await r.page.innerText('.revision-compare');
+  assert(cmp.includes(before.text.slice(0, 10)) && cmp.includes('세 번째 답안입니다.'), '1차·3차 비교: ' + cmp);
+  const fb = await r.page.innerText('#feedback-inspector');
+  assert(fb.includes('1차 제출에 대한 피드백'), '피드백이 회차별로 묶이지 않음');
+});
+
+test('D04 퀴즈 보기 내용을 바꿔 저장 → 버전 2, 이전 응시 기록은 버전 1 문항으로 표시 · 제목만 바꾸면 그대로', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  await page.click('[data-page="weeks"]'); await pause(page, 500);
+  await page.click('[data-week-open="w1"]'); await pause(page, 400);
+  await page.click('[data-week-tab="quiz"]'); await pause(page, 300);
+  await page.fill('#quiz-title', '인사 복습(제목만 수정)');
+  await page.click('#save-week'); await pause(page, 900);
+  assert((await dump(page, 'classes/c1/weeks/w1')).quiz.version === 1, '제목만 바꿨는데 버전이 올라감');
+  await page.click('[data-week-open="w1"]'); await pause(page, 400);
+  await page.click('[data-week-tab="quiz"]'); await pause(page, 300);
+  await page.fill('.quiz-editor-question >> nth=0 >> [data-option="2"]', '좋은 밤 되세요');
+  await page.click('#save-week'); await pause(page, 900);
+  const w = await dump(page, 'classes/c1/weeks/w1');
+  assert(w.quiz.version === 2, '퀴즈 버전: ' + w.quiz.version);
+  const v2 = await dump(page, 'classes/c1/weeks/w1/quizVersions/2');
+  assert(v2?.questions?.[0]?.options?.[2] === '좋은 밤 되세요', '버전 2 사본이 없음');
+  await page.click('[data-page="feedback"]'); await pause(page, 500);
+  await page.click('[data-feedback-tab="quizResults"]'); await pause(page, 500);
+  await page.selectOption('#admin-week-picker', 'w1'); await pause(page, 700);
+  await page.click('[data-feedback-uid="s1"]'); await pause(page, 500);
+  await page.click('[data-attempt-history] summary'); await pause(page, 800);
+  const hist = await page.innerText('[data-attempt-content]');
+  assert(hist.includes('문제 버전 1'), '응시 기록의 문제 버전 표시: ' + hist.slice(0, 200));
+  await page.click('[data-attempt-content] details >> nth=0 >> summary'); await pause(page, 300);
+  assert((await page.innerText('[data-attempt-content]')).includes('좋은 밤 되세요 / 안녕히 주무세요'), '이전 응시가 버전 1 보기로 표시되지 않음');
+});
+
+test('D05 응시 도중 강사가 퀴즈를 바꿔도 시작한 버전으로 저장', async b => {
+  const { page } = await openAs(b, 'index.html', 's2', { viewport: { width: 390, height: 844 } });
+  await page.click('[data-tab="quiz"]'); await pause(page, 500);
+  await page.selectOption('#student-week-picker', 'w4'); await pause(page, 700);
+  await page.click('.answer-option:has-text("20살")'); await page.click('#quiz-next'); await pause(page, 200);
+  await page.evaluate(() => window.__mock.remoteWrite('classes/c1/weeks/w4', { quiz: { version: 2 } }));
+  await pause(page, 600);
+  await page.click('.answer-option:has-text("O")'); await page.click('#quiz-next'); await pause(page, 200);
+  await page.click('.answer-option:has-text("quince")'); await page.click('#quiz-next'); await pause(page, 900);
+  const res = await dump(page, 'classes/c1/weeks/w4/quizResults/s2');
+  assert(res?.quizVersion === 1 && res.firstAttempt.quizVersion === 1, '저장된 버전: ' + res?.quizVersion);
+  assert(JSON.stringify(res.questionIds) === JSON.stringify(['q41', 'q42', 'q43']), '문항 순서 기록: ' + JSON.stringify(res.questionIds));
+});
+
+test('D06 수강 중지·재등록 기록과 날짜별 수강 판정(wasActiveAt)', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  await page.click('[data-page="classes"]'); await pause(page, 400);
+  await page.click('[data-open-roster="c1"]'); await pause(page, 900);
+  await page.click('[data-status-uid="s2"]'); await ok(page); await pause(page, 700);
+  await page.click('[data-status-uid="s2"]'); await ok(page); await pause(page, 700);
+  const types = await page.evaluate(() => window.__mock.list('enrollments/s2_c1/events/').map(p => window.__mock.dump(p).type));
+  assert(JSON.stringify(types.sort()) === JSON.stringify(['resumed', 'stopped']), '기록: ' + types.join(','));
+  const verdicts = await page.evaluate(async () => {
+    const { wasActiveAt } = await import('/common.js?v=test');
+    const ts = s => ({ seconds: Date.parse(s + 'T03:00:00Z') / 1000 });
+    const en = { status: 'inactive', joinedAt: ts('2026-09-01') };
+    const ev = [{ type: 'joined', at: ts('2026-09-01') }, { type: 'stopped', at: ts('2026-10-10') }];
+    return ['2026-08-31', '2026-09-15', '2026-10-10', '2026-10-20'].map(d => wasActiveAt(en, ev, d).active)
+      .concat([wasActiveAt({ status: 'inactive', joinedAt: ts('2026-09-01') }, [], '2026-10-01').estimated]);
+  });
+  assert(JSON.stringify(verdicts) === JSON.stringify([false, true, false, false, true]), 'wasActiveAt: ' + JSON.stringify(verdicts));
+});
+
+test('D07 녹음 길이가 제출·이력에 저장되고 화면에 표시됨', async b => {
+  const { page } = await openAs(b, 'index.html', 's2', { viewport: { width: 390, height: 844 } });
+  await page.selectOption('#student-week-picker', 'w2'); await pause(page, 700);
+  await page.click('#student-audio-ui [data-record-start]'); await pause(page, 2300);
+  await page.click('#student-audio-ui [data-record-stop]'); await pause(page, 500);
+  await page.click('#submit-assignment'); await pause(page, 1200);
+  const d = await dump(page, 'classes/c1/weeks/w2/submissions/s2');
+  assert(d?.audioDuration >= 2 && d.audioDuration <= 4, '저장된 길이: ' + d?.audioDuration);
+  const rev = await dump(page, 'classes/c1/weeks/w2/submissions/s2/revisions/1');
+  assert(rev?.audioDuration === d.audioDuration, '이력의 길이: ' + rev?.audioDuration);
+  assert(/0:0[2-4]/.test(await page.innerText('.audio-duration')), '길이 표시: ' + await page.innerText('.audio-duration'));
+});
+
+test('D08 학생 확인 시각: 피드백을 보면 기록, 강사 화면에 학생 확인 표시 · 질문 대화를 열면 기록', async b => {
+  let r = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 } });
+  await r.page.selectOption('#student-week-picker', 'w1'); await pause(r.page, 900);
+  const seen = (await dump(r.page, 'classes/c1/weeks/w1/submissions/s1')).studentSeenFeedbackAt;
+  assert(seen, '피드백 확인 시각이 저장되지 않음');
+  await r.page.click('[data-tab="questions"]'); await pause(r.page, 600);
+  await r.page.click('[data-qid="q1"]'); await pause(r.page, 600);
+  assert((await dump(r.page, 'classes/c1/questions/q1')).studentSeenAt, '질문 확인 시각이 저장되지 않음');
+  const writes = (await r.page.evaluate(() => window.__mock.writes())).filter(w => w.path === 'classes/c1/weeks/w1/submissions/s1');
+  assert(writes.length === 1, '확인 시각을 여러 번 저장함: ' + writes.length);
+  await r.context.close();
+  r = await openAs(b, 'admin.html', 'admin1');
+  await r.page.evaluate(s => window.__mock.remoteWrite('classes/c1/weeks/w1/submissions/s1', { studentSeenFeedbackAt: s }), seen);
+  await r.page.click('[data-page="feedback"]'); await pause(r.page, 500);
+  await r.page.selectOption('#admin-week-picker', 'w1'); await pause(r.page, 700);
+  await r.page.click('[data-feedback-uid="s1"]'); await pause(r.page, 500);
+  assert((await r.page.innerText('#feedback-inspector')).includes('학생 확인'), '강사 화면에 학생 확인 표시가 없음');
+});
+
+test('D09 학생 입장 시 입장 기록(joined) — v3 규칙에서는 함께 저장, v2 규칙에서는 등록만 저장', async b => {
+  for (const rules of ['v3', 'v2']) {
+    const { page, context } = await openAs(b, 'index.html', 's6', { rules, viewport: { width: 390, height: 844 } });
+    await page.fill('#join-code', 'HOLA2026'); await page.click('#join-form button[type="submit"]'); await pause(page, 1200);
+    assert((await dump(page, 'enrollments/s6_c1'))?.status === 'active', rules + ': 입장 실패');
+    const events = await page.evaluate(() => window.__mock.list('enrollments/s6_c1/events/').map(p => window.__mock.dump(p).type));
+    assert(rules === 'v3' ? events.join() === 'joined' : events.length === 0, rules + ': 입장 기록 ' + events.join(','));
+    await context.close();
+  }
 });
 
 test('기본: 학생 과제 텍스트 제출, 퀴즈 3/3, 강사 화면 주요 메뉴 오류 없음', async b => {

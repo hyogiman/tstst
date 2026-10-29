@@ -85,6 +85,11 @@ export function todayKey(date = new Date()) {
   return `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`;
 }
 export const fmt = value => formatDateTime(value);
+// 두 날짜 키('YYYY-MM-DD') 사이의 일수(to - from)
+export function daysBetween(fromKey, toKey) {
+  const [a, b] = [fromKey, toKey].map(k => { const [y, m, d] = String(k).split('-').map(Number); return Date.UTC(y, m - 1, d); });
+  return Math.round((b - a) / 86400000);
+}
 
 // ---------- 상태 표시 (P0-07) ----------
 // 상태는 색만으로 구분하지 않고 기호와 글자를 함께 씁니다.
@@ -138,6 +143,79 @@ export function reviewState(d) {
   return lastFeedback < submitted ? 'rereview' : 'done';
 }
 export const REVIEW_LABEL = { none: ['neutral', '미제출'], pending: ['warning', '피드백 대기'], rereview: ['warning', '재검토 대기'], done: ['success', '피드백 완료'] };
+
+// ---------- 퀴즈 답안 (P1-02) ----------
+// Firestore는 배열 안에 배열을 저장할 수 없습니다. 복수정답 답(예: [0,2])은
+// answersById {문항ID: [선택 인덱스]}(맵 안의 배열은 저장 가능)와 answers ["2","0,2",…](문자열 목록)으로 저장합니다.
+export function parseAnswer(a) {
+  if (Array.isArray(a)) return a.map(Number);
+  if (a === null || a === undefined || a === '') return [];
+  if (typeof a === 'number') return [a];
+  if (typeof a === 'string') return a.split(',').filter(x => x !== '').map(Number);
+  return [];
+}
+export const encodeAnswer = a => parseAnswer(a).join(',');
+// 응시 기록(entry)의 답을 문항 순서대로 [선택 인덱스 배열]로 돌려줍니다. 문항 ID가 있으면 ID로 맞춥니다.
+export const questionKey = (q, i) => q?.id || 'idx' + i; // 문항 ID가 없는 이전 문항은 순서로 구분
+export function answersFor(entry, questions) {
+  const byId = entry?.answersById;
+  return questions.map((q, i) => {
+    const key = questionKey(q, i);
+    return byId && key in byId ? parseAnswer(byId[key]) : parseAnswer(entry?.answers?.[i]);
+  });
+}
+// 퀴즈 버전 비교용: 제목·문항 ID 생성 방식과 무관한 문항 내용만 남깁니다.
+export function quizContentKey(questions = []) {
+  return JSON.stringify(questions.map(q => ({
+    id: q.id || '', type: q.type || 'single', stem: q.stem || '', options: q.options || [],
+    correctIndices: [...(q.correctIndices || [])].map(Number).sort((a, b) => a - b), explanation: q.explanation || '',
+  })));
+}
+
+// ---------- 수강 기간 (P1-04) ----------
+// 그 날짜(운영 시간대 'YYYY-MM-DD')에 수강 중이었는지 판정합니다. 근거가 부족하면 estimated: true.
+// events: [{type:'joined'|'stopped'|'resumed'|'transferred_out'|'transferred_in', at}]
+const START_EVENTS = new Set(['joined', 'resumed', 'transferred_in']);
+const END_EVENTS = new Set(['stopped', 'transferred_out']);
+export const dateKeyOf = value => { const d = toDate(value); return d ? todayKey(d) : ''; };
+export function wasActiveAt(enrollment, events = [], date) {
+  if (!enrollment) return { active: false, estimated: false };
+  if (!date) return { active: enrollment.status === 'active', estimated: true }; // 날짜 없는 차시: 현재 수강생 기준
+  const joined = dateKeyOf(enrollment.joinedAt);
+  const timeline = events.filter(e => e && (START_EVENTS.has(e.type) || END_EVENTS.has(e.type)) && dateKeyOf(e.at))
+    .sort((a, b) => (toDate(a.at)?.getTime() || 0) - (toDate(b.at)?.getTime() || 0));
+  if (!timeline.length) {
+    const active = !!joined && joined <= date;
+    return { active, estimated: enrollment.status !== 'active' };
+  }
+  // 첫 이벤트 전 상태: 첫 이벤트가 '시작'이면 그 전에는 수강 전, '끝'이면 등록일부터 수강 중이었다고 봅니다.
+  let active = END_EVENTS.has(timeline[0].type) && !!joined && joined <= date;
+  for (const e of timeline) {
+    if (dateKeyOf(e.at) > date) break;
+    active = START_EVENTS.has(e.type);
+  }
+  return { active, estimated: false };
+}
+
+// ---------- 음성 길이 (P1-06) ----------
+// 음성 플레이어 + 길이(예: 0:42)
+export function audioMarkup(path, duration) {
+  const d = Number(duration) > 0 ? formatDuration(duration) : '';
+  return `<div class="audio-row"><audio controls preload="none" data-media-path="${esc(path)}"></audio>${d ? `<span class="audio-duration" aria-label="길이 ${d}">${d}</span>` : ''}</div>`;
+}
+// 파일에서 길이(초)를 읽습니다. Chrome 녹음(webm)은 길이가 Infinity로 나오는 경우가 있어, 읽지 못하면 null.
+export function readAudioDuration(file, timeoutMs = 4000) {
+  return new Promise(resolve => {
+    if (!file || typeof Audio === 'undefined') { resolve(null); return; }
+    const url = URL.createObjectURL(file), audio = new Audio();
+    const finish = v => { clearTimeout(timer); URL.revokeObjectURL(url); resolve(Number.isFinite(v) && v > 0 ? Math.round(v) : null); };
+    const timer = setTimeout(() => finish(NaN), timeoutMs);
+    audio.preload = 'metadata';
+    audio.onloadedmetadata = () => finish(audio.duration);
+    audio.onerror = () => finish(NaN);
+    audio.src = url;
+  });
+}
 export const ex = e => { console.error(e); const c=e?.code||''; return ({'auth/invalid-credential':'이메일 또는 비밀번호를 확인해 주세요.','auth/email-already-in-use':'이미 가입된 이메일입니다.','auth/weak-password':'비밀번호는 6자 이상으로 설정해 주세요.','auth/invalid-email':'올바른 이메일을 입력해 주세요.','auth/unauthorized-domain':'Firebase Authentication에서 현재 도메인을 승인해 주세요.','auth/too-many-requests':'로그인 시도가 많습니다. 잠시 후 다시 시도해 주세요.','permission-denied':'접근 권한이 없습니다. 보안 규칙 또는 계정 권한을 확인해 주세요.','storage/unauthorized':'파일 저장 권한이 없습니다. Storage 보안 규칙을 확인해 주세요.','storage/quota-exceeded':'Storage 사용량 또는 요금제 제한을 확인해 주세요.'})[c] || e?.message || '처리 중 오류가 발생했습니다.'; };
 let toastTimer; export function toast(message,bad=false){const box=$('#toast');if(!box)return;box.textContent=message;box.className='toast show'+(bad?' bad':'');clearTimeout(toastTimer);toastTimer=setTimeout(()=>box.className='toast',4200)}
 export function loading(el){el.classList.add('loading');el.textContent='불러오는 중입니다'}
@@ -236,7 +314,7 @@ export function mountAuth(root,opts={signup:true}){
 // 녹음은 한 번에 하나만 합니다. 녹음 결과는 '녹음을 시작한 대상'에만 저장되고,
 // 화면을 옮기면 자동으로 멈춰 마이크를 끕니다(P0-02). 파일 선택 업로드도 대안으로 제공합니다.
 let activeRecorder=null;
-export const formatDuration=sec=>`${Math.floor(sec/60)}:${String(Math.round(sec)%60).padStart(2,'0')}`;
+export const formatDuration=sec=>{const t=Math.max(0,Math.round(Number(sec)||0));return `${Math.floor(t/60)}:${String(t%60).padStart(2,'0')}`};
 export async function recordStart(onFile,onStatus,label=''){
   if(activeRecorder)throw Error('현재 녹음 중인 항목을 먼저 종료해 주세요.');
   if(!navigator.mediaDevices?.getUserMedia||!globalThis.MediaRecorder)throw Error('이 브라우저에서 음성 녹음을 지원하지 않습니다. 음성 파일을 선택해 주세요.');
@@ -282,7 +360,12 @@ export function wireMediaUi(container,onFile,{label='',initialFile=null}={}){
     name.textContent=`${prefix}: ${file.name}${file.durationSec?` · ${formatDuration(file.durationSec)}`:''}`;
     draft.classList.remove('hide');
   };
-  const onSelected=file=>{if(!file)return;onFile(file);if(container.isConnected){show(file,'첨부할 음성');status.textContent=''}};
+  const onSelected=async file=>{
+    if(!file)return;
+    if(file.durationSec===undefined)file.durationSec=await readAudioDuration(file); // P1-06: 파일 선택 업로드도 길이를 남깁니다
+    onFile(file);
+    if(container.isConnected){show(file,'첨부할 음성');status.textContent=''}
+  };
   $('[data-record-start]',container)?.addEventListener('click',async()=>{try{await recordStart(onSelected,t=>{if(status.isConnected)status.textContent=t},label)}catch(e){toast(ex(e),true)}});
   $('[data-record-stop]',container)?.addEventListener('click',recordStop);
   input?.addEventListener('change',e=>onSelected(e.target.files[0]));

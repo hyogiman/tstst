@@ -83,6 +83,23 @@ service cloud.firestore {
         get(userDoc(request.auth.uid)).data.role == 'student' &&
         canJoin(request.auth.uid, request.resource.data.classId);
       allow update, delete: if admin();
+
+      // P1-04: 수강 기간 기록(변경 불가). 학생은 수강 등록을 만들 때 같은 일괄 쓰기로 'joined' 기록 하나만 남길 수 있습니다.
+      match /events/{evid} {
+        function enrollmentAfter() { return getAfter(/databases/$(database)/documents/enrollments/$(eid)).data; }
+        allow get, list: if admin();
+        allow create: if admin() ||
+          (signedIn() &&
+           !exists(/databases/$(database)/documents/enrollments/$(eid)) &&
+           enrollmentAfter().uid == request.auth.uid &&
+           request.resource.data.keys().hasOnly(['type','at','by','toClassId']) &&
+           request.resource.data.type == 'joined' &&
+           request.resource.data.by == request.auth.uid &&
+           request.resource.data.at == request.time &&
+           request.resource.data.get('toClassId', '') == enrollmentAfter().classId);
+        allow update: if false;
+        allow delete: if admin();
+      }
     }
     match /classes/{cid} {
       // 보관된 반도 수강했던 학생은 읽을 수 있습니다(지난 자료 열람, 2026-10-29 요청). 강의 영상 파일은 Storage 규칙에서 막습니다.
@@ -128,7 +145,11 @@ service cloud.firestore {
            request.resource.data.status == 'open' &&
            request.resource.data.needsTeacherReply == true &&
            request.resource.data.lastSenderRole == 'student' &&
-           request.resource.data.lastMessageAt == request.time);
+           request.resource.data.lastMessageAt == request.time) ||
+          // P1-05: 학생이 대화를 연 시각
+          (signedIn() && resource.data.uid == request.auth.uid && member(cid) &&
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['studentSeenAt']) &&
+           request.resource.data.studentSeenAt == request.time);
         allow delete: if admin();
 
         match /replies/{rid} {
@@ -155,17 +176,23 @@ service cloud.firestore {
             (signedIn() && request.auth.uid == uid && enrolled(cid) && visible(cid,wid));
           allow create: if signedIn() && request.auth.uid == uid && member(cid) &&
             visible(cid,wid) && get(weekDoc(cid,wid)).data.assignment.enabled == true &&
-            request.resource.data.keys().hasOnly(['userId','studentName','email','text','audioPath','submittedAt','revision','firstSubmittedAt','latestSubmittedAt']) &&
+            request.resource.data.keys().hasOnly(['userId','studentName','email','text','audioPath','audioDuration','submittedAt','revision','firstSubmittedAt','latestSubmittedAt']) &&
+            (request.resource.data.get('audioDuration', null) == null || request.resource.data.audioDuration is number) &&
             request.resource.data.get('revision', 1) == 1 &&
             request.resource.data.get('firstSubmittedAt', request.time) == request.time &&
             request.resource.data.userId == uid && request.resource.data.text is string &&
             request.resource.data.text.size() <= 20000 && request.resource.data.audioPath is string &&
             (request.resource.data.audioPath == '' || request.resource.data.audioPath.matches('^classes/' + cid + '/submissions/' + wid + '/' + uid + '/.*$'));
           allow update: if admin() ||
+            // P1-05: 학생이 피드백을 본 시각
+            (signedIn() && request.auth.uid == uid && member(cid) &&
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['studentSeenFeedbackAt']) &&
+             request.resource.data.studentSeenFeedbackAt == request.time) ||
             (signedIn() && request.auth.uid == uid && member(cid) && visible(cid,wid) &&
              get(weekDoc(cid,wid)).data.assignment.enabled == true &&
              request.resource.data.userId == uid &&
-             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['studentName','email','text','audioPath','submittedAt','revision','firstSubmittedAt','latestSubmittedAt']) &&
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['studentName','email','text','audioPath','audioDuration','submittedAt','revision','firstSubmittedAt','latestSubmittedAt']) &&
+             (request.resource.data.get('audioDuration', null) == null || request.resource.data.audioDuration is number) &&
              // P0-04: 제출 회차는 1씩만 오르고, 처음 제출 시각은 한 번 정해지면 바뀌지 않습니다(이전 문서는 기존 submittedAt으로 정함).
              (!changed(['revision']) || request.resource.data.revision == resource.data.get('revision', 1) + 1) &&
              (!changed(['firstSubmittedAt']) || (!('firstSubmittedAt' in resource.data) && request.resource.data.firstSubmittedAt == resource.data.submittedAt)) &&
@@ -174,13 +201,46 @@ service cloud.firestore {
              request.resource.data.audioPath is string &&
              (request.resource.data.audioPath == '' || request.resource.data.audioPath.matches('^classes/' + cid + '/submissions/' + wid + '/' + uid + '/.*$')));
           allow delete: if admin();
+
+          // P1-01: 제출 이력(제출 1회 = 문서 1개, 문서 ID = 회차). 만들기만 하고 수정·삭제하지 않습니다(강사의 영구 삭제만 예외).
+          match /revisions/{rev} {
+            function summary() { return /databases/$(database)/documents/classes/$(cid)/weeks/$(wid)/submissions/$(uid); }
+            allow get, list: if admin() || (signedIn() && request.auth.uid == uid && enrolled(cid) && visible(cid,wid));
+            allow create: if signedIn() && request.auth.uid == uid && member(cid) && visible(cid,wid) &&
+              get(weekDoc(cid,wid)).data.assignment.enabled == true &&
+              request.resource.data.keys().hasOnly(['revision','text','audioPath','audioDuration','submittedAt','studentName','legacy']) &&
+              request.resource.data.revision is int && rev == string(request.resource.data.revision) &&
+              request.resource.data.text is string && request.resource.data.text.size() <= 20000 &&
+              request.resource.data.audioPath is string &&
+              (request.resource.data.audioPath == '' || request.resource.data.audioPath.matches('^classes/' + cid + '/submissions/' + wid + '/' + uid + '/.*$')) &&
+              (
+                // 새 제출: 요약 문서의 새 회차와 같고, 제출 시각은 지금
+                (request.resource.data.revision == getAfter(summary()).data.revision &&
+                 request.resource.data.submittedAt == request.time &&
+                 request.resource.data.get('legacy', false) == false)
+                ||
+                // 회차 정보가 없던 이전 제출을 처음 다시 낼 때: 그 내용을 1차 기록으로 그대로 보존
+                (request.resource.data.revision == 1 && request.resource.data.legacy == true &&
+                 exists(summary()) && !('revision' in get(summary()).data) &&
+                 request.resource.data.text == get(summary()).data.get('text', '') &&
+                 request.resource.data.audioPath == get(summary()).data.get('audioPath', '') &&
+                 request.resource.data.submittedAt == get(summary()).data.submittedAt)
+              );
+            allow update: if false;
+            allow delete: if admin();
+          }
+        }
+        // P1-02: 퀴즈 버전 사본(정답 포함) — 강사 전용
+        match /quizVersions/{version} {
+          allow get, list, create, update, delete: if admin();
         }
         match /quizResults/{uid} {
           allow get, list: if admin() ||
             (signedIn() && request.auth.uid == uid && enrolled(cid) && visible(cid,wid));
           allow create: if signedIn() && request.auth.uid == uid && member(cid) &&
             visible(cid,wid) && get(weekDoc(cid,wid)).data.quiz.enabled == true &&
-            request.resource.data.keys().hasOnly(['userId','studentName','email','answers','score','total','submittedAt','firstAttempt','attemptCount']) &&
+            request.resource.data.keys().hasOnly(['userId','studentName','email','answers','answersById','questionIds','quizVersion','score','total','submittedAt','firstAttempt','attemptCount']) &&
+            request.resource.data.get('answersById', {}) is map &&
             request.resource.data.userId == uid && request.resource.data.answers is list &&
             request.resource.data.answers.size() <= 200 &&
             request.resource.data.score is int && request.resource.data.total is int &&
@@ -189,10 +249,15 @@ service cloud.firestore {
             request.resource.data.firstAttempt.total == request.resource.data.total &&
             request.resource.data.attemptCount == 1;
           allow update: if admin() ||
+            // P1-05: 학생이 피드백을 본 시각
+            (signedIn() && request.auth.uid == uid && member(cid) &&
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['studentSeenFeedbackAt']) &&
+             request.resource.data.studentSeenFeedbackAt == request.time) ||
             (signedIn() && request.auth.uid == uid && member(cid) && visible(cid,wid) &&
              get(weekDoc(cid,wid)).data.quiz.enabled == true &&
              request.resource.data.userId == uid &&
-             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['studentName','email','answers','score','total','submittedAt','firstAttempt','attemptCount']) &&
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['studentName','email','answers','answersById','questionIds','quizVersion','score','total','submittedAt','firstAttempt','attemptCount']) &&
+             request.resource.data.get('answersById', {}) is map &&
              request.resource.data.answers is list && request.resource.data.answers.size() <= 200 &&
              request.resource.data.score is int && request.resource.data.total is int &&
              request.resource.data.score >= 0 && request.resource.data.score <= request.resource.data.total &&
@@ -210,7 +275,8 @@ service cloud.firestore {
             allow get, list: if admin() || (signedIn() && request.auth.uid == uid && enrolled(cid) && visible(cid,wid));
             allow create: if signedIn() && request.auth.uid == uid && member(cid) && visible(cid,wid) &&
               get(weekDoc(cid,wid)).data.quiz.enabled == true &&
-              request.resource.data.keys().hasOnly(['userId','answers','score','total','attemptNumber','submittedAt']) &&
+              request.resource.data.keys().hasOnly(['userId','answers','answersById','questionIds','quizVersion','score','total','attemptNumber','submittedAt']) &&
+              request.resource.data.get('answersById', {}) is map &&
               request.resource.data.userId == uid && request.resource.data.answers is list && request.resource.data.answers.size() <= 200 &&
               request.resource.data.score is int && request.resource.data.total is int &&
               request.resource.data.score >= 0 && request.resource.data.score <= request.resource.data.total &&

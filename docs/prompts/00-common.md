@@ -32,6 +32,8 @@ users/{uid}               role('admin'|'student'), displayName, realName, nickna
 joinCodes/{CODE}          classId, createdBy, updatedAt                 ← 코드 단건 조회용
 enrollments/{uid}_{cid}   uid, classId, studentName, email, joinCode,
                           status('active'|'inactive'|'transferred'), joinedAt
+  events/{eid}            type('joined'|'stopped'|'resumed'|'transferred_out'|'transferred_in'),
+                          at, by, fromClassId?, toClassId?      ← 배치 06, 변경 불가(학생은 입장 때 'joined'만)
 classes/{cid}             name, description, joinCode, archived,
                           schedule[{weekId, label, date}], createdAt, createdBy
   members/{uid}           uid, name(공개 표시명), status, joinedAt       ← 같은 반 학생에게 공개
@@ -39,24 +41,34 @@ classes/{cid}             name, description, joinCode, archived,
   questions/{qid}         uid, studentName, title, content, status('open'|'answered'),
                           createdAt, answeredAt,
                           needsTeacherReply(bool), lastMessageAt, lastSenderRole('student'|'admin')  ← 배치 05
+                          studentSeenAt                                                         ← 배치 06
                           (필드 없는 이전 질문은 status로 판단: common.js needsReply())
     replies/{rid}         uid, role('student'|'admin'), author, text, createdAt
   weeks/{wid}             label, order, sessionDate, published, createdAt, updatedAt,
                           assignment{enabled, title, instructions, allowText, allowAudio,
-                                     dueAt('YYYY-MM-DDTHH:mm' 문자열, 시간대 없음)},
-                          quiz{enabled, title, questions[{id, type('single'|'multiple'|'ox'),
+                                     dueAt('YYYY-MM-DDTHH:mm' 문자열, 한국 시간으로 해석),
+                                     dueAtTs(Timestamp, 배치 06 — 학생 D-day 표시용, D3: 통계 마감 아님)},
+                          quiz{enabled, title, version(배치 06), questions[{id, type('single'|'multiple'|'ox'),
                                stem, options[], correctIndices[], correctIndex, explanation}]},
                           preview{enabled, title, mode('rich'|'image'), richHtml, imagePath,
                                   videos[{path,name,size}], files[{path,name,size}]}
     submissions/{uid}     userId, studentName, email, text, audioPath,
                           submittedAt(재제출 시 덮어씀),
                           revision(1부터, 재제출마다 +1), firstSubmittedAt(불변), latestSubmittedAt  ← 배치 05
-                          feedbacks[{id, text, audioPath, createdAt(ISO 문자열), author, forRevision}],
+                          audioDuration(초), studentSeenFeedbackAt                                  ← 배치 06
+                          feedbacks[{id, text, audioPath, audioDuration, createdAt(ISO 문자열), author, forRevision}],
                           (구버전) feedback{text, audioPath, updatedAt}
-    quizResults/{uid}     userId, studentName, email, answers[], score, total, submittedAt,
-                          attemptCount, firstAttempt{score, total, submittedAt, answers?, legacy},
-                          feedbacks[]
-      attempts/{aid}      userId, answers[], score, total, attemptNumber, submittedAt
+      revisions/{회차}    revision, text, audioPath, audioDuration, submittedAt, studentName, legacy?
+                          ← 배치 06: 제출 1회 = 문서 1개, 변경 불가. 회차 없던 이전 제출은 처음 다시 낼 때 1차로 보존
+    quizVersions/{버전}   version, questions(정답 포함), savedAt, savedBy   ← 배치 06, 강사 전용
+    quizResults/{uid}     userId, studentName, email, score, total, submittedAt, attemptCount,
+                          answers["2","0,2",…](문자열 목록), answersById{문항ID:[선택]}, questionIds[], quizVersion,
+                          firstAttempt{score, total, submittedAt, answers, answersById, quizVersion, legacy},
+                          studentSeenFeedbackAt, feedbacks[]
+                          ※ Firestore는 배열 안에 배열을 저장하지 못합니다. 복수정답 답을 [2,[0,2]]처럼 저장하면
+                            오류가 나므로(배치 06에서 수정) answersById(맵 안의 배열)로 저장합니다.
+      attempts/{aid}      userId, answers[], answersById{}, questionIds[], quizVersion, score, total,
+                          attemptNumber, submittedAt
     attendance/{uid}      status('present'|'absent'), note, updatedAt   ← 문서 없음 = 미입력
                           (D2: 출석·불참 두 가지. 이전 형식의 'late'는 출석, 'excused'는 불참으로 읽음)
 Storage
@@ -69,7 +81,7 @@ Storage
 
 **보관된 반(2026-10-29 요청):** 수강 등록이 active인 학생은 반이 보관된 뒤에도 그 반의 기록을 읽을 수 있습니다(읽기 전용, 강의 영상 제외). 규칙의 `enrolled(cid)`(읽기)와 `member(cid)`(쓰기, 운영 중인 반)를 구분해 씁니다.
 
-**공통 판정 함수(common.js):** `formatDateTime`·`toDate`·`todayKey`(D10 시간대), `needsReply`·`byLastActivity`(질문), `reviewState`·`feedbackItems`(과제 피드백), `statusPill`(상태 배지).
+**공통 판정 함수(common.js):** `formatDateTime`·`toDate`·`todayKey`·`daysBetween`(D10 시간대), `needsReply`·`byLastActivity`(질문), `reviewState`·`feedbackItems`(과제 피드백), `statusPill`(상태 배지), `answersFor`·`parseAnswer`·`quizContentKey`(퀴즈 답·버전), `wasActiveAt`(그 날짜에 수강 중이었는지, 근거 부족 시 estimated), `readAudioDuration`·`audioMarkup`(음성 길이).
 
 ---
 
