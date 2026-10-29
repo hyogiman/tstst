@@ -42,6 +42,7 @@ classes/{cid}             name, description, joinCode, archived,
                           createdAt, answeredAt,
                           needsTeacherReply(bool), lastMessageAt, lastSenderRole('student'|'admin')  ← 배치 05
                           studentSeenAt                                                         ← 배치 06
+                          weekId?(차시 연결), context?('assignment'|'quiz', '이 피드백에 질문하기')   ← 배치 10
                           (필드 없는 이전 질문은 status로 판단: common.js needsReply())
     replies/{rid}         uid, role('student'|'admin'), author, text, createdAt
   weeks/{wid}             label, order, sessionDate, published, createdAt, updatedAt,
@@ -68,7 +69,8 @@ classes/{cid}             name, description, joinCode, archived,
                           ※ Firestore는 배열 안에 배열을 저장하지 못합니다. 복수정답 답을 [2,[0,2]]처럼 저장하면
                             오류가 나므로(배치 06에서 수정) answersById(맵 안의 배열)로 저장합니다.
       attempts/{aid}      userId, answers[], answersById{}, questionIds[], quizVersion, score, total,
-                          attemptNumber, submittedAt
+                          attemptNumber, submittedAt,
+                          mode?('wrongOnly' = 틀린 문제만 다시 풀기. 요약 문서의 점수·첫 응시는 바꾸지 않음)   ← 배치 10
     attendance/{uid}      status('present'|'absent'), note, updatedAt   ← 문서 없음 = 미입력
                           (D2: 출석·불참 두 가지. 이전 형식의 'late'는 출석, 'excused'는 불참으로 읽음)
 Storage

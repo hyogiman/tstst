@@ -31,6 +31,19 @@ export function joinSessionLabels(labels) {
 }
 export const ratio = (num, den) => (den > 0 ? num / den : null);
 
+// 피드백 대기·재검토 대기 수. 대시보드 '처리할 일'과 강사 사이드바 배지(배치 10)가 같은 기준을 씁니다.
+// 지금 수강 중인 학생의 제출만 셉니다(과제·복습 관리 화면에 보이는 학생과 같게).
+export function feedbackQueue(submissions, activeUids, reviewState) {
+  let pending = 0, rereview = 0;
+  for (const d of submissions || []) {
+    if (!d || !activeUids.has(d.id)) continue;
+    const state = reviewState(d);
+    if (state === 'pending') pending++;
+    else if (state === 'rereview') rereview++;
+  }
+  return { pending, rereview };
+}
+
 // 첫 응시 기록 판정: {kind:'first', pct} · {kind:'legacy'}(첫 응시를 알 수 없는 이전 기록)
 export function firstAttemptOf(result) {
   const fa = result?.firstAttempt;
@@ -137,7 +150,7 @@ export function computeDashboard(input, today, deps) {
     const rows = list.map(s => ({ id: s.id, short: s.short, label: s.label, date: s.date, count: count(s) })).filter(r => r.count > 0);
     return { total: rows.reduce((n, r) => n + r.count, 0), sessions: rows };
   };
-  const reviewCount = wanted => s => [...docsBy(input.submissions, s.id).values()].filter(d => activeNow.has(d.id) && reviewState(d) === wanted).length;
+  const reviewCount = wanted => s => feedbackQueue(input.submissions?.[s.id], activeNow, reviewState)[wanted];
   const publishSoon = sessions.filter(s => s.state !== 'done' && s.date && daysBetween(today, s.date) >= 0 && daysBetween(today, s.date) <= PUBLISH_SOON_DAYS && (!s.published || !s.previewOn));
   const actions = {
     feedback: bySession(sessions, reviewCount('pending')),

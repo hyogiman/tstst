@@ -100,6 +100,13 @@ export function sessionState(session, today = todayKey(), { hasAttendance = fals
   if (date === today) return 'today';
   return date < today ? 'done' : 'upcoming';
 }
+// '3차시 · 카페에서 주문하기' → '3차시' (dashboard.js의 shortLabel과 같은 규칙)
+export const shortLabel = label => String(label || '').split(' · ')[0].trim() || '차시';
+// 질문의 차시 표시(배치 10): '3차시', 피드백에서 보낸 질문은 '3차시 과제'·'3차시 복습'
+export function questionSessionTag(q, label) {
+  if (!q?.weekId || !label) return '';
+  return shortLabel(label) + (q.context === 'assignment' ? ' 과제' : q.context === 'quiz' ? ' 복습' : '');
+}
 // 날짜 'YYYY-MM-DD' → '10월 30일 (금)'
 export const sessionDateText = date => date ? formatDateTime(date, { time: false }) : '날짜 미정';
 

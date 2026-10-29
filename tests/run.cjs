@@ -17,9 +17,12 @@ const trackStreams = page => page.addInitScript(() => {
   const orig = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
   navigator.mediaDevices.getUserMedia = async c => { const s = await orig(c); window.__streams.push(s); return s; };
 });
+// 배치 10부터 학생 첫 화면은 '홈'입니다. 과제 화면에서 시작하던 기존 시나리오는 tab: 'assignment'(학생 기본값)로 과제 탭을 먼저 엽니다.
 async function openAs(browser, file, user, opts = {}) {
-  const r = await openApp(browser, { file, user, rules: opts.rules || 'v3', viewport: opts.viewport || { width: 1280, height: 900 } });
+  const r = await openApp(browser, { file, user, rules: opts.rules || 'v3', viewport: opts.viewport || { width: 1280, height: 900 }, seed: opts.seed });
   await pause(r.page, 600);
+  const tab = opts.tab ?? (file === 'index.html' ? 'assignment' : null);
+  if (tab && tab !== 'home' && await r.page.$(`[data-tab="${tab}"]`)) { await r.page.click(`[data-tab="${tab}"]`); await pause(r.page, 600); }
   return r;
 }
 
@@ -101,6 +104,7 @@ test('B03 학생 녹음 중 탭 이동: 녹음 중지·마이크 종료·다른 
   const r = await openApp(b, { file: 'index.html', user: 's1', rules: 'proposed', viewport: { width: 390, height: 844 } });
   const page = r.page;
   await trackStreams(page); await page.reload(); await pause(page, 700);
+  await page.click('[data-tab="assignment"]'); await pause(page, 600);
   await page.selectOption('#student-week-picker', 'w4'); await pause(page, 600);
   await page.click('#student-audio-ui [data-record-start]'); await pause(page, 1300);
   await page.click('[data-tab="quiz"]'); await pause(page, 600);
@@ -110,6 +114,7 @@ test('B03 학생 녹음 중 탭 이동: 녹음 중지·마이크 종료·다른 
   await page.selectOption('#student-week-picker', 'w4'); await pause(page, 600);
   assert(await page.$eval('#student-audio-ui [data-media-draft]', el => !el.classList.contains('hide')), '4차시로 돌아왔을 때 녹음 초안이 보이지 않음');
   await page.selectOption('#student-week-picker', 'w3'); await pause(page, 600);
+  await page.click('#edit-assignment'); await pause(page, 200); // 3차시는 이미 제출함 → [수정해서 다시 제출]
   await page.fill('#assignment-text', 'Estoy bien, gracias.');
   await page.click('#submit-assignment'); await pause(page, 800);
   const uploads = await page.evaluate(() => window.__mock.uploads());
@@ -258,6 +263,7 @@ test('F01 보관된 반 학생: 지난 반 자료를 읽기 전용으로 열람,
   // 복습: 연습 모드, 저장하지 않음
   await page.evaluate(() => window.__mock.clearWrites());
   await page.click('[data-tab="quiz"]'); await pause(page, 600);
+  await page.click('#quiz-full-retry'); await pause(page, 200);
   for (let i = 0; i < 2; i++) { await page.click('.answer-option >> nth=0'); await page.click('#quiz-next'); await pause(page, 250); }
   await pause(page, 300);
   assert((await page.innerText('#quiz-content')).includes('연습 결과는 저장되지 않아요'), '연습 모드 안내가 없음');
@@ -356,12 +362,14 @@ test('B10 피드백 받은 학생이 재제출 → 2차 제출 기록, 강사 �
   let r = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 } });
   await r.page.selectOption('#student-week-picker', 'w1'); await pause(r.page, 700);
   const before = await dump(r.page, 'classes/c1/weeks/w1/submissions/s1');
+  await r.page.click('#edit-assignment'); await pause(r.page, 200);
   await r.page.fill('#assignment-text', '¡Hola! Me llamo Minji. Soy de Corea y soy estudiante.');
   await r.page.click('#submit-assignment'); await pause(r.page, 900);
   let d = await dump(r.page, 'classes/c1/weeks/w1/submissions/s1');
   assert(d.revision === 2, '재제출 회차: ' + d.revision);
   assert(JSON.stringify(d.firstSubmittedAt) === JSON.stringify(before.submittedAt), '처음 제출 시각이 기존 제출 시각이 아님');
-  assert((await r.page.innerText('#assignment-form-area')).includes('수정본을 제출했어요'), '학생 화면에 재검토 대기 안내가 없음');
+  assert((await r.page.innerText('.submitted-card')).includes('수정본 확인 전') && (await r.page.innerText('.submitted-card')).includes('2차 제출'), '학생 화면에 재검토 대기 안내가 없음');
+  await r.page.click('#edit-assignment'); await pause(r.page, 200);
   await r.page.fill('#assignment-text', '세 번째 답안');
   await r.page.click('#submit-assignment'); await pause(r.page, 900);
   d = await dump(r.page, 'classes/c1/weeks/w1/submissions/s1');
@@ -389,6 +397,7 @@ test('B11 피드백·마감 시각은 브라우저 시간대와 상관없이 한
   for (const timezoneId of ['Asia/Seoul', 'Europe/Madrid', 'America/Los_Angeles']) {
     const { page, context } = await openApp(b, { file: 'index.html', user: 's1', timezoneId, viewport: { width: 390, height: 844 } });
     await pause(page, 600);
+    await page.click('[data-tab="assignment"]'); await pause(page, 500);
     await page.selectOption('#student-week-picker', 'w1'); await pause(page, 700);
     const text = await page.innerText('#student-body');
     assert(/선생님 · \d+월 \d+일 \(.\) 오전 10:00/.test(text), `${timezoneId}: 피드백 시각이 한국 시간 오전 10:00이 아님`);
@@ -469,6 +478,7 @@ test('D01 복수정답 문항이 있는 퀴즈 결과 저장 (Firestore는 배�
   const { page } = await openAs(b, 'index.html', 's2', { viewport: { width: 390, height: 844 } });
   await page.click('[data-tab="quiz"]'); await pause(page, 500);
   await page.selectOption('#student-week-picker', 'w1'); await pause(page, 700);
+  await page.click('#quiz-full-retry'); await pause(page, 200);
   await page.click('.answer-option:has-text("좋은 밤 되세요")'); await page.click('#quiz-next'); await pause(page, 200);
   await page.click('.answer-option:has-text("Hola")'); await page.click('.answer-option:has-text("Buenos días")'); await page.click('#quiz-next'); await pause(page, 200);
   await page.click('.answer-option:has-text("O")'); await page.click('#quiz-next'); await pause(page, 900);
@@ -482,6 +492,7 @@ test('D02 재제출 3회: 제출 이력 3개(이전 형식 → 1차 보존), 처
   await r.page.selectOption('#student-week-picker', 'w1'); await pause(r.page, 700);
   const before = await dump(r.page, 'classes/c1/weeks/w1/submissions/s1');
   for (const text of ['두 번째 답안입니다.', '세 번째 답안입니다.']) {
+    await r.page.click('#edit-assignment'); await pause(r.page, 200);
     await r.page.fill('#assignment-text', text); await r.page.click('#submit-assignment'); await pause(r.page, 900);
   }
   const revs = await r.page.evaluate(() => window.__mock.list('classes/c1/weeks/w1/submissions/s1/revisions/').map(p => window.__mock.dump(p)));
@@ -730,8 +741,8 @@ test('B18 기록을 불러오지 못하면 "불러오지 못했어요"와 다시
   const { page } = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 } });
   await page.evaluate(() => window.__mock.failReads('classes/c1/weeks/w1/submissions/s1$'));
   await page.selectOption('#student-week-picker', 'w1'); await pause(page, 700);
-  const area = await page.innerText('#assignment-form-area');
-  assert(area.includes('불러오지 못했어요') && await page.$('#assignment-form-area [data-retry]'), '불러오기 실패 안내: ' + area);
+  const area = await page.innerText('#assignment-area');
+  assert(area.includes('불러오지 못했어요') && await page.$('#assignment-area [data-retry]'), '불러오기 실패 안내: ' + area);
   assert(!(await page.$('#submit-assignment')), '실패했는데 제출 폼이 보임');
   assert(!/Firestore|Storage|permission|보안 규칙/i.test(area), '학생 화면에 개발 용어: ' + area);
 });
@@ -789,14 +800,14 @@ test('S03 sessionState: 어제·오늘·내일·날짜 없음(출결 있음/없�
   assert(JSON.stringify(r) === JSON.stringify(['done', 'today', 'upcoming', 'done', 'upcoming']), JSON.stringify(r));
 });
 
-test('S04 학생 예습(D8): 대상 차시·날짜 표시, 예습 탭을 열면 오늘/다가오는 차시가 기본 선택', async b => {
-  const { page } = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 } });
-  await page.selectOption('#student-week-picker', 'w1'); await pause(page, 500);
-  await page.click('[data-tab="preview"]'); await pause(page, 600);
+test('S04 학생 예습(D8): 홈에서 다음 수업 예습을 열면 그 차시가 선택되고, 하단 메뉴는 홈·과제·복습·질문·내 정보(D6)', async b => {
+  const { page } = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 }, tab: 'home' });
+  eq(await page.$$eval('.nav-item .nav-label', els => els.map(e => e.textContent)), ['홈', '과제', '복습', '질문', '내 정보'], '하단 메뉴');
+  await page.click('.home-preview [data-home-go="preview"]'); await pause(page, 600);
   assert((await page.inputValue('#student-week-picker')) === 'w5', '기본 선택: ' + await page.inputValue('#student-week-picker'));
   const head = await page.innerText('.page-head');
   assert(head.includes('예습') && /5차시 · 카페에서 주문하기 수업 준비 · \d+월 \d+일 \(.\)/.test(head), '머리말: ' + head);
-  assert((await page.innerText('.student-nav')).includes('예습') && !(await page.innerText('.student-nav')).includes('다음차시'), '하단 메뉴 이름');
+  assert(await page.$eval('.nav-item[data-tab="home"]', el => el.classList.contains('active') && el.getAttribute('aria-current') === 'page'), '예습 화면에서 홈 메뉴가 켜지지 않음');
 });
 
 test('S05 유튜브 링크: 허용 주소만 추가, 학생 화면은 youtube-nocookie 임베드, 지난 반에서는 숨김', async b => {
@@ -811,10 +822,10 @@ test('S05 유튜브 링크: 허용 주소만 추가, 학생 화면은 youtube-no
   const v = (await dump(r.page, 'classes/c1/weeks/w5')).preview.videos;
   assert(v.length === 1 && v[0].kind === 'youtube' && v[0].videoId === 'dQw4w9WgXcQ', '저장 형식: ' + JSON.stringify(v));
   await r.context.close();
-  r = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 } });
+  r = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 }, tab: 'home' });
   await r.page.evaluate(v => window.__mock.remoteWrite('classes/c1/weeks/w5', { preview: { videos: v } }), v);
   await pause(r.page, 400);
-  await r.page.click('[data-tab="preview"]'); await pause(r.page, 600);
+  await r.page.click('.home-preview [data-home-go="preview"]'); await pause(r.page, 600);
   const src = await r.page.getAttribute('.video-embed iframe', 'src');
   assert(src === 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?rel=0', 'iframe 주소: ' + src);
   await r.context.close();
@@ -1031,6 +1042,143 @@ test('DB05 대시보드: 0건이면 "처리할 일이 없어요", 문항 분석�
   eq(order, ['1번 정답률 0% 0/2명', '2번 정답률 50% 1/2명', '3번 정답률 100% 2/2명'], '정답률 낮은 순');
   assert((await page.innerText('.dash-item:first-child .is-top-wrong')).includes('가장 많이 고른 오답'), '오답 강조 없음');
   assert((await page.innerText('#dash-item-body')).includes('첫 응시를 알 수 없는 이전 기록 1명'), '이전 기록 분리 안내 없음');
+});
+
+// ----- 배치 10: 학생 동선 · 새 소식 -----
+test('ST01 홈: 다음 수업·이번 차시 할 일·새 소식·예습·출석 요약', async b => {
+  const { page } = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 }, tab: 'home' });
+  assert((await page.innerText('.home-next')).includes('5차시 · 카페에서 주문하기') && (await page.innerText('.home-next')).includes('오늘'), '다음 수업: ' + await page.innerText('.home-next'));
+  const todo = await page.$$eval('.todo-row', rows => rows.map(r => r.innerText.replace(/\s+/g, ' ')));
+  assert(todo.length === 3 && todo[0].startsWith('예습') && todo[0].includes('5차시') && todo[1].startsWith('과제') && todo[1].includes('미제출') && todo[1].includes('4차시') && todo[2].startsWith('복습') && todo[2].includes('미응시'), '할 일: ' + todo.join(' | '));
+  eq(await page.$$eval('.news-item span:first-child', els => els.map(e => e.textContent)), ['새 피드백 · 2차시 과제', '새 피드백 · 1차시 과제'], '새 소식');
+  assert((await page.innerText('.home-attendance')).includes('4 / 4차시 출석'), '출석 요약: ' + await page.innerText('.home-attendance'));
+  // 모바일 첫 화면 안에 할 일 카드가 보임
+  const top = await page.$eval('.home-todo', el => el.getBoundingClientRect().top);
+  assert(top < 844, '할 일 카드가 첫 화면 밖: ' + top);
+  await page.click('.news-item:has-text("2차시 과제")'); await pause(page, 900);
+  eq([await page.inputValue('#student-week-picker'), await page.$eval('.nav-item.active', el => el.dataset.tab)], ['w2', 'assignment'], '새 소식 → 과제 화면');
+});
+
+test('ST02 새 피드백 배지: 강사 피드백 → 과제 탭 배지 → 과제 화면을 보면 사라짐 → 다시 열어도 없음', async b => {
+  let r = await openAs(b, 'index.html', 's2', { viewport: { width: 390, height: 844 }, tab: 'home' });
+  const badge = page => page.$eval('.nav-item[data-tab="assignment"]', el => [el.querySelector('.nav-badge')?.textContent || '', el.getAttribute('aria-label')]);
+  eq(await badge(r.page), ['', '과제'], '처음 배지');
+  await r.page.evaluate(() => window.__mock.remoteWrite('classes/c1/weeks/w1/submissions/s2', { feedbacks: [{ id: 'nf1', text: '문장이 자연스러워요.', audioPath: '', createdAt: new Date().toISOString(), author: '유진', forRevision: 1 }] }));
+  await pause(r.page, 600);
+  eq(await badge(r.page), ['1', '과제, 새 피드백 1개'], '피드백 도착 후 배지');
+  assert((await r.page.innerText('.home-news')).includes('새 피드백 · 1차시 과제'), '홈 새 소식에 없음');
+  await r.page.click('.news-item'); await pause(r.page, 1000);
+  assert((await r.page.innerText('.student-feedback')).includes('새 피드백'), '과제 화면에 새 피드백 표시가 없음');
+  eq(await badge(r.page), ['', '과제'], '확인 후 배지');
+  const doc = await dump(r.page, 'classes/c1/weeks/w1/submissions/s2');
+  assert(doc.studentSeenFeedbackAt, '확인 시각이 저장되지 않음');
+  await r.context.close();
+  // 새로 연 화면(새로고침과 같음)에도 배지가 없어야 함: 저장된 문서를 그대로 옮겨 확인
+  r = await openAs(b, 'index.html', 's2', { viewport: { width: 390, height: 844 }, tab: 'home' });
+  await r.page.evaluate(d => window.__mock.remoteWrite('classes/c1/weeks/w1/submissions/s2', d, { merge: false }), doc);
+  await pause(r.page, 600);
+  eq(await badge(r.page), ['', '과제'], '다시 열었을 때 배지');
+});
+
+test('ST03 과제: 제출한 학생은 "제출한 답안"이 첫 카드, 편집 폼은 [수정해서 다시 제출]을 눌러야 열림', async b => {
+  const { page } = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 } });
+  await page.selectOption('#student-week-picker', 'w1'); await pause(page, 700);
+  const first = await page.$eval('#assignment-area > .card', el => el.innerText);
+  assert(first.includes('제출한 답안') && first.includes('Me llamo Minji'), '첫 카드: ' + first.slice(0, 80));
+  assert(await page.$eval('#assignment-editor', el => el.classList.contains('hide')), '편집 폼이 처음부터 열려 있음');
+  // 피드백은 답안 바로 아래, 최신이 위
+  const order = await page.$$eval('#assignment-area > *', els => els.map(e => e.matches('.submitted-card') ? 'answer' : e.id === 'student-assignment-feedback' ? 'feedback' : e.matches('.assignment-brief') ? 'brief' : e.id));
+  eq(order, ['answer', 'feedback', 'brief', 'assignment-editor'], '카드 순서');
+  await page.click('#edit-assignment'); await pause(page, 300);
+  assert(!(await page.$eval('#assignment-editor', el => el.classList.contains('hide'))) && await page.$eval('#edit-assignment', el => el.getAttribute('aria-expanded')) === 'true', '편집 폼이 열리지 않음');
+  assert((await page.inputValue('#assignment-text')).includes('Me llamo Minji'), '편집 폼에 기존 답안이 없음');
+});
+
+test('ST04 이 피드백에 질문하기: [1차시 과제] 제목 + weekId·context 저장, 강사 질문함에 차시 표시', async b => {
+  let r = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 } });
+  await r.page.selectOption('#student-week-picker', 'w1'); await pause(r.page, 700);
+  await r.page.click('[data-ask-feedback]'); await pause(r.page, 200);
+  eq(await r.page.inputValue('[data-feedback-question] input[name="title"]'), '[1차시 과제] ', '제목 접두어');
+  await r.page.fill('[data-feedback-question] input[name="title"]', '[1차시 과제] 직업 문장 질문');
+  await r.page.fill('[data-feedback-question] textarea', '직업 앞에 관사를 빼는 이유가 궁금해요.');
+  await r.page.click('[data-feedback-question] button[type="submit"]'); await pause(r.page, 700);
+  const qs = await r.page.evaluate(() => window.__mock.list('classes/c1/questions/').filter(p => p.split('/').length === 4).map(p => [p, window.__mock.dump(p)]));
+  const mine = qs.find(([, d]) => d.title === '[1차시 과제] 직업 문장 질문');
+  assert(mine && mine[1].weekId === 'w1' && mine[1].context === 'assignment' && mine[1].needsTeacherReply === true, '질문 문서: ' + JSON.stringify(mine));
+  // 질문 탭의 목록에도 차시 표시
+  await r.page.click('[data-tab="questions"]'); await pause(r.page, 600);
+  assert((await r.page.innerText('#question-list')).includes('1차시 과제'), '학생 질문 목록에 차시 표시가 없음');
+  await r.context.close();
+  r = await openAs(b, 'admin.html', 'admin1');
+  await r.page.evaluate(([p, d]) => window.__mock.remoteWrite(p, d, { merge: false }), mine);
+  await r.page.click('[data-page="questions"]'); await pause(r.page, 700);
+  const qid = mine[0].split('/').pop();
+  assert((await r.page.innerText(`[data-admin-qid="${qid}"]`)).includes('1차시 과제'), '강사 질문함에 차시 표시가 없음');
+  await r.page.click(`[data-admin-qid="${qid}"]`); await pause(r.page, 500);
+  assert((await r.page.innerText('#admin-question-detail')).includes('1차시 과제'), '질문 상세에 차시 표시가 없음');
+});
+
+test('ST05 복습: 결과 먼저 → 틀린 문제만 다시 풀기는 attempts(mode:wrongOnly)에만 저장, 점수·첫 응시 그대로', async b => {
+  const { page } = await openAs(b, 'index.html', 's2', { viewport: { width: 390, height: 844 } });
+  await page.click('[data-tab="quiz"]'); await pause(page, 500);
+  await page.selectOption('#student-week-picker', 'w1'); await pause(page, 900);
+  const summary = await page.innerText('#quiz-content');
+  assert(summary.includes('첫 점수 1/3') && summary.includes('지난번에 틀린 문항 2개') && !(await page.$('.answer-option')), '결과 먼저: ' + summary.slice(0, 120));
+  const before = await dump(page, 'classes/c1/weeks/w1/quizResults/s2');
+  await page.click('#quiz-wrong-only'); await pause(page, 300);
+  assert((await page.innerText('.question-count')).includes('틀린 문제 다시 풀기 · QUESTION 1 / 2'), '틀린 문제만 풀기 시작 안 됨');
+  await page.click('.answer-option:has-text("좋은 밤 되세요")'); await page.click('#quiz-next'); await pause(page, 200);
+  await page.click('.answer-option:has-text("Hola")'); await page.click('.answer-option:has-text("Buenos días")'); await page.click('#quiz-next'); await pause(page, 900);
+  const result = await page.innerText('#quiz-content');
+  assert(result.includes('지난번 틀린 2문항 중 2문항 정답') && result.includes('지난번에 틀린 문항을 이번에 맞혔어요'), '연습 결과: ' + result.slice(0, 160));
+  const after = await dump(page, 'classes/c1/weeks/w1/quizResults/s2');
+  eq([after.score, after.total, after.attemptCount, JSON.stringify(after.firstAttempt)], [before.score, before.total, before.attemptCount, JSON.stringify(before.firstAttempt)], '요약 문서(점수·첫 응시)');
+  const attempts = await page.evaluate(() => window.__mock.list('classes/c1/weeks/w1/quizResults/s2/attempts/').map(p => window.__mock.dump(p)));
+  const practice = attempts.find(a => a.mode === 'wrongOnly');
+  assert(practice && practice.score === 2 && practice.total === 2 && JSON.stringify(practice.questionIds) === JSON.stringify(['q11', 'q12']) && JSON.stringify(practice.answersById.q12) === '[0,2]', '연습 기록: ' + JSON.stringify(practice));
+  await page.click('#quiz-back-summary'); await pause(page, 900);
+  const again = await page.innerText('#quiz-content');
+  assert(again.includes('틀린 문제 연습 · 2문항 중 2문항 정답') && !(await page.$('#quiz-wrong-only')), '연습 뒤 결과 요약: ' + again.slice(0, 200));
+});
+
+test('ST06 320px: 하단 메뉴 라벨 12px 이상, 잘리지 않음, 활성 메뉴는 색 + 굵기 + 표시선', async b => {
+  const { page } = await openAs(b, 'index.html', 's1', { viewport: { width: 320, height: 640 }, tab: 'home' });
+  const labels = await page.$$eval('.nav-label', els => els.map(e => ({ text: e.textContent, size: parseFloat(getComputedStyle(e).fontSize), cut: e.scrollWidth > e.clientWidth + 0.5 })));
+  assert(labels.length === 5 && labels.every(l => l.size >= 12 && !l.cut), '라벨: ' + JSON.stringify(labels));
+  const active = await page.$eval('.nav-item.active', el => ({ weight: getComputedStyle(el).fontWeight, bar: getComputedStyle(el, '::before').content !== 'none', current: el.getAttribute('aria-current') }));
+  assert(Number(active.weight) >= 800 && active.bar && active.current === 'page', '활성 메뉴: ' + JSON.stringify(active));
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+  assert(overflow <= 0, '가로 넘침: ' + overflow);
+});
+
+test('ST07 강사 사이드바 배지: 질문함 = 답변 대기, 과제·복습 관리 = 피드백 대기 + 재검토 대기(대시보드와 같은 기준)', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  await pause(page, 600);
+  const side = key => page.$eval(`.side-link[data-page="${key}"]`, el => [el.querySelector('.side-badge')?.textContent || '', el.querySelector('.side-badge-text')?.textContent || '']);
+  eq(await side('questions'), ['1', ', 답변 대기 질문 1건'], '질문함 배지');
+  eq(await side('feedback'), ['4', ', 피드백·재검토 대기 4건'], '과제·복습 관리 배지');
+  // 강사가 피드백을 남기면 줄어듦
+  await page.evaluate(() => window.__mock.remoteWrite('classes/c1/weeks/w1/submissions/s2', { feedbacks: [{ id: 'x1', text: '좋아요', createdAt: new Date().toISOString(), forRevision: 1 }] }));
+  await pause(page, 500);
+  eq((await side('feedback'))[0], '3', '피드백 뒤 배지');
+  await page.evaluate(() => window.__mock.remoteWrite('classes/c1/questions/q2', { status: 'answered', needsTeacherReply: false }));
+  await pause(page, 500);
+  eq(await side('questions'), ['', ''], '답변 뒤 질문함 배지');
+});
+
+test('ST08 강사 응시 기록: 틀린 문제 연습은 "틀린 문제 다시 풀기"로 따로 표시, 그 문항만 보여 줌', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  await page.evaluate(() => window.__mock.remoteWrite('classes/c1/weeks/w1/quizResults/s2/attempts/p1', { userId: 's2', answers: ['2', '0,2'], answersById: { q11: [2], q12: [0, 2] }, questionIds: ['q11', 'q12'], quizVersion: 1, score: 2, total: 2, attemptNumber: 1, mode: 'wrongOnly', submittedAt: window.__mock.ts(Date.now()) }));
+  await page.click('[data-page="feedback"]'); await pause(page, 500);
+  await page.click('[data-feedback-tab="quizResults"]'); await pause(page, 500);
+  await page.selectOption('#admin-week-picker', 'w1'); await pause(page, 700);
+  await page.click('[data-feedback-uid="s2"]'); await pause(page, 400);
+  await page.click('[data-attempt-history] > summary'); await pause(page, 700);
+  const rows = await page.$$eval('[data-attempt-content] > details', els => els.map(e => e.querySelector('summary').innerText.replace(/\s+/g, ' ')));
+  assert(rows.length === 2 && rows[0].includes('1번째 응시') && rows[1].includes('틀린 문제 다시 풀기') && rows[1].includes('연습 2/2'), '응시 기록: ' + rows.join(' | '));
+  await page.click('[data-attempt-content] > details:nth-child(2) > summary'); await pause(page, 200);
+  const lines = await page.$$eval('[data-attempt-content] > details:nth-child(2) p.hint', els => els.length);
+  assert(lines === 3, '연습 문항 수(설명 1줄 + 문항 2줄): ' + lines);
 });
 
 test('기본: 학생 과제 텍스트 제출, 퀴즈 3/3, 강사 화면 주요 메뉴 오류 없음', async b => {

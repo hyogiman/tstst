@@ -11,16 +11,18 @@
 .student-header .row{gap:6px;flex-wrap:nowrap}
 .student-header .user-pill,.student-header .pill{background:var(--surface);border:1px solid var(--line);color:var(--ink-2);font-size:13px;padding:6px 12px}
 
-/* 하단 메뉴: 떠 있는 탭 바 + 선 아이콘 */
+/* 하단 메뉴: 떠 있는 탭 바 + 선 아이콘 (D6: 5개). 라벨은 12px 아래로 줄이지 않고, 좁은 화면에서는 아이콘을 줄입니다. */
 .student-nav{position:fixed;z-index:40;left:50%;bottom:14px;transform:translateX(-50%);width:min(620px,calc(100% - 20px));padding:6px calc(6px + env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) calc(6px + env(safe-area-inset-left));border-radius:22px;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);border:1px solid var(--line);box-shadow:0 18px 50px rgba(42,32,36,.16)}
-.student-nav-inner{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:2px}
+.student-nav-inner{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px}
 .nav-item{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:0;min-height:58px;padding:6px 2px;border:0;border-radius:16px;background:transparent;color:var(--muted);font-size:12px;font-weight:700;letter-spacing:-.02em;transition:background .15s,color .15s}
-.nav-item>span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.nav-icon{display:grid;place-items:center;width:24px;height:24px}
+.nav-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.nav-icon{position:relative;display:grid;place-items:center;width:24px;height:24px}
 .nav-icon svg{width:22px;height:22px}
 .nav-item:hover{color:var(--ink)}
-.nav-item.active{color:var(--wine-600);background:var(--wine-50)}
+.nav-item.active{color:var(--wine-700);background:var(--wine-50);font-weight:800}
 .nav-item.active::before{content:'';position:absolute;top:4px;width:18px;height:3px;border-radius:3px;background:var(--wine-600)}
+/* 새 소식 배지: 숫자 + aria-label(예: '과제, 새 피드백 1개') */
+.nav-badge{position:absolute;top:-6px;right:-10px;min-width:18px;height:18px;padding:0 5px;border-radius:var(--r-pill);background:var(--wine-600);color:#fff;font-size:11px;font-weight:800;line-height:18px;text-align:center;box-shadow:0 0 0 2px var(--surface)}
 
 /* 페이지 머리 */
 .page-head{padding:2px 0}
@@ -71,7 +73,6 @@
 .past-banner strong{display:block;color:var(--ink);font-size:15px}
 .past-banner span{display:block;color:var(--ink-2);font-size:13px;line-height:1.55}
 .past-banner .btn{flex-shrink:0}
-.student-nav.is-past .student-nav-inner{grid-template-columns:repeat(5,minmax(0,1fr))}
 .past-classes{margin-top:16px}
 .past-classes .hint{margin:6px 0 14px}
 .past-class-list{display:flex;flex-direction:column;gap:8px}
@@ -82,7 +83,50 @@
 .past-answer-text{white-space:pre-wrap;overflow-wrap:anywhere}
 .quiz-note{margin-top:12px}
 
-/* 우리 반 */
+/* 홈 (배치 10 · D6 B안): 넓은 화면은 두 칸, 휴대폰은 다음 수업 → 할 일 → 새 소식 → 예습 → 출석 순서 */
+.home-grid{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:16px;align-items:start}
+.home-next h2{font-size:22px}
+.home-next-date{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:16px}
+.home-todo h3,.home-news h3,.home-attendance h3{font-size:17px}
+.home-news h3 small,.student-feedback h3 small,.classmates-card h3 small{margin-left:4px;font-size:13px;font-weight:700;color:var(--muted)}
+.todo-list{display:flex;flex-direction:column;margin:8px 0 0;padding:0;list-style:none}
+.todo-row{display:grid;grid-template-columns:40px minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.todo-row:last-child{border-bottom:0;padding-bottom:0}
+.todo-kind{font-size:13px;font-weight:800;color:var(--ink-2)}
+.todo-main{display:flex;flex-direction:column;gap:3px;min-width:0}
+.todo-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.todo-week{font-size:13px;font-weight:600;color:var(--muted)}
+.todo-main small{font-size:12px;line-height:1.5;color:var(--muted)}
+.news-list{display:flex;flex-direction:column;gap:6px;margin:10px 0 0;padding:0;list-style:none}
+.news-item{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;min-height:46px;padding:10px 14px;border:1px solid var(--wine-100);border-radius:var(--r-sm);background:var(--wine-50);color:var(--ink);font-size:14px;font-weight:650;text-align:left}
+.news-item:hover{border-color:var(--wine-200)}
+.news-item span:first-child{overflow-wrap:anywhere}
+.home-preview-text{margin:6px 0;color:var(--ink-2);font-size:14px;line-height:1.7}
+.home-preview .btn{margin-top:12px}
+.home-attendance-count{margin:8px 0 2px;font-size:15px}
+.home-attendance-count strong{font-family:var(--font-display);font-size:30px;font-weight:600;color:var(--ink)}
+.home-attendance .linkbutton{margin-top:10px}
+
+/* 과제 (배치 10): 제출한 답안을 먼저, 편집 폼은 [수정해서 다시 제출]로 엽니다 */
+.submitted-text{padding:14px 16px;border-radius:var(--r-md);background:var(--surface-2);font-size:16px;line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere}
+#assignment-area .student-feedback{margin-top:0}
+.feedback-meta{margin-bottom:6px;color:var(--saffron-600);font-size:12px;font-weight:700;line-height:1.8}
+.feedback-meta .pill{margin-left:4px;vertical-align:1px}
+.feedback .feedback-meta strong{display:inline;margin:0}
+.feedback-text{white-space:pre-wrap;overflow-wrap:anywhere}
+.feedback-audio,.feedback-ask{margin-top:10px}
+.ask-form{margin-top:10px;padding:14px;border-radius:var(--r-md);background:var(--surface);border:1px solid var(--line)}
+.assignment-preview-link{align-self:flex-start}
+
+/* 복습 결과 먼저 (배치 10) */
+.quiz-scores{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.quiz-summary-title{margin:18px 0 2px;font-size:16px}
+.quiz-actions{margin-top:20px}
+.quiz-actions .btn{flex:1 1 auto}
+.question-session-tag{display:inline-block;margin-right:6px;padding:1px 8px;border-radius:var(--r-pill);background:var(--surface-2);border:1px solid var(--line);color:var(--ink-2);font-size:11px;font-weight:700}
+
+/* 우리 반 (내 정보 안의 카드) */
+.classmates-card{margin-top:16px}
 .classmate-card{display:flex;align-items:center;gap:12px;padding:14px 16px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface)}
 .classmate-avatar{width:40px;height:40px;flex-shrink:0;border-radius:13px;display:grid;place-items:center;background:var(--olive-50);color:var(--olive-700);font-weight:800}
 .focus-card{padding:24px;border-radius:var(--r-lg);background:var(--surface);border:1px solid var(--line)}
@@ -100,12 +144,21 @@
   .page-head p{font-size:14px}
   .answer-option{font-size:15px;min-height:58px;padding:12px 14px}
   .student-nav{bottom:8px;border-radius:20px;padding:5px}
-  .nav-item{min-height:56px;font-size:11.5px}
+  .nav-item{min-height:56px}
   .past-banner{flex-direction:column;align-items:stretch;margin-top:-8px}
 }
-@media (max-width:360px){
-  .nav-item{font-size:11px}
-  .nav-icon svg{width:20px;height:20px}
+@media (max-width:760px){
+  .home-grid{display:flex;flex-direction:column;align-items:stretch}
+  .home-main,.home-side{display:contents}
+  .home-next{order:1}.home-todo{order:2}.home-news{order:3}.home-preview{order:4}.home-attendance{order:5}
+}
+@media (max-width:420px){
+  .todo-row{grid-template-columns:36px minmax(0,1fr);row-gap:8px}
+  .todo-row .btn{grid-column:2;justify-self:start}
+}
+@media (max-width:370px){
+  .nav-item{letter-spacing:-.04em;padding:6px 1px}
+  .nav-icon,.nav-icon svg{width:19px;height:19px}
 }
 /* 학생 화면에서는 토스트를 하단 메뉴 위에 띄웁니다 */
 body:has(.student-nav) .toast{bottom:96px}

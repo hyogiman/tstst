@@ -132,12 +132,15 @@ service cloud.firestore {
           get(/databases/$(database)/documents/classes/$(cid)/questions/$(qid)).data.uid == request.auth.uid;}
         allow get, list: if admin() || owner();
         allow create: if member(cid) &&
-          request.resource.data.keys().hasOnly(['uid','studentName','title','content','createdAt','status','needsTeacherReply','lastMessageAt','lastSenderRole']) &&
+          request.resource.data.keys().hasOnly(['uid','studentName','title','content','createdAt','status','needsTeacherReply','lastMessageAt','lastSenderRole','weekId','context']) &&
           request.resource.data.uid == request.auth.uid && request.resource.data.status == 'open' &&
           request.resource.data.get('needsTeacherReply', true) == true &&
           request.resource.data.get('lastSenderRole', 'student') == 'student' &&
           request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 100 &&
-          request.resource.data.content is string && request.resource.data.content.size() > 0 && request.resource.data.content.size() <= 8000;
+          request.resource.data.content is string && request.resource.data.content.size() > 0 && request.resource.data.content.size() <= 8000 &&
+          // 배치 10: 질문에 차시를 연결할 수 있습니다(선택). '이 피드백에 질문하기'는 context로 과제·복습을 구분합니다.
+          request.resource.data.get('weekId', '') is string && request.resource.data.get('weekId', '').size() <= 100 &&
+          request.resource.data.get('context', 'general') in ['general', 'assignment', 'quiz'];
         // P0-03: 학생은 자기 질문에 추가 질문을 남길 때 '답변 대기'로 되돌리는 필드만 바꿀 수 있습니다.
         allow update: if admin() ||
           (signedIn() && resource.data.uid == request.auth.uid && member(cid) &&
@@ -275,13 +278,23 @@ service cloud.firestore {
             allow get, list: if admin() || (signedIn() && request.auth.uid == uid && enrolled(cid) && visible(cid,wid));
             allow create: if signedIn() && request.auth.uid == uid && member(cid) && visible(cid,wid) &&
               get(weekDoc(cid,wid)).data.quiz.enabled == true &&
-              request.resource.data.keys().hasOnly(['userId','answers','answersById','questionIds','quizVersion','score','total','attemptNumber','submittedAt']) &&
+              request.resource.data.keys().hasOnly(['userId','answers','answersById','questionIds','quizVersion','score','total','attemptNumber','submittedAt','mode']) &&
               request.resource.data.get('answersById', {}) is map &&
               request.resource.data.userId == uid && request.resource.data.answers is list && request.resource.data.answers.size() <= 200 &&
               request.resource.data.score is int && request.resource.data.total is int &&
               request.resource.data.score >= 0 && request.resource.data.score <= request.resource.data.total &&
               request.resource.data.attemptNumber is int && request.resource.data.attemptNumber > 0 &&
-              getAfter(/databases/$(database)/documents/classes/$(cid)/weeks/$(wid)/quizResults/$(uid)).data.score == request.resource.data.score;
+              (
+                // 전체 응시: 요약 문서(quizResults)와 같은 일괄 쓰기로 저장합니다.
+                (request.resource.data.get('mode', 'full') == 'full' &&
+                 getAfter(/databases/$(database)/documents/classes/$(cid)/weeks/$(wid)/quizResults/$(uid)).data.score == request.resource.data.score)
+                ||
+                // 배치 10: 틀린 문제만 다시 풀기. 부분 점수는 전체 점수와 비교할 수 없어 요약 문서(점수·첫 응시)는 그대로 두고 기록만 남깁니다.
+                (request.resource.data.get('mode', 'full') == 'wrongOnly' &&
+                 exists(/databases/$(database)/documents/classes/$(cid)/weeks/$(wid)/quizResults/$(uid)) &&
+                 request.resource.data.total >= 1 &&
+                 request.resource.data.total <= get(/databases/$(database)/documents/classes/$(cid)/weeks/$(wid)/quizResults/$(uid)).data.total)
+              );
             allow update, delete: if admin();
           }
         }

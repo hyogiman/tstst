@@ -15,8 +15,8 @@
 <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;1,9..144,500&display=swap">
 <!-- 배포할 때 CSS를 바꾸면 ?v= 값을 함께 올려 브라우저 캐시를 갱신하세요 -->
-<link rel="stylesheet" href="common.css?v=20261029g">
-<link rel="stylesheet" href="student.css?v=20261029g">
+<link rel="stylesheet" href="common.css?v=20261029h">
+<link rel="stylesheet" href="student.css?v=20261029h">
 </head>
 <body>
 <div id="root"></div>
@@ -35,7 +35,7 @@ window.__appStarted=true; // 모듈(외부 SDK 포함)을 모두 불러와 앱�
 
 import { onAuthStateChanged, updateProfile, signOut } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import { doc, getDoc, getDocs, collection, query, where, addDoc, setDoc, updateDoc, serverTimestamp, onSnapshot, runTransaction, writeBatch } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
-import { CONFIGURED, auth, db, $, $$, esc, fmt, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, ensureProfile, mountAuth, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalConfirm, formatDateTime, statusPill, paintPill, needsReply, byLastActivity, feedbackItems, reviewState, toDate, todayKey, daysBetween, audioMarkup, parseAnswer, encodeAnswer, normalizeQuizQuestion, isCorrectAnswer, setErrorAudience, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded, sessionState, sessionDateText, youtubeEmbedUrl } from './common.js?v=20261029g';
+import { CONFIGURED, auth, db, $, $$, esc, fmt, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, ensureProfile, mountAuth, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalConfirm, formatDateTime, statusPill, paintPill, needsReply, byLastActivity, feedbackItems, reviewState, toDate, todayKey, daysBetween, audioMarkup, parseAnswer, encodeAnswer, normalizeQuizQuestion, isCorrectAnswer, answersFor, attendanceValue, dateKeyOf, shortLabel, questionSessionTag, setErrorAudience, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded, sessionState, sessionDateText, youtubeEmbedUrl } from './common.js?v=20261029h';
 
 
 // ===== INDEX PAGE =====
@@ -43,11 +43,17 @@ setErrorAudience('student'); // P1-08: 학생에게는 개발 용어 없는 오�
 installOfflineBanner();
 const root=$('#root');
 // 로그아웃하면 이 초기값으로 되돌립니다(P0-09).
-const studentInitialState=()=>({user:null,profile:null,classes:[],classId:'',weeks:[],weekId:'',tab:'assignment',quiz:null,live:{},activeQuestionId:'',directory:[],enrollmentRealName:'',enrollments:[],hadEnrollment:false,audioDrafts:{},joining:false,pastClasses:[],past:null,seenMarked:{}});
+const studentInitialState=()=>({user:null,profile:null,classes:[],classId:'',weeks:[],weekId:'',tab:'home',news:newsState(),quiz:null,live:{},activeQuestionId:'',directory:[],enrollmentRealName:'',enrollments:[],hadEnrollment:false,audioDrafts:{},joining:false,pastClasses:[],past:null,seenMarked:{}});
 const S=studentInitialState();
-const NAV=[['assignment','pencil','과제'],['quiz','review','복습'],['preview','book','예습'],['questions','chat','질문'],['classmates','people','우리 반'],['mypage','user','내 정보']];
+// D6(B안): 홈 · 과제 · 복습 · 질문 · 내 정보. 예습은 홈과 각 차시 화면에서 열고, '우리 반'은 내 정보 안으로 옮겼습니다.
+// 지난 반(보관된 반)은 홈 대신 '수업 자료'(예습 자료, 강의 영상 제외)를 둡니다.
+const NAV=[['home','home','홈'],['assignment','pencil','과제'],['quiz','review','복습'],['questions','chat','질문'],['mypage','user','내 정보']];
+const PAST_NAV=[['assignment','pencil','과제'],['quiz','review','복습'],['preview','book','수업 자료'],['questions','chat','질문'],['mypage','user','내 정보']];
+// 메뉴에 없는 화면은 가까운 메뉴를 켭니다(예습 → 홈, 예전 '우리 반' → 내 정보).
+const navKey=tab=>tab==='preview'&&!S.past?'home':tab==='classmates'?'mypage':tab==='home'&&S.past?'assignment':tab;
 // 하단 메뉴 아이콘: 강사 화면 사이드바와 같은 선 아이콘(기기마다 모양이 달라지는 이모지 대신)
 const NAV_ICONS={
+ home:'<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/>',
  pencil:'<path d="M4 20h4L19.5 8.5a2.8 2.8 0 0 0-4-4L4 16v4z"/><path d="m13.5 6.5 4 4"/>',
  review:'<path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 3.5V8h4.5"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 20.5V16h-4.5"/>',
  book:'<path d="M12 7C8 4 5 4 2 5v14c3-1 6-1 10 2 4-3 7-3 10-2V5c-3-1-6-1-10 2zM12 7v14"/>',
@@ -59,7 +65,7 @@ const navIcon=name=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 const week=()=>S.weeks.find(w=>w.id===S.weekId);
 const currentClass=()=>S.classes.find(c=>c.id===S.classId);
 function stopLive(key){if(S.live[key]){S.live[key]();delete S.live[key]}}
-function clearPageLive(){for(const k of Object.keys(S.live))if(!['enrollments','weeks','classSchedule'].includes(k))stopLive(k)}
+function clearPageLive(){for(const k of Object.keys(S.live))if(!['enrollments','weeks','classSchedule'].includes(k)&&!k.startsWith('news:'))stopLive(k)}
 function onLiveError(err){console.error('실시간 구독 실패',err);toast('실시간 연결을 확인해 주세요: '+ex(err),true)}
 // 실시간 비교에서는 저장 시각만 바뀐 경우를 무시합니다.
 const comparableWeeks=list=>JSON.stringify(list.map(({updatedAt,createdAt,...rest})=>rest));
@@ -71,6 +77,7 @@ function studentHasUnsavedWork(){
   if(z&&!z.finished&&z.answers.some(a=>Array.isArray(a)?a.length:a!==null))return true;
   const text=$('#assignment-text');
   if(text&&text.value.trim()!==(text.dataset.saved||'').trim())return true;
+  if($$('[data-feedback-question] textarea').some(t=>t.value.trim()))return true; // '이 피드백에 질문하기'를 쓰는 중
   return S.tab==='assignment'&&!!S.audioDrafts[assignmentDraftKey()];
 }
 // P0-10: 작업 중(저장 안 한 작업, 입력칸 사용 중, 퀴즈 결과 확인 중)이면 화면을 다시 그리지 않습니다.
@@ -85,7 +92,9 @@ function startWeekLive(){stopLive('weeks');if(!S.classId)return;const cid=S.clas
     const incoming=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.order??0)-(b.order??0));
     if(comparableWeeks(S.weeks)===comparableWeeks(incoming))return;
     const viewingGone=!!S.weekId&&!incoming.some(w=>w.id===S.weekId);
+    const sameSessions=S.weeks.map(w=>w.id).join()===incoming.map(w=>w.id).join();
     S.weeks=incoming;
+    if(!sameSessions)startNewsLive(); // 새로 공개되거나 비공개로 바뀐 차시에 맞춰 새 소식 구독을 다시 엽니다
     if(isStudentBusy()){
       showLiveNotice($('#student-body'),viewingGone?'지금 보고 있는 차시가 비공개로 바뀌었어요.':'선생님이 학습 자료를 업데이트했어요.','지금 반영',applyWeekUpdate);
       return;
@@ -150,20 +159,172 @@ function startEnrollmentLive(){stopLive('enrollments');
     S.pastClasses=past;
     const next=picked?.cls.id||'';
     if(next===S.classId)return;
-    stopLive('weeks');stopLive('classSchedule');clearPageLive();
+    stopLive('weeks');stopLive('classSchedule');clearPageLive();stopNewsLive();
     S.classId=next;S.classes=picked?[picked.cls]:[];S.weeks=[];S.weekId='';S.quiz=null;
     S.enrollmentRealName=String(picked?.enrollment.studentName||'').trim();
-    if(next){try{await loadWeeks();startWeekLive();startClassScheduleLive()}catch(e){onLiveError(e)}}
+    if(next){try{await loadWeeks();startWeekLive();startClassScheduleLive();startNewsLive()}catch(e){onLiveError(e)}}
     frame();toast(next?'선생님이 지정한 반 정보가 반영되었어요.':'수강 상태가 바뀌었어요.');
   },onLiveError);
 }
 
+// ---------- 새 소식 · 배지 (배치 10 · P2-08) ----------
+// 새 피드백: 피드백 시각 > 내가 본 시각(studentSeenFeedbackAt). 새 답변: 선생님이 마지막으로 말했고 lastMessageAt > studentSeenAt.
+// 최근 공개 차시 6개는 내 제출·복습 결과를 실시간으로 보고, 그 이전 차시는 한 번 읽습니다.
+// 새로 여는 구독: 차시당 2개(최대 12개) + 내 질문 목록 1개. 화면을 옮겨도 유지하고, 반이 바뀌거나 로그아웃하면 정리합니다.
+const NEWS_LIVE_SESSIONS=6;
+function newsState(){return {classId:'',submissions:{},quizResults:{},questions:[]}}
+// 확인 시각이 서버에 저장되기 전(null)은 '방금 봄'으로 셉니다.
+const seenAt=v=>v===null?Number.MAX_SAFE_INTEGER:(toDate(v)?.getTime()||0);
+const newestFeedbackAt=d=>Math.max(0,...feedbackItems(d).map(f=>toDate(f.createdAt)?.getTime()||0));
+const hasNewFeedback=d=>!!d&&newestFeedbackAt(d)>seenAt(d.studentSeenFeedbackAt);
+const hasNewAnswer=q=>q?.lastSenderRole==='admin'&&(toDate(q.lastMessageAt)?.getTime()||0)>seenAt(q.studentSeenAt);
+let newsTimer=null;
+function stopNewsLive(){for(const k of Object.keys(S.live))if(k.startsWith('news:'))stopLive(k);S.news=newsState();paintNavBadges()}
+function startNewsLive(){
+  stopNewsLive();
+  if(!S.classId||S.past||!S.user)return;
+  const cid=S.classId,uid=S.user.uid;S.news.classId=cid;
+  const live=new Set(S.weeks.slice(-NEWS_LIVE_SESSIONS).map(w=>w.id));
+  const keep=(kind,wid,d)=>{if(S.news.classId!==cid)return;S.news[kind][wid]=d;newsChanged()};
+  for(const w of S.weeks)for(const kind of ['submissions','quizResults']){
+    const ref=doc(db,'classes',cid,'weeks',w.id,kind,uid);
+    if(live.has(w.id))S.live[`news:${kind}:${w.id}`]=onSnapshot(ref,snap=>keep(kind,w.id,snap.exists()?snap.data():null),err=>console.warn('새 소식 구독 실패',kind,w.id,err));
+    else getDoc(ref).then(snap=>keep(kind,w.id,snap.exists()?snap.data():null)).catch(err=>console.warn('새 소식 조회 실패',kind,w.id,err));
+  }
+  S.live['news:questions']=onSnapshot(query(collection(db,'classes',cid,'questions'),where('uid','==',uid)),snap=>{
+    if(S.news.classId!==cid)return;S.news.questions=snap.docs.map(d=>({id:d.id,...d.data()}));newsChanged();
+  },err=>console.warn('질문 소식 구독 실패',err));
+}
+function newsChanged(){clearTimeout(newsTimer);newsTimer=setTimeout(()=>{paintNavBadges();if(S.tab==='home')drawHomeLive()},60)}
+// 새 소식 목록(최근 것부터): 과제·복습 피드백은 차시별 1건, 질문은 질문별 1건
+function newsItems(){
+  if(S.past)return [];
+  const items=[];
+  for(const w of S.weeks){
+    const sub=S.news.submissions[w.id],quiz=S.news.quizResults[w.id];
+    if(hasNewFeedback(sub))items.push({kind:'assignment',weekId:w.id,text:`새 피드백 · ${shortLabel(w.label)} 과제`,at:newestFeedbackAt(sub)});
+    if(hasNewFeedback(quiz))items.push({kind:'quiz',weekId:w.id,text:`새 피드백 · ${shortLabel(w.label)} 복습`,at:newestFeedbackAt(quiz)});
+  }
+  for(const q of S.news.questions)if(hasNewAnswer(q))items.push({kind:'questions',questionId:q.id,text:`질문 답변 도착 · ${q.title||'내 질문'}`,at:toDate(q.lastMessageAt)?.getTime()||0});
+  return items.sort((a,b)=>b.at-a.at);
+}
+// 하단 메뉴 배지: 숫자 + 화면 읽기 도구용 설명(예: '과제, 새 피드백 1개')
+function paintNavBadges(){
+  const count={assignment:0,quiz:0,questions:0};
+  for(const item of newsItems())count[item.kind]++;
+  const what={assignment:'새 피드백',quiz:'새 피드백',questions:'새 답변'};
+  for(const btn of $$('.nav-item[data-tab]')){
+    const key=btn.dataset.tab,n=count[key]||0,label=btn.dataset.label||'';
+    let badge=$('.nav-badge',btn);
+    if(n){
+      if(!badge){badge=document.createElement('span');badge.className='nav-badge';badge.setAttribute('aria-hidden','true');$('.nav-icon',btn)?.append(badge)}
+      badge.textContent=n>9?'9+':String(n);btn.setAttribute('aria-label',`${label}, ${what[key]} ${n}개`);
+    }else{badge?.remove();btn.setAttribute('aria-label',label)}
+  }
+}
+// 화면 이동(하단 메뉴·홈 카드 공용). 예습은 메뉴에 없어서 홈 아래 화면으로 엽니다.
+function goTab(tab,{weekId='',questionId=''}={}){
+  if(weekId&&S.weeks.some(w=>w.id===weekId))S.weekId=weekId;
+  else if(tab==='preview'&&!S.past)S.weekId=upcomingWeekId()||S.weekId;
+  if(questionId)S.activeQuestionId=questionId;
+  S.tab=tab;S.quiz=null;
+  history.pushState({senorayuStudent:true,tab},'','#'+tab);
+  renderBody();window.scrollTo(0,0);
+}
+
+// ---------- 홈 (배치 10 · D6 B안) ----------
+// 다음 수업 · 이번 차시 할 일 · 새 소식 · 예습 미리보기 · 출석 요약. 수업 시각 필드는 없어 날짜만 씁니다(D10 한국 시간).
+const relativeDay=date=>{const n=daysBetween(todayKey(),date);return n===0?'오늘':n===1?'내일':n===2?'모레':n>0?`${n}일 뒤`:`${-n}일 전`};
+// 반 일정 사본(비공개 차시 포함, 이름·날짜)에 공개된 차시 문서를 붙입니다. 사본이 없으면 공개 차시만 씁니다.
+function classSessions(){
+  const published=new Map(S.weeks.map(w=>[w.id,w])),sch=currentClass()?.schedule||[];
+  const list=sch.length?sch.map(x=>({id:x.weekId,label:x.label||published.get(x.weekId)?.label||'차시',date:x.date||published.get(x.weekId)?.sessionDate||'',week:published.get(x.weekId)||null}))
+    :S.weeks.map(w=>({id:w.id,label:w.label,date:sessionDateOf(w),week:w}));
+  return list.map(x=>({...x,state:sessionState({date:x.date})}));
+}
+// 다음 수업: 오늘 수업이 있으면 오늘, 없으면 가장 가까운 다가오는 수업
+const nextSession=()=>classSessions().filter(x=>x.date&&x.state!=='done').sort((a,b)=>a.date.localeCompare(b.date))[0]||null;
+// 이번 차시(과제·복습 기준): 수업한 차시(오늘 포함) 중 과제나 복습이 켜진 가장 최근 차시. 날짜를 정하지 않은 반이면 마지막 공개 차시
+const hasTasks=w=>!!(w?.assignment?.enabled||(w?.quiz?.enabled&&w.quiz.questions?.length));
+function currentTaskWeek(){
+  const held=[...S.weeks].reverse().find(w=>hasTasks(w)&&['done','today'].includes(sessionState({date:sessionDateOf(w)})));
+  return held||(S.weeks.some(w=>sessionDateOf(w))?null:[...S.weeks].reverse().find(hasTasks))||null;
+}
+// 과제 상태(학생에게 보이는 말): D3에 따라 권장일은 안내만 하고, 지난 뒤 제출도 그대로 인정합니다.
+function assignmentStatus(w,d){
+  if(!d){
+    const due=toDate(w.assignment?.dueAtTs||w.assignment?.dueAt);
+    const days=due?daysBetween(todayKey(),todayKey(due)):null;
+    return {pill:statusPill('neutral','미제출'),note:days===null?'':days<0?'권장일이 지났지만 지금 제출해도 괜찮아요':days===0?'제출 권장일 오늘까지':`제출 권장일 D-${days}`,action:'과제 하기'};
+  }
+  if(hasNewFeedback(d))return {pill:statusPill('brand','새 피드백'),note:'선생님 피드백이 도착했어요',action:'피드백 보기'};
+  const state=reviewState(d),revised=(Number(d.revision)||1)>1;
+  if(state==='done')return {pill:statusPill('success','피드백 받음'),note:revised?`${Number(d.revision)}차 제출`:'',action:'답안 보기'};
+  if(revised)return {pill:statusPill('success','수정본 제출함'),note:'선생님이 다시 확인할 거예요',action:'답안 보기'};
+  return {pill:statusPill('success','제출함'),note:'선생님 확인을 기다리는 중',action:'답안 보기'};
+}
+const scorePct=(score,total)=>Math.round(100*(Number(score)||0)/Math.max(1,Number(total)||1));
+function quizStatus(d){
+  if(!d)return {pill:statusPill('neutral','미응시'),note:'',action:'복습하기'};
+  if(hasNewFeedback(d))return {pill:statusPill('brand','새 피드백'),note:'선생님 피드백이 도착했어요',action:'결과 보기'};
+  const first=d.firstAttempt||d;
+  return {pill:statusPill('success',`첫 점수 ${scorePct(first.score,first.total)}%`),note:'다시 풀기 가능',action:'결과 보기'};
+}
+// 예습 자료 미리보기 글(서식을 뺀 앞부분)
+function previewExcerpt(p){
+  if(!p)return '';
+  if(p.mode==='image')return '이미지로 정리된 예습 자료가 있어요.';
+  const html=sanitizeRich(p.richHtml||'').replace(/<\/(p|h[1-6]|li|div|blockquote|tr)>|<br\s*\/?>/gi,m=>' '+m); // 문단 사이를 띄어 이어 붙입니다
+  const text=new DOMParser().parseFromString(html,'text/html').body.textContent.replace(/\s+/g,' ').trim();
+  return text.length>120?text.slice(0,120)+'…':text;
+}
+function renderHome(body){
+  const name=((S.profile?.displayName==='수강생'&&S.user?.displayName)?S.user.displayName:S.profile?.displayName)||'';
+  body.innerHTML=`${bodyHeader(`¡Hola${name?', '+esc(name):''}!`,'오늘 할 일과 새 소식을 확인해 보세요.')}<div class="home-grid"><div class="stack home-main" id="home-main"></div><div class="stack home-side"><section class="card home-news" id="home-news" aria-labelledby="home-news-title"></section><section class="card home-attendance" id="home-attendance" aria-labelledby="home-attendance-title"><h3 id="home-attendance-title">출석</h3><div class="loading">출석 기록 확인 중</div></section></div></div>`;
+  drawHomeLive();drawHomeAttendance();
+}
+// 새 소식이 오면 다시 그리는 부분(다음 수업·할 일·예습·새 소식)
+function drawHomeLive(){
+  const main=$('#home-main'),newsBox=$('#home-news');if(!main||!newsBox)return;
+  const next=nextSession(),tw=currentTaskWeek();
+  const nextCard=next?`<section class="card home-next" aria-labelledby="home-next-title"><p class="eyebrow">PRÓXIMA CLASE · 다음 수업</p><h2 id="home-next-title">${esc(next.label)}</h2><p class="home-next-date"><strong>${esc(sessionDateText(next.date))}</strong><span class="pill brand">${esc(relativeDay(next.date))}</span></p></section>`
+    :`<section class="card home-next"><p class="eyebrow">PRÓXIMA CLASE · 다음 수업</p><h2>다음 수업 날짜가 아직 없어요</h2><p class="hint">선생님이 수업 일정을 정하면 여기에 보여요.</p></section>`;
+  const row=(kind,week,status,target)=>`<li class="todo-row"><span class="todo-kind">${kind}</span><div class="todo-main"><div class="todo-line">${status.pill}<span class="todo-week">${esc(shortLabel(week.label))}</span></div>${status.note?`<small>${esc(status.note)}</small>`:''}</div><button type="button" class="btn secondary small" data-home-go="${target}" data-week="${esc(week.id)}">${esc(status.action)}</button></li>`;
+  const rows=[];
+  const pw=next?.week;
+  if(pw?.preview?.enabled)rows.push(`<li class="todo-row"><span class="todo-kind">예습</span><div class="todo-main"><div class="todo-line">${statusPill('brand','자료 있음')}<span class="todo-week">${esc(shortLabel(pw.label))}</span></div><small>${esc(relativeDay(next.date))} 수업 전에 보면 좋아요</small></div><button type="button" class="btn secondary small" data-home-go="preview" data-week="${esc(pw.id)}">자료 보기</button></li>`);
+  if(tw?.assignment?.enabled)rows.push(row('과제',tw,assignmentStatus(tw,S.news.submissions[tw.id]),'assignment'));
+  if(tw?.quiz?.enabled&&tw.quiz.questions?.length)rows.push(row('복습',tw,quizStatus(S.news.quizResults[tw.id]),'quiz'));
+  const todo=`<section class="card home-todo" aria-labelledby="home-todo-title"><h3 id="home-todo-title">이번 차시 할 일</h3>${rows.length?`<ul class="todo-list">${rows.join('')}</ul>`:'<p class="hint">지금은 할 일이 없어요. 선생님이 과제나 복습을 열면 여기에 보여요.</p>'}</section>`;
+  const preview=pw?.preview?.enabled?`<section class="card home-preview" aria-labelledby="home-preview-title"><p class="eyebrow">PREPARACIÓN · 예습</p><h3 id="home-preview-title">${esc(pw.preview.title&&pw.preview.title!=='다음 차시'?pw.preview.title:`${shortLabel(pw.label)} 예습`)}</h3>${previewExcerpt(pw.preview)?`<p class="home-preview-text">${esc(previewExcerpt(pw.preview))}</p>`:''}<p class="hint">${[(pw.preview.videos||[]).length?`영상 ${(pw.preview.videos||[]).length}개`:'',(pw.preview.files||[]).length?`첨부 자료 ${(pw.preview.files||[]).length}개`:''].filter(Boolean).join(' · ')||`${esc(shortLabel(pw.label))} 수업 전에 볼 자료`}</p><button type="button" class="btn small" data-home-go="preview" data-week="${esc(pw.id)}">예습 자료 보기 →</button></section>`:'';
+  main.innerHTML=nextCard+todo+preview;
+  const items=newsItems();
+  newsBox.innerHTML=`<h3 id="home-news-title">새 소식${items.length?` <small>${items.length}</small>`:''}</h3>${items.length?`<ul class="news-list">${items.map(i=>`<li><button type="button" class="news-item" data-home-go="${i.kind}" data-week="${esc(i.weekId||'')}" data-question="${esc(i.questionId||'')}"><span>${esc(i.text)}</span><span aria-hidden="true">→</span></button></li>`).join('')}</ul>`:'<p class="hint">새 소식이 없어요. 피드백이나 답변이 오면 여기에 보여요.</p>'}`;
+  for(const el of $$('[data-home-go]',$('#student-body')))el.onclick=()=>goTab(el.dataset.homeGo,{weekId:el.dataset.week,questionId:el.dataset.question});
+}
+// 출석 요약: 등록한 날 이후 지난 수업 중 출석 수. 자세한 기록은 내 정보에서 봅니다.
+async function drawHomeAttendance(){
+  const box=$('#home-attendance');if(!box)return;
+  const cid=S.classId,mine=S.enrollments.find(e=>e.classId===cid&&e.status==='active');
+  const joined=dateKeyOf(mine?.joinedAt);
+  const held=classSessions().filter(x=>x.state==='done'&&(!joined||!x.date||x.date>=joined));
+  const title='<h3 id="home-attendance-title">출석</h3>';
+  if(!held.length){box.innerHTML=title+'<p class="hint">아직 지난 수업이 없어요.</p>';return}
+  try{
+    const values=await Promise.all(held.map(x=>getDoc(doc(db,'classes',cid,'weeks',x.id,'attendance',S.user.uid)).then(d=>attendanceValue(d.exists()?d.data().status:''))));
+    if(S.tab!=='home'||S.classId!==cid||!box.isConnected)return;
+    const present=values.filter(v=>v==='present').length,absent=values.filter(v=>v==='absent').length,blank=values.length-present-absent;
+    box.innerHTML=`${title}<p class="home-attendance-count"><strong>${present}</strong> / ${values.length}차시 출석</p><p class="hint">${[absent?`불참 ${absent}`:'',blank?`미입력 ${blank}`:''].filter(Boolean).join(' · ')||'지난 수업에 모두 출석했어요'}</p><button type="button" class="linkbutton" data-home-go="mypage">내 정보에서 자세히 보기 →</button>`;
+    $('[data-home-go]',box).onclick=()=>goTab('mypage');
+  }catch(e){if(box.isConnected)showLoadFailed(box,()=>drawHomeAttendance(),e)}
+}
+
 const wselect=()=>`<select id="student-week-picker" class="input week-chooser">${S.weeks.map(w=>`<option value="${esc(w.id)}" ${w.id===S.weekId?'selected':''}>${esc(w.label)}</option>`).join('')}</select>`;
-function enterStudentHistory(){if(history.state?.senorayuStudent)return;history.replaceState({senorayuStudent:true,tab:'assignment'},'');history.pushState({senorayuStudent:true,tab:S.tab},'','#'+S.tab)}
-window.addEventListener('popstate',e=>{if(!S.user||!document.querySelector('.student-app'))return;S.tab=e.state?.senorayuStudent?e.state.tab:'assignment';S.quiz=null;renderBody()});
+function enterStudentHistory(){if(history.state?.senorayuStudent)return;history.replaceState({senorayuStudent:true,tab:'home'},'');history.pushState({senorayuStudent:true,tab:S.tab},'','#'+S.tab)}
+window.addEventListener('popstate',e=>{if(!S.user||!document.querySelector('.student-app'))return;S.tab=e.state?.senorayuStudent?e.state.tab:'home';S.quiz=null;renderBody()});
 function frame(){
   enterStudentHistory();
-  root.innerHTML=`<div class="student-app"><header class="student-header"><div class="brand"><div class="logo"><img src="senorayu-mark.svg" alt="쎄뇨라유 스페인어 로고"></div><div><strong>쎄뇨라유 스페인어</strong><small>MI ESPACIO DE ESPAÑOL</small></div></div><div class="row"><span class="pill user-pill">${esc(((S.profile?.displayName==='수강생'&&S.user?.displayName)?S.user.displayName:S.profile?.displayName)||S.user?.displayName||'수강생')} 님</span><button id="student-logout" class="btn ghost small">로그아웃</button></div></header>${S.past?`<div class="past-banner" role="note"><div><strong>지난 반 · ${esc(currentClass()?.name||'')}</strong><span>수업이 끝난 반이에요. 기록은 읽기만 할 수 있고, 강의 영상은 볼 수 없어요.</span></div><button type="button" class="btn secondary small" id="past-exit">돌아가기</button></div>`:''}<main id="student-body"></main></div><nav class="student-nav ${S.past?'is-past':''}" aria-label="하단 메뉴"><div class="student-nav-inner">${(S.past?NAV.filter(([key])=>key!=='classmates'):NAV).map(([key,icon,label])=>`<button type="button" class="nav-item ${S.tab===key?'active':''}" data-tab="${key}" aria-label="${label}"><span class="nav-icon">${navIcon(icon)}</span><span>${label}</span></button>`).join('')}</div></nav>`;
+  root.innerHTML=`<div class="student-app"><header class="student-header"><div class="brand"><div class="logo"><img src="senorayu-mark.svg" alt="쎄뇨라유 스페인어 로고"></div><div><strong>쎄뇨라유 스페인어</strong><small>MI ESPACIO DE ESPAÑOL</small></div></div><div class="row"><span class="pill user-pill">${esc(((S.profile?.displayName==='수강생'&&S.user?.displayName)?S.user.displayName:S.profile?.displayName)||S.user?.displayName||'수강생')} 님</span><button id="student-logout" class="btn ghost small">로그아웃</button></div></header>${S.past?`<div class="past-banner" role="note"><div><strong>지난 반 · ${esc(currentClass()?.name||'')}</strong><span>수업이 끝난 반이에요. 기록은 읽기만 할 수 있고, 강의 영상은 볼 수 없어요.</span></div><button type="button" class="btn secondary small" id="past-exit">돌아가기</button></div>`:''}<main id="student-body"></main></div><nav class="student-nav ${S.past?'is-past':''}" aria-label="하단 메뉴"><div class="student-nav-inner">${(S.past?PAST_NAV:NAV).map(([key,icon,label])=>`<button type="button" class="nav-item ${navKey(S.tab)===key?'active':''}" data-tab="${key}" data-label="${label}" aria-label="${label}"${navKey(S.tab)===key?' aria-current="page"':''}><span class="nav-icon">${navIcon(icon)}</span><span class="nav-label">${label}</span></button>`).join('')}</div></nav>`;
   $('#student-logout').addEventListener('click',async()=>{
     // P1-07: 공용 PC에서 다음 사람이 보지 않도록 이 기기의 임시 저장 답안을 지웁니다.
     flushAssignmentDraft();
@@ -172,8 +333,8 @@ function frame(){
     resetStudentSession();signOut(auth); // P0-09: 구독을 먼저 끊고 로그아웃
   });
   $('#past-exit')?.addEventListener('click',closePastClass);
-  $$('[data-tab]').forEach(b=>b.addEventListener('click',()=>{S.tab=b.dataset.tab;if(S.tab==='preview'&&!S.past)S.weekId=upcomingWeekId()||S.weekId;history.pushState({senorayuStudent:true,tab:S.tab},'','#'+S.tab);S.quiz=null;renderBody()}));
-  renderBody();
+  $$('[data-tab]').forEach(b=>b.addEventListener('click',()=>goTab(b.dataset.tab)));
+  renderBody();paintNavBadges();
 }
 function bodyHeader(title,description){return `<div class="page-head"><div class="eyebrow">LEARNING JOURNEY</div><h1>${title}</h1><p>${description}</p></div>`}
 function weekHeader(title,description){return `<div class="section-title"><div>${bodyHeader(title,description)}</div>${S.weeks.length?wselect():''}</div>`}
@@ -181,12 +342,16 @@ function weeklyPicker(){ $('#student-week-picker')?.addEventListener('change',e=
 function renderBody(){
   flushAssignmentDraft(); // P1-07: 화면을 옮기기 전에 작성 중인 답안을 임시 저장
   stopRecordingForNavigation(); // P0-02: 화면을 옮기면 녹음을 멈춥니다.
-  clearPageLive();$$('.nav-item').forEach(el=>el.classList.toggle('active',el.dataset.tab===S.tab));const body=$('#student-body');if(!body)return;
+  clearPageLive();
+  if(S.tab==='classmates')S.tab='mypage'; // 예전 '우리 반' 화면은 내 정보 안으로 옮겼습니다
+  if(S.tab==='home'&&S.past)S.tab='assignment';
+  $$('.nav-item').forEach(el=>{const on=el.dataset.tab===navKey(S.tab);el.classList.toggle('active',on);if(on)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current')});
+  const body=$('#student-body');if(!body)return;
   if(!S.classes.length){renderJoin(body);return}
   if(S.weeks.length&&!S.weeks.some(w=>w.id===S.weekId))S.weekId=S.weeks.at(-1).id;
+  if(S.tab==='home'){renderHome(body);return}
   if(S.tab==='mypage'){renderMyPage(body);return}
   if(S.tab==='questions'){renderQuestions(body);return}
-  if(S.tab==='classmates'){renderClassmates(body);return}
   if(!S.weeks.length){body.innerHTML=S.past?bodyHeader('지난 반 자료','이 반에는 볼 수 있는 차시가 없어요.')+empty('공개된 차시가 없습니다'):bodyHeader('첫 수업을 준비하고 있어요','선생님이 학습 자료를 공개하면 이곳에서 확인할 수 있어요.')+empty('아직 공개된 차시가 없습니다','선생님이 학습 자료를 게시한 뒤 다시 확인해 주세요.');return}
   if(S.tab==='assignment')renderAssignment(body);
   if(S.tab==='quiz')renderQuiz(body);
@@ -236,7 +401,7 @@ async function loadStudent(){
   const snaps=await getDocs(query(collection(db,'enrollments'),where('uid','==',S.user.uid)));
   S.enrollments=snaps.docs.map(d=>({id:d.id,...d.data()}));
   S.hadEnrollment=S.enrollments.length>0;
-  stopLive('weeks');stopLive('classSchedule');clearPageLive();
+  stopLive('weeks');stopLive('classSchedule');clearPageLive();stopNewsLive();
   S.past=null;S.classes=[];S.classId='';S.weeks=[];S.weekId='';S.quiz=null;
   const {current:picked,past}=await sortEnrollments(S.enrollments);
   S.pastClasses=past;
@@ -246,7 +411,7 @@ async function loadStudent(){
     if(!S.profile?.assignedClassId){try{await updateDoc(doc(db,'users',S.user.uid),{assignedClassId:S.classId});S.profile.assignedClassId=S.classId}catch(e){console.warn('기존 수강생 소속반 갱신 실패',e)}}
     await loadWeeks();
   }
-  frame();startWeekLive();startEnrollmentLive();startClassScheduleLive();
+  frame();startWeekLive();startEnrollmentLive();startClassScheduleLive();startNewsLive();
 }
 // 로그아웃 때 모든 실시간 연결·녹음·초안·화면 상태를 정리합니다(P0-09).
 function resetStudentSession(){
@@ -259,8 +424,8 @@ window.addEventListener('beforeunload',e=>{flushAssignmentDraft();if(S.user&&stu
 async function openPastClass(cid){
   const cls=S.pastClasses.find(c=>c.id===cid);if(!cls)return;
   stopRecordingForNavigation();
-  stopLive('weeks');stopLive('classSchedule');clearPageLive();
-  S.past={returnTab:S.classId?'mypage':'assignment'};
+  stopLive('weeks');stopLive('classSchedule');clearPageLive();stopNewsLive();
+  S.past={returnTab:S.classId?'mypage':'home'};
   S.classId=cid;S.classes=[cls];S.weeks=[];S.weekId='';S.quiz=null;S.tab='assignment';
   try{await loadWeeks()}
   catch(e){console.error('지난 반 자료 조회 실패',e);toast('지난 반 자료를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',true);await closePastClass();return}
@@ -268,7 +433,7 @@ async function openPastClass(cid){
   frame();
 }
 async function closePastClass(){
-  S.tab=S.past?.returnTab||'assignment';
+  S.tab=S.past?.returnTab||'home';
   S.past=null;
   await loadStudent();
 }
@@ -280,13 +445,6 @@ function wirePastClasses(container){$$('[data-past-class]',container).forEach(b=
 async function loadWeeks(){const snap=await getDocs(query(collection(db,'classes',S.classId,'weeks'),where('published','==',true)));
   S.weeks=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.order??0)-(b.order??0));
   if(!S.weeks.some(w=>w.id===S.weekId))S.weekId=S.weeks.at(-1)?.id||'';
-}
-function feedbackMarkup(obj){
-  const comments=feedbackItems(obj);
-  if(!comments.length)return '';
-  // 수정본을 낸 과제는 피드백마다 몇 차 제출에 대한 것인지 표시합니다(P0-04).
-  const revised=(Number(obj?.revision)||1)>1;
-  return `<div class="student-feedback"><h3 style="margin-bottom:12px">💬 선생님의 피드백 (${comments.length})</h3><div class="stack">${comments.map(f=>`<div class="feedback"><strong>선생님 · ${esc(formatDateTime(f.createdAt))}${revised?` · ${Number(f.forRevision)||1}차 제출에 대한 피드백`:''}</strong>${f.text?`<div style="white-space:pre-wrap">${esc(f.text)}</div>`:''}${f.audioPath?`<div style="margin-top:10px">${audioMarkup(f.audioPath,f.audioDuration)}</div>`:''}</div>`).join('')}</div></div>`;
 }
 // 제출 권장일(D3: 통계 마감이 아니라 안내용이고, 지난 뒤에 내도 똑같이 인정합니다)
 function dueLine(assignment){
@@ -344,29 +502,95 @@ async function markFeedbackSeen(kind,wid,data){
   const seen=toDate(data.studentSeenFeedbackAt)?.getTime()||0,key=`${S.classId}:${wid}:${kind}`;
   if(newest<=seen||S.seenMarked[key]>=newest)return;
   S.seenMarked[key]=newest;
-  try{await updateDoc(doc(db,'classes',S.classId,'weeks',wid,kind,S.user.uid),{studentSeenFeedbackAt:serverTimestamp()})}
-  catch(e){console.warn('피드백 확인 시각 저장 실패',e)}
+  try{
+    await updateDoc(doc(db,'classes',S.classId,'weeks',wid,kind,S.user.uid),{studentSeenFeedbackAt:serverTimestamp()});
+    if(S.news[kind]?.[wid])S.news[kind][wid]={...S.news[kind][wid],studentSeenFeedbackAt:new Date()};newsChanged();
+  }catch(e){console.warn('피드백 확인 시각 저장 실패',e)}
+}
+// 선생님 피드백(배치 10): 최신 피드백을 위에 두고, 수정본이 있으면 몇 차 제출에 대한 것인지 표시합니다.
+// newSince: 이 화면을 연 시점에 이미 본 시각. 그 뒤에 온 피드백에 '새 피드백'을 붙입니다. askable이면 '이 피드백에 질문하기'
+function feedbackMarkup(obj,{askable=false,newSince=Number.MAX_SAFE_INTEGER}={}){
+  const comments=feedbackItems(obj);
+  if(!comments.length)return '';
+  const revised=(Number(obj?.revision)||1)>1;
+  const items=[...comments].sort((a,b)=>(toDate(b.createdAt)?.getTime()||0)-(toDate(a.createdAt)?.getTime()||0));
+  return `<section class="card stack student-feedback" aria-label="선생님의 피드백"><h3>선생님의 피드백 <small>${items.length}</small></h3>${items.map(f=>`<article class="feedback"><p class="feedback-meta"><strong>선생님</strong> · ${esc(formatDateTime(f.createdAt))}${revised?` · ${Number(f.forRevision)||1}차 제출에 대한 피드백`:''}${(toDate(f.createdAt)?.getTime()||0)>newSince?' '+statusPill('brand','새 피드백'):''}</p>${f.text?`<div class="feedback-text">${esc(f.text)}</div>`:''}${f.audioPath?`<div class="feedback-audio">${audioMarkup(f.audioPath,f.audioDuration)}</div>`:''}${askable?'<div class="feedback-ask"><button type="button" class="btn ghost small" data-ask-feedback aria-expanded="false">이 피드백에 질문하기</button><div data-ask-slot></div></div>':''}</article>`).join('')}</section>`;
+}
+// 질문 보내기(질문 탭·피드백 질문 공용). weekId·context는 배치 10 규칙에서 허용합니다.
+// 게시된 규칙이 아직 이 필드를 막으면 제목의 [N차시 과제] 표시만 남기고 연결 없이 보냅니다.
+async function createQuestion({title,content,weekId='',context=''}){
+  const ref=collection(db,'classes',S.classId,'questions');
+  const base={uid:S.user.uid,studentName:S.profile.displayName||'수강생',title,content,createdAt:serverTimestamp(),status:'open',needsTeacherReply:true,lastMessageAt:serverTimestamp(),lastSenderRole:'student'};
+  const linked={...base,...(weekId?{weekId}:{}),...(context?{context}:{})};
+  try{await addDoc(ref,linked)}
+  catch(err){
+    if(err?.code!=='permission-denied'||(!weekId&&!context))throw err;
+    console.warn('질문의 차시 연결을 저장하지 못해 연결 없이 보냅니다(보안 규칙 확인 필요).',err);
+    await addDoc(ref,base);
+  }
+}
+// '이 피드백에 질문하기': 피드백 바로 아래에 질문 폼을 열고, 제목에 [3차시 과제] 같은 표시를 붙입니다.
+let askSeq=0;
+function wireFeedbackQuestions(container,w,context){
+  if(!container||container.dataset.askWired)return;
+  container.dataset.askWired='1';
+  container.addEventListener('click',e=>{
+    const open=e.target.closest('[data-ask-feedback]');if(!open)return;
+    const slot=open.nextElementSibling;
+    if(slot.firstElementChild){slot.innerHTML='';open.setAttribute('aria-expanded','false');return}
+    const n=++askSeq,prefix=`[${shortLabel(w.label)} ${context==='quiz'?'복습':'과제'}] `;
+    slot.innerHTML=`<form class="ask-form stack" data-feedback-question><div class="field"><label for="ask-title-${n}">질문 제목</label><input id="ask-title-${n}" name="title" required maxlength="100" value="${esc(prefix)}"></div><div class="field"><label for="ask-content-${n}">질문 내용</label><textarea id="ask-content-${n}" name="content" rows="4" required maxlength="8000" placeholder="피드백에서 궁금한 점을 적어 주세요."></textarea></div><div class="row"><button class="btn small" type="submit">질문 보내기</button><button class="btn ghost small" type="button" data-ask-cancel>취소</button></div></form>`;
+    open.setAttribute('aria-expanded','true');
+    const form=$('form',slot);$('textarea',form).focus();
+    $('[data-ask-cancel]',form).onclick=()=>{slot.innerHTML='';open.setAttribute('aria-expanded','false');open.focus()};
+    form.onsubmit=async ev=>{
+      ev.preventDefault();const fd=new FormData(form),title=String(fd.get('title')||'').trim(),content=String(fd.get('content')||'').trim();
+      if(!title||!content)return;
+      const btn=$('button[type="submit"]',form);btn.disabled=true;
+      try{await createQuestion({title,content,weekId:w.id,context});slot.innerHTML='<p class="notice">질문을 보냈어요. 답변은 질문 탭에서 확인할 수 있어요.</p>';open.setAttribute('aria-expanded','false');toast('질문을 보냈어요.')}
+      catch(err){toast(ex(err),true);btn.disabled=false}
+    };
+  });
+}
+// 제출한 답안 카드(배치 10): 제출 기록이 있으면 과제 화면의 첫 카드입니다. 편집 폼은 [수정해서 다시 제출]을 눌러야 열립니다.
+function submittedCard(d){
+  const revision=Number(d.revision)||1,state=reviewState(d);
+  const pill=state==='done'?statusPill('success','피드백 받음'):statusPill('neutral',revision>1?'수정본 확인 전':'선생님 확인 전');
+  return `<section class="card stack submitted-card" aria-labelledby="submitted-title"><div class="between"><div><p class="eyebrow">MI RESPUESTA</p><h2 id="submitted-title">제출한 답안</h2></div>${pill}</div><p class="hint">${revision>1?`${revision}차 제출 · `:''}${esc(formatDateTime(d.latestSubmittedAt||d.submittedAt))}</p>${d.text?`<div class="submitted-text">${esc(d.text)}</div>`:''}${d.audioPath?audioMarkup(d.audioPath,d.audioDuration):''}${!d.text&&!d.audioPath?'<p class="hint">제출한 내용이 비어 있어요.</p>':''}${revisionHistoryMarkup(d)}${S.past?'':'<div class="row" data-edit-row><button type="button" class="btn secondary" id="edit-assignment" aria-expanded="false" aria-controls="assignment-editor">수정해서 다시 제출</button></div>'}</section>`;
+}
+function editorCard(w,d){
+  return `<section class="card stack${d?' hide':''}" id="assignment-editor" aria-labelledby="editor-title"><div><h3 id="editor-title">${d?'수정해서 다시 제출':'답안 작성'}</h3>${d?'<p class="hint">다시 제출하면 수정본으로 기록되고, 이전 답안도 그대로 남아요.</p>':''}</div>${w.assignment.allowText!==false?`<div class="field"><label for="assignment-text">작성 과제</label><textarea id="assignment-text" rows="8" maxlength="20000" placeholder="여기에 스페인어로 답안을 작성해 주세요." data-saved="${esc(d?.text||'')}">${esc(d?.text||'')}</textarea></div>`:''}${w.assignment.allowAudio!==false?`<div class="field"><span class="field-label">말하기 과제</span><div id="student-audio-ui">${makeMediaUi('audio')}</div>${d?.audioPath?'<p class="hint">새 녹음을 올리지 않으면 지금 제출된 녹음을 그대로 써요.</p>':''}</div>`:''}<div class="between"><p id="assignment-progress" class="hint">답안은 본인과 강사만 열람할 수 있습니다.</p><div class="row">${d?'<button type="button" class="btn ghost" id="cancel-edit">닫기</button>':''}<button class="btn" id="submit-assignment">${d?'수정본 제출하기 →':'과제 제출하기 →'}</button></div></div></section>`;
 }
 async function renderAssignment(body){
   const w=week();
   body.innerHTML=weekHeader('과제',S.past?'제출한 답안과 선생님의 피드백을 다시 볼 수 있어요.':'말하기와 쓰기를 차근차근 연습해 보세요.');weeklyPicker();
   if(!w.assignment?.enabled){body.insertAdjacentHTML('beforeend',empty('이 차시의 과제는 아직 열리지 않았습니다','선생님이 과제를 공개하면 여기서 제출할 수 있어요.'));return}
-  body.insertAdjacentHTML('beforeend',`<div class="card stack"><div class="between"><div><h2>${esc(w.assignment.title||'스페인어 과제')}</h2></div><span class="pill brand">TAREA</span></div><div class="subtle article" style="white-space:pre-wrap">${esc(w.assignment.instructions||'과제 내용을 확인해 주세요.')}</div>${dueLine(w.assignment)}<div id="assignment-form-area" class="stack"><div class="loading">제출 기록 확인 중</div></div></div>`);
+  body.insertAdjacentHTML('beforeend','<div id="assignment-area" class="stack"><div class="card"><div class="loading">제출 기록 확인 중</div></div></div>');
   let snap;
   try{snap=await getDoc(doc(db,'classes',S.classId,'weeks',w.id,'submissions',S.user.uid))}
-  catch(e){if(S.weekId===w.id&&S.tab==='assignment')showLoadFailed($('#assignment-form-area'),()=>renderAssignment(body),e);return} // '미제출'로 보이지 않게(P1-08)
-  if(S.weekId!==w.id||S.tab!=='assignment')return;const data=snap.exists()?snap.data():null;const draftKey=assignmentDraftKey(w.id);
-  const area=$('#assignment-form-area');if(!area)return;
-  const revision=Number(data?.revision)||1;
-  if(S.past){
-    // 지난 반: 제출한 답안과 피드백만 보여 주고 새로 제출할 수 없습니다.
-    area.innerHTML=`${data?`<div class="past-answer"><p class="hint">내가 제출한 답안 · ${revision>1?`${revision}차 제출 · `:''}${esc(formatDateTime(data.latestSubmittedAt||data.submittedAt))}</p>${data.text?`<p class="past-answer-text">${esc(data.text)}</p>`:''}${data.audioPath?audioMarkup(data.audioPath,data.audioDuration):''}</div>`:'<p class="notice">이 차시에는 제출 기록이 없어요.</p>'}${revisionHistoryMarkup(data)}<div id="student-assignment-feedback">${feedbackMarkup(data)}</div>`;
-  }else{
-    const waiting=revision>1&&['pending','rereview'].includes(reviewState(data));
-    area.innerHTML=`${data?(waiting?`<p class="notice warn">✏️ 수정본을 제출했어요 · 선생님 확인 대기 · ${revision}차 제출 · ${esc(formatDateTime(data.latestSubmittedAt||data.submittedAt))}</p>`:`<p class="notice">✅ 제출 기록이 있습니다 · ${revision>1?`${revision}차 제출 · `:''}${esc(formatDateTime(data.latestSubmittedAt||data.submittedAt))} · 다시 제출하면 수정본으로 기록되고, 이전 답안도 남아요.</p>`):''}${w.assignment.allowText!==false?`<div class="field"><label for="assignment-text">작성 과제</label><textarea id="assignment-text" rows="8" maxlength="20000" placeholder="여기에 스페인어로 답안을 작성해 주세요." data-saved="${esc(data?.text||'')}">${esc(data?.text||'')}</textarea></div>`:''}${w.assignment.allowAudio!==false?`<div class="field"><span class="field-label">말하기 과제</span><div id="student-audio-ui">${makeMediaUi('audio')}</div>${data?.audioPath?`<div><p class="hint">지금 제출된 녹음</p>${audioMarkup(data.audioPath,data.audioDuration)}</div>`:''}</div>`:''}<div class="between"><p id="assignment-progress" class="hint">답안은 본인과 강사만 열람할 수 있습니다.</p><button class="btn" id="submit-assignment">과제 제출하기 →</button></div>${revisionHistoryMarkup(data)}<div id="student-assignment-feedback">${feedbackMarkup(data)}</div>`;
+  catch(e){if(S.weekId===w.id&&S.tab==='assignment')showLoadFailed($('#assignment-area .card'),()=>renderAssignment(body),e);return} // '미제출'로 보이지 않게(P1-08)
+  if(S.weekId!==w.id||S.tab!=='assignment')return;
+  const data=snap.exists()?snap.data():null,draftKey=assignmentDraftKey(w.id);
+  const area=$('#assignment-area');if(!area)return;
+  const revision=Number(data?.revision)||1,newSince=seenAt(data?.studentSeenFeedbackAt);
+  const brief=`<section class="card stack assignment-brief" aria-labelledby="assignment-title"><div class="between"><h2 id="assignment-title">${esc(w.assignment.title||'스페인어 과제')}</h2><span class="pill brand">TAREA</span></div><div class="subtle article" style="white-space:pre-wrap">${esc(w.assignment.instructions||'과제 내용을 확인해 주세요.')}</div>${dueLine(w.assignment)}${!S.past&&w.preview?.enabled?'<button type="button" class="linkbutton assignment-preview-link" data-open-preview>이 차시 예습 자료 보기 →</button>':''}</section>`;
+  const feedback=`<div id="student-assignment-feedback">${feedbackMarkup(data,{askable:!S.past,newSince})}</div>`;
+  // 제출 기록이 있으면: 제출한 답안 → 피드백 → 과제 안내 → (닫힌) 수정 폼. 없으면: 과제 안내 → 답안 작성 폼
+  if(S.past)area.innerHTML=data?submittedCard(data)+feedback+brief:brief+'<p class="notice">이 차시에는 제출 기록이 없어요.</p>';
+  else area.innerHTML=data?submittedCard(data)+feedback+brief+editorCard(w,data):brief+editorCard(w,null);
+  const fbBox=$('#student-assignment-feedback',area);if(fbBox)fbBox.dataset.rendered=fbBox.innerHTML;
+  $('[data-open-preview]',area)?.addEventListener('click',()=>goTab('preview',{weekId:w.id}));
+  if(!S.past){
     // P0-02: 음성 초안은 이 차시에만 붙습니다(반·차시·학생 키).
     if(w.assignment.allowAudio!==false)wireMediaUi($('#student-audio-ui'),f=>{if(f)S.audioDrafts[draftKey]=f;else delete S.audioDrafts[draftKey]},{label:`${w.label} 과제`,initialFile:S.audioDrafts[draftKey]});
     wireAssignmentDraft(area,w.id,data?.text||'');
+    const editor=$('#assignment-editor',area),openBtn=$('#edit-assignment',area);
+    const openEditor=(focus=true)=>{editor.classList.remove('hide');openBtn?.setAttribute('aria-expanded','true');$('[data-edit-row]',area)?.classList.add('hide');if(focus){editor.scrollIntoView({behavior:'smooth',block:'start'});$('#assignment-text',editor)?.focus({preventScroll:true})}};
+    openBtn?.addEventListener('click',()=>openEditor());
+    $('#cancel-edit',area)?.addEventListener('click',()=>{flushAssignmentDraft();editor.classList.add('hide');openBtn?.setAttribute('aria-expanded','false');$('[data-edit-row]',area)?.classList.remove('hide');openBtn?.focus()});
+    // 이 기기에 임시 저장된 답안이나 첨부해 둔 음성이 있으면 수정 폼을 열어 둡니다(배치 07 초안 복원).
+    if(data&&($('[data-draft-notice]',area)||S.audioDrafts[draftKey]))openEditor(false);
+    wireFeedbackQuestions(fbBox,w,'assignment');
   }
   useMediaPaths(area);wireRevisionHistory(area,w.id,revision);markFeedbackSeen('submissions',w.id,data);
   S.live.assignment=onSnapshot(doc(db,'classes',S.classId,'weeks',w.id,'submissions',S.user.uid),snapshot=>{
@@ -374,8 +598,10 @@ async function renderAssignment(body){
     const el=$('#student-assignment-feedback');if(!el)return;
     const latest=snapshot.exists()?snapshot.data():null;
     markFeedbackSeen('submissions',w.id,latest);
-    const html=feedbackMarkup(latest);
+    const html=feedbackMarkup(latest,{askable:!S.past,newSince});
     if(el.dataset.rendered===html)return;
+    // 피드백에 질문을 쓰는 중이면 덮어쓰지 않고 알려 줍니다(P0-10).
+    if($$('[data-feedback-question] textarea',el).some(t=>t.value.trim())){showLiveNotice($('#student-body'),'선생님이 피드백을 새로 남겼어요. 쓰던 질문은 그대로 두었어요.','지금 반영',()=>renderAssignment(body));return}
     el.innerHTML=html;el.dataset.rendered=html;useMediaPaths(el);
   },onLiveError);
   if(S.past)return;
@@ -393,7 +619,7 @@ async function renderAssignment(body){
       catch(err){await removeUploaded(uploaded);throw err} // P1-09: 제출이 저장되지 않았으면 방금 올린 음성을 지웁니다.
       delete S.audioDrafts[draftKey];
       const storeKey=assignmentStoreKey(w.id);if(pendingDraft?.key===storeKey){clearTimeout(pendingDraft.timer);pendingDraft=null}drafts.remove(storeKey);
-      toast('과제를 제출했습니다!');await renderAssignment(body);
+      toast('과제를 제출했습니다!');await renderAssignment(body);window.scrollTo(0,0);
     }catch(err){toast(ex(err),true)}finally{btn.disabled=false}
   });
 }
@@ -429,35 +655,83 @@ function shuffleQuestion(q){
   for(let i=opt.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[opt[i],opt[j]]=[opt[j],opt[i]]}
   return opt;
 }
-async function renderQuiz(body){const w=week();body.innerHTML=weekHeader('단어 복습',S.past?'연습 모드예요. 다시 풀어 볼 수 있지만 결과는 저장되지 않아요.':'한 문제씩 풀고 마지막에 결과를 확인하세요.');weeklyPicker();
+// 복습(배치 10): 응시 기록이 있으면 결과를 먼저 보여 주고 [틀린 문제만 다시 풀기]·[전체 다시 풀기]를 둡니다.
+// '틀린 문제만' 응시는 attempts에 mode:'wrongOnly'로만 남기고, quizResults의 점수·첫 응시는 바꾸지 않습니다(부분 점수는 전체 점수와 비교할 수 없음).
+async function renderQuiz(body){const w=week();body.innerHTML=weekHeader('복습',S.past?'연습 모드예요. 다시 풀어 볼 수 있지만 결과는 저장되지 않아요.':'지난 결과를 먼저 확인하고, 틀린 문제를 다시 풀어 보세요.');weeklyPicker();
   if(!w.quiz?.enabled||!w.quiz.questions?.length){body.insertAdjacentHTML('beforeend',empty('이 차시의 복습 퀴즈를 준비하고 있어요'));return}
   let snap;
   try{snap=await getDoc(doc(db,'classes',S.classId,'weeks',w.id,'quizResults',S.user.uid))}
   catch(e){if(S.weekId===w.id&&S.tab==='quiz'){body.insertAdjacentHTML('beforeend','<div class="card" id="quiz-stage"></div>');showLoadFailed($('#quiz-stage'),()=>renderQuiz(body),e)}return} // P1-08
   if(S.weekId!==w.id||S.tab!=='quiz')return;
-  const last=snap.exists()?snap.data():null;
-  body.insertAdjacentHTML('beforeend',`<div class="card" id="quiz-stage"><div class="between"><div><h2>${esc(w.quiz.title||'이번 주 단어 퀴즈')}</h2></div><span class="pill brand">${w.quiz.questions.length}문항</span></div><div id="quiz-last-status">${last?`<p class="notice" style="margin-top:17px">최근 점수: ${last.score??0}/${last.total??0}점 · 다시 풀 수 있습니다.</p>`:''}</div><div id="quiz-live-feedback">${feedbackMarkup(last)}</div><div style="margin-top:19px" id="quiz-content"></div></div>`);
+  const last=snap.exists()?snap.data():null,newSince=seenAt(last?.studentSeenFeedbackAt);
+  body.insertAdjacentHTML('beforeend',`<div class="card" id="quiz-stage"><div class="between"><div><h2>${esc(w.quiz.title||'이번 주 단어 퀴즈')}</h2></div><span class="pill brand">${w.quiz.questions.length}문항</span></div><div style="margin-top:19px" id="quiz-content"></div></div><div id="quiz-live-feedback">${feedbackMarkup(last,{askable:!S.past,newSince})}</div>`);
   // P1-02: 응시를 시작할 때의 문항과 버전을 고정합니다. 풀던 중 강사가 퀴즈를 바꿔도 시작한 버전으로 채점·저장합니다.
   const qs=w.quiz.questions.map(normalizeQuizQuestion);
-  const progressKey=S.past?'':draftKey(S.user.uid,S.classId,w.id,'quiz',Number(w.quiz.version)||0);
-  S.quiz={id:w.id,version:Number(w.quiz.version)||null,questions:qs,shuffled:qs.map(shuffleQuestion),answers:Array(qs.length).fill(null),index:0,last,progressKey};
+  const ctx={w,qs,last,version:Number(w.quiz.version)||null,progressKey:S.past?'':draftKey(S.user.uid,S.classId,w.id,'quiz',Number(w.quiz.version)||0)};
+  S.quiz=null;
+  const fbBox=$('#quiz-live-feedback');fbBox.dataset.rendered=fbBox.innerHTML;
   useMediaPaths(body);markFeedbackSeen('quizResults',w.id,last);
+  if(!S.past)wireFeedbackQuestions(fbBox,w,'quiz');
   // P1-07: 같은 탭에서 풀던 문제가 있으면(다른 탭에 다녀오거나 새로고침) 이어서 풀지 묻습니다.
-  const saved=readQuizProgress(progressKey,qs);
+  const saved=readQuizProgress(ctx.progressKey,qs);
   if(saved){
     $('#quiz-content').innerHTML=`<div class="resume-card"><p><strong>풀던 문제가 있어요</strong> · ${saved.index+1} / ${qs.length}번 문항까지 진행</p><div class="row"><button type="button" class="btn" data-resume>이어서 풀기</button><button type="button" class="btn secondary" data-restart>처음부터</button></div></div>`;
-    $('[data-resume]').onclick=()=>{Object.assign(S.quiz,saved);showQuestion()};
-    $('[data-restart]').onclick=()=>{drafts.remove(progressKey,'session');showQuestion()};
-  }else showQuestion();
+    $('[data-resume]').onclick=()=>{startQuiz(ctx);Object.assign(S.quiz,saved);showQuestion()};
+    $('[data-restart]').onclick=()=>{drafts.remove(ctx.progressKey,'session');startQuiz(ctx)};
+  }else if(last)showQuizSummary(ctx);
+  else startQuiz(ctx);
   S.live.quiz=onSnapshot(doc(db,'classes',S.classId,'weeks',w.id,'quizResults',S.user.uid),snapshot=>{
     if(S.tab!=='quiz'||S.weekId!==w.id)return;
     const d=snapshot.exists()?snapshot.data():null;
-    const status=$('#quiz-last-status'),feedback=$('#quiz-live-feedback');
-    if(status)status.innerHTML=d?`<p class="notice" style="margin-top:17px">최근 점수 ${Number(d.score)||0}/${Number(d.total)||0} · 첫 응시 ${Number(d.firstAttempt?.score??d.score)||0}/${Number(d.firstAttempt?.total??d.total)||0}</p>`:'';
+    if(d)ctx.last=d;
     markFeedbackSeen('quizResults',w.id,d);
-    if(feedback){const html=feedbackMarkup(d);if(feedback.dataset.rendered!==html){feedback.innerHTML=html;feedback.dataset.rendered=html;useMediaPaths(feedback)}}
+    const html=feedbackMarkup(d,{askable:!S.past,newSince});
+    if(fbBox.dataset.rendered===html||!fbBox.isConnected)return;
+    if($$('[data-feedback-question] textarea',fbBox).some(t=>t.value.trim()))return; // 질문을 쓰는 중이면 덮지 않음
+    fbBox.innerHTML=html;fbBox.dataset.rendered=html;useMediaPaths(fbBox);
   },onLiveError);
-
+}
+// 응시 시작. mode:'wrongOnly'면 ids의 문항만 풉니다(풀이 진행 임시 저장은 전체 응시에만).
+function startQuiz(ctx,{mode='full',ids=null}={}){
+  const questions=ids?ctx.qs.filter(q=>ids.includes(q.id)):ctx.qs;
+  S.quiz={id:ctx.w.id,version:ctx.version,questions,shuffled:questions.map(shuffleQuestion),answers:Array(questions.length).fill(null),index:0,last:ctx.last,progressKey:mode==='full'?ctx.progressKey:'',mode,ctx};
+  showQuestion();
+}
+// 지난 결과 해석: 같은 문제 버전일 때만 문항별 정오를 보여 줍니다(학생은 이전 버전 문항 사본을 읽을 수 없음).
+function lastReview({w,qs,last}){
+  const sameVersion=!!last&&(Number(last.quizVersion)||null)===(Number(w.quiz.version)||null);
+  const answers=sameVersion?answersFor(last,qs):null;
+  return {sameVersion,answers,wrong:answers?qs.filter((q,i)=>!isCorrectAnswer(q,answers[i])):[],practice:null};
+}
+// 최근 전체 응시 뒤에 한 '틀린 문제 연습' 중 마지막 것. 아직 틀린 문항을 다음 연습에 씁니다.
+async function latestPractice({w,qs,last}){
+  if(!last)return null;
+  const snap=await getDocs(collection(db,'classes',S.classId,'weeks',w.id,'quizResults',S.user.uid,'attempts'));
+  const after=toDate(last.submittedAt)?.getTime()||0,version=Number(w.quiz.version)||null,time=a=>toDate(a.submittedAt)?.getTime()||0;
+  const p=snap.docs.map(d=>d.data()).filter(a=>a.mode==='wrongOnly'&&(Number(a.quizVersion)||null)===version&&time(a)>after).sort((a,b)=>time(b)-time(a))[0];
+  if(!p)return null;
+  const sub=qs.filter(q=>(p.questionIds||[]).includes(q.id)),answers=answersFor(p,sub);
+  return {at:p.submittedAt,score:Number(p.score)||0,total:Number(p.total)||sub.length,wrongIds:sub.filter((q,i)=>!isCorrectAnswer(q,answers[i])).map(q=>q.id)};
+}
+const reviewLine=(q,answer,good)=>`<div class="review-line"><div class="between"><strong>${esc(q.stem)}</strong>${good===undefined?'':good?statusPill('success','정답'):statusPill('danger','오답')}</div><p class="hint" style="margin-top:7px">내 답: ${esc(answerLabel(q,answer))} · 정답: ${esc(answerLabel(q,q.correctIndices))}</p>${q.explanation?`<p class="hint" style="margin-top:5px">💡 ${esc(q.explanation)}</p>`:''}</div>`;
+async function showQuizSummary(ctx){
+  const node=$('#quiz-content');if(!node)return;
+  S.quiz=null;
+  const r=lastReview(ctx);
+  const draw=()=>{
+    const {qs,last}=ctx,first=last.firstAttempt||last;
+    const still=r.practice?qs.filter(q=>r.practice.wrongIds.includes(q.id)):r.wrong;
+    node.innerHTML=`<div class="quiz-summary"><div class="quiz-scores"><div class="mini-stat"><strong>${scorePct(first.score,first.total)}%</strong><span>첫 점수 ${Number(first.score)||0}/${Number(first.total)||0}</span></div><div class="mini-stat"><strong>${scorePct(last.score,last.total)}%</strong><span>최근 점수 ${Number(last.score)||0}/${Number(last.total)||0}</span></div></div>
+      ${r.practice?`<p class="notice">틀린 문제 연습 · ${r.practice.total}문항 중 ${r.practice.score}문항 정답 · ${esc(formatDateTime(r.practice.at,{time:false}))}</p>`:''}
+      ${!r.sameVersion?'<p class="hint">선생님이 문제를 바꿔서 지난 결과의 문항별 정답은 보여 드릴 수 없어요. 전체 다시 풀기로 새 문제를 풀어 보세요.</p>':r.wrong.length?`<h3 class="quiz-summary-title">지난번에 틀린 문항 ${r.wrong.length}개</h3>${r.wrong.map(q=>reviewLine(q,r.answers[qs.indexOf(q)])).join('')}`:'<p class="notice">지난번에 모두 맞혔어요 ✓</p>'}
+      <div class="row quiz-actions">${r.sameVersion&&still.length?`<button type="button" class="btn" id="quiz-wrong-only">틀린 문제만 다시 풀기 (${still.length})</button>`:''}<button type="button" class="btn${r.sameVersion&&still.length?' secondary':''}" id="quiz-full-retry">전체 다시 풀기</button></div></div>`;
+    $('#quiz-wrong-only',node)?.addEventListener('click',()=>startQuiz(ctx,{mode:'wrongOnly',ids:still.map(q=>q.id)}));
+    $('#quiz-full-retry',node).addEventListener('click',()=>startQuiz(ctx));
+  };
+  draw();
+  if(!r.sameVersion||!r.wrong.length)return;
+  try{r.practice=await latestPractice(ctx)}catch(e){console.warn('틀린 문제 연습 기록 조회 실패',e);return}
+  if(r.practice&&!S.quiz&&S.tab==='quiz'&&S.weekId===ctx.w.id&&node.isConnected)draw();
 }
 // 풀이 진행(답·현재 문항·보기 섞인 순서)을 이 탭에 보관합니다. 키에 퀴즈 버전이 들어가 문제가 바뀌면 이어 풀지 않습니다.
 function saveQuizProgress(){
@@ -477,7 +751,7 @@ function readQuizProgress(key,qs){
 }
 function showQuestion(){const z=S.quiz;if(!z)return;const node=$('#quiz-content');if(!node)return;saveQuizProgress();
   const n=z.index,q=z.questions[n],multi=q.type==='multiple';const current=z.answers[n],selected=Array.isArray(current)?current:current===null?[]:[current];
-  node.innerHTML=`<div class="question-count">QUESTION ${n+1} / ${z.questions.length} <span class="pill brand" style="margin-left:7px">${multi?'복수정답':q.type==='ox'?'O / X':'객관식'}</span></div>
+  node.innerHTML=`<div class="question-count">${z.mode==='wrongOnly'?'틀린 문제 다시 풀기 · ':''}QUESTION ${n+1} / ${z.questions.length} <span class="pill brand" style="margin-left:7px">${multi?'복수정답':q.type==='ox'?'O / X':'객관식'}</span></div>
   <div class="progress"><div style="width:${((n+1)/z.questions.length)*100}%"></div></div>
   <h3 style="font-size:21px;margin-bottom:8px">${esc(q.stem)}</h3>
   <p class="hint" style="margin-bottom:19px">${multi?'정답이라고 생각하는 항목을 모두 선택하세요.':'정답 한 개를 선택하세요.'}</p>
@@ -492,38 +766,66 @@ function showQuestion(){const z=S.quiz;if(!z)return;const node=$('#quiz-content'
   $('#quiz-next').onclick=()=>{if(z.answers[n]===null||Array.isArray(z.answers[n])&&!z.answers[n].length){toast('선택지를 하나 이상 선택해 주세요.',true);return}if(n<z.questions.length-1){z.index++;showQuestion()}else finishQuiz()};
 }
 async function finishQuiz(){const z=S.quiz;if(!z)return;
+  const results=z.questions.map((q,i)=>isCorrectAnswer(q,z.answers[i])),score=results.filter(Boolean).length;
+  if(z.mode==='wrongOnly'){await finishPractice(z,results);return}
   if(S.past){
     // 지난 반은 연습 모드: 채점 결과만 보여 주고 저장하지 않습니다.
-    const score=z.questions.filter((q,i)=>isCorrectAnswer(q,z.answers[i])).length;
     z.finished=true;showQuizResult($('#quiz-content'),z,score,'연습 결과는 저장되지 않아요.');
     return;
   }
   if(!S.weeks.some(w=>w.id===z.id)){toast('이 차시가 비공개로 바뀌어 지금은 결과를 저장할 수 없어요. 선생님께 문의해 주세요.',true);return}
-  const score=z.questions.filter((q,i)=>isCorrectAnswer(q,z.answers[i])).length,target=$('#quiz-content');loading(target);
+  const target=$('#quiz-content');loading(target);
   try{
     const resultRef=doc(db,'classes',S.classId,'weeks',z.id,'quizResults',S.user.uid);
     const attemptRef=doc(collection(db,'classes',S.classId,'weeks',z.id,'quizResults',S.user.uid,'attempts'));
     // Firestore는 배열 안의 배열을 저장하지 못하므로(복수정답 [0,2]) 문항 ID별 맵과 문자열 목록으로 저장합니다(P1-02).
     const answersById=Object.fromEntries(z.questions.map((q,i)=>[q.id,parseAnswer(z.answers[i])]));
     const record={answers:z.answers.map(encodeAnswer),answersById,questionIds:z.questions.map(q=>q.id),quizVersion:z.version};
+    let count=1;
     await runTransaction(db,async tx=>{
       const oldSnap=await tx.get(resultRef),old=oldSnap.exists()?oldSnap.data():null;
       const first=old?.firstAttempt || (old?{score:Number(old.score)||0,total:Number(old.total)||0,submittedAt:old.submittedAt||null,answers:(old.answers||[]).map(encodeAnswer),legacy:true}:{score,total:z.questions.length,submittedAt:new Date().toISOString(),answers:record.answers,answersById,quizVersion:z.version,legacy:false});
-      const count=Math.max(0,Number(old?.attemptCount)|| (old?1:0))+1;
+      count=Math.max(0,Number(old?.attemptCount)|| (old?1:0))+1;
       const name=((S.profile.displayName==='수강생'&&S.user.displayName)?S.user.displayName:S.profile.displayName)||S.user.email;
       tx.set(attemptRef,{userId:S.user.uid,...record,score,total:z.questions.length,attemptNumber:count,submittedAt:serverTimestamp()});
       tx.set(resultRef,{userId:S.user.uid,studentName:name,email:S.user.email||'',...record,score,total:z.questions.length,submittedAt:serverTimestamp(),firstAttempt:first,attemptCount:count},{merge:true});
     });
     z.finished=true;drafts.remove(z.progressKey,'session');
+    z.ctx.last={...(z.ctx.last||{}),...record,score,total:z.questions.length,attemptCount:count,submittedAt:new Date()};
     if(S.weekId!==z.id||S.tab!=='quiz')return;
     showQuizResult(target,z,score);toast('복습 결과가 저장되었습니다.');
   }catch(e){target.classList.remove('loading');toast(ex(e),true);showQuestion()}
 }
+// 틀린 문제 연습 저장: 요약 문서(점수·첫 응시)는 그대로 두고 attempts에만 남깁니다. 지난 반·이전 규칙이면 저장 없이 결과만 보여 줍니다.
+async function finishPractice(z,results){
+  const target=$('#quiz-content');
+  let saved=false;
+  if(!S.past&&S.weeks.some(w=>w.id===z.id)){
+    loading(target);
+    try{
+      await setDoc(doc(collection(db,'classes',S.classId,'weeks',z.id,'quizResults',S.user.uid,'attempts')),{userId:S.user.uid,answers:z.answers.map(encodeAnswer),answersById:Object.fromEntries(z.questions.map((q,i)=>[q.id,parseAnswer(z.answers[i])])),questionIds:z.questions.map(q=>q.id),quizVersion:z.version,score:results.filter(Boolean).length,total:z.questions.length,attemptNumber:Math.max(1,Number(z.last?.attemptCount)||1),mode:'wrongOnly',submittedAt:serverTimestamp()});
+      saved=true;
+    }catch(e){console.warn('틀린 문제 연습 기록 저장 실패',e)}
+    target.classList.remove('loading');
+  }
+  z.finished=true;
+  if(S.weekId!==z.id||S.tab!=='quiz')return;
+  const fixed=z.questions.filter((q,i)=>results[i]),still=z.questions.filter((q,i)=>!results[i]);
+  target.innerHTML=`<div class="quiz-result"><div class="eyebrow">PRÁCTICA · 틀린 문제 연습</div><h2>지난번 틀린 ${z.questions.length}문항 중 ${fixed.length}문항 정답</h2>${fixed.length?`<p class="notice quiz-note">지난번에 틀린 문항을 이번에 맞혔어요 · '${esc(fixed[0].stem)}'${fixed.length>1?` 외 ${fixed.length-1}문항`:''}</p>`:''}${S.past?'<p class="notice quiz-note">연습 결과는 저장되지 않아요.</p>':saved?'':'<p class="hint">이번 연습 기록은 저장하지 못했어요. 점수와 첫 응시 기록은 그대로예요.</p>'}</div><div class="separator"></div>${z.questions.map((q,i)=>reviewLine(q,z.answers[i],results[i])).join('')}<div class="row quiz-actions" style="margin-top:20px">${still.length?`<button type="button" class="btn" id="quiz-wrong-again">아직 틀린 문제 다시 풀기 (${still.length})</button>`:''}<button type="button" class="btn secondary" id="quiz-full-retry">전체 다시 풀기</button><button type="button" class="btn ghost" id="quiz-back-summary">결과 요약으로</button></div>`;
+  $('#quiz-wrong-again',target)?.addEventListener('click',()=>startQuiz(z.ctx,{mode:'wrongOnly',ids:still.map(q=>q.id)}));
+  $('#quiz-full-retry',target).addEventListener('click',()=>startQuiz(z.ctx));
+  $('#quiz-back-summary',target).addEventListener('click',()=>{S.quiz=null;renderBody()});
+}
 function showQuizResult(target,z,score,note=''){
     if(!target)return;
     const pct=Math.round(score/z.questions.length*100);target.classList.remove('loading');
-    target.innerHTML=`<div style="text-align:center"><div class="eyebrow">QUIZ COMPLETE ✨</div><h2>복습을 완료했어요!</h2><div class="score-ring" style="--angle:${pct}%"><div class="score-ring-inner"><div><strong>${score} / ${z.questions.length}</strong><br><span>정답 ${pct}%</span></div></div></div><p class="muted">복수정답은 정답을 모두 선택해야 1점입니다.</p>${note?`<p class="notice quiz-note">${esc(note)}</p>`:''}</div><div class="separator"></div>${z.questions.map((q,i)=>{const good=isCorrectAnswer(q,z.answers[i]);return `<div class="review-line"><div class="between"><strong>${i+1}. ${esc(q.stem)}</strong>${good?statusPill('success','정답'):statusPill('danger','오답')}</div><p class="hint" style="margin-top:7px">내 답: ${esc(answerLabel(q,z.answers[i]))} · 정답: ${esc(answerLabel(q,q.correctIndices))}</p>${q.explanation?`<p class="hint" style="margin-top:5px">💡 ${esc(q.explanation)}</p>`:''}</div>`}).join('')}${feedbackMarkup(z.last)}<button id="quiz-retry" class="btn secondary full" style="margin-top:20px">다시 풀기</button>`;
-    useMediaPaths(target);$('#quiz-retry').onclick=()=>renderBody();
+    // 다시 푼 경우: 지난번(같은 문제 버전)에 틀렸는데 이번에 맞힌 문항을 짧게 알려 줍니다. 반복 횟수는 강조하지 않습니다.
+    const before=z.last&&(Number(z.last.quizVersion)||null)===(z.version||null)?answersFor(z.last,z.questions):null;
+    const fixed=before?z.questions.filter((q,i)=>!isCorrectAnswer(q,before[i])&&isCorrectAnswer(q,z.answers[i])):[];
+    const wrongNow=z.questions.filter((q,i)=>!isCorrectAnswer(q,z.answers[i]));
+    target.innerHTML=`<div style="text-align:center"><div class="eyebrow">QUIZ COMPLETE ✨</div><h2>복습을 완료했어요!</h2><div class="score-ring" style="--angle:${pct}%"><div class="score-ring-inner"><div><strong>${score} / ${z.questions.length}</strong><br><span>정답 ${pct}%</span></div></div></div><p class="muted">복수정답은 정답을 모두 선택해야 1점입니다.</p>${fixed.length?`<p class="notice quiz-note">지난번에 틀린 문항을 이번에 맞혔어요 · '${esc(fixed[0].stem)}'${fixed.length>1?` 외 ${fixed.length-1}문항`:''}</p>`:''}${note?`<p class="notice quiz-note">${esc(note)}</p>`:''}</div><div class="separator"></div>${z.questions.map((q,i)=>reviewLine(q,z.answers[i],isCorrectAnswer(q,z.answers[i]))).join('')}<div class="row quiz-actions" style="margin-top:20px">${wrongNow.length?`<button type="button" class="btn" id="quiz-wrong-again">틀린 문제만 다시 풀기 (${wrongNow.length})</button>`:''}<button id="quiz-retry" type="button" class="btn secondary">전체 다시 풀기</button></div>`;
+    $('#quiz-wrong-again',target)?.addEventListener('click',()=>startQuiz(z.ctx,{mode:'wrongOnly',ids:wrongNow.map(q=>q.id)}));
+    $('#quiz-retry',target).onclick=()=>{if(z.ctx)startQuiz(z.ctx);else renderBody()};
 }
 // D8: N차시 문서의 예습 = N차시 수업 전에 볼 자료. 수업 날짜는 차시 문서 → 반 일정 사본 순으로 찾습니다.
 const sessionDateOf=w=>w?.sessionDate||currentClass()?.schedule?.find(x=>x.weekId===w?.id)?.date||'';
@@ -555,9 +857,9 @@ async function renderMyPage(body){
   }
   const realName=String(S.profile.realName||S.enrollmentRealName||S.profile.displayName||'').trim();
   const preferred=String(S.profile.nickname||(S.profile.displayName!==realName?S.profile.displayName:'')||'').trim();
-  body.innerHTML=bodyHeader('마이페이지','내 학습 정보와 출석 기록을 한곳에서 확인하세요.');
-  body.insertAdjacentHTML('beforeend',`<div class="grid2"><div class="card"><h3>👋 프로필</h3><div class="separator"></div><dl class="info-grid"><dt>내 이름</dt><dd>${esc(realName)}</dd><dt>사용하는 별명</dt><dd>${esc(preferred||'미설정')}</dd><dt>로그인 ID</dt><dd>${esc(S.user.email)}</dd><dt>현재 반</dt><dd>${esc(currentClass()?.name||'미등록')}</dd><dt>수강 시작</dt><dd>${esc((currentClass()?.schedule||[]).map(x=>x.date).filter(Boolean).sort()[0]||'수업 날짜 미설정')}</dd></dl><div class="separator"></div><form id="student-name-form" class="row" style="align-items:end"><div class="field" style="flex:1;min-width:160px"><label>우리 반에 표시할 별명</label><input name="displayName" maxlength="35" value="${esc(preferred)}" placeholder="비우면 실제 이름으로 표시"></div><button class="btn secondary small" type="submit">별명 저장</button></form><p class="hint">우리 반 명단에는 별명만 표시됩니다. 강사에게는 별명과 실명이 함께 표시됩니다.</p><div class="quiet-note">반 변경이 필요하시면 강사에게 요청해 주세요.</div></div><div class="card"><h3>📋 출석 현황</h3><p class="hint" style="margin:6px 0 12px">등록된 차시별 수업 날짜와 출결을 표시합니다.</p><div id="attendance-overview" class="loading">불러오는 중</div></div></div>${pastClassesCard()}`);
-  wirePastClasses(body);
+  body.innerHTML=bodyHeader('내 정보','내 프로필, 출석 기록, 우리 반 친구들을 확인하세요.');
+  body.insertAdjacentHTML('beforeend',`<div class="grid2"><div class="card"><h3>👋 프로필</h3><div class="separator"></div><dl class="info-grid"><dt>내 이름</dt><dd>${esc(realName)}</dd><dt>사용하는 별명</dt><dd>${esc(preferred||'미설정')}</dd><dt>로그인 ID</dt><dd>${esc(S.user.email)}</dd><dt>현재 반</dt><dd>${esc(currentClass()?.name||'미등록')}</dd><dt>수강 시작</dt><dd>${esc((currentClass()?.schedule||[]).map(x=>x.date).filter(Boolean).sort()[0]||'수업 날짜 미설정')}</dd></dl><div class="separator"></div><form id="student-name-form" class="row" style="align-items:end"><div class="field" style="flex:1;min-width:160px"><label>우리 반에 표시할 별명</label><input name="displayName" maxlength="35" value="${esc(preferred)}" placeholder="비우면 실제 이름으로 표시"></div><button class="btn secondary small" type="submit">별명 저장</button></form><p class="hint">우리 반 명단에는 별명만 표시됩니다. 강사에게는 별명과 실명이 함께 표시됩니다.</p><div class="quiet-note">반 변경이 필요하시면 강사에게 요청해 주세요.</div></div><div class="card"><h3>📋 출석 현황</h3><p class="hint" style="margin:6px 0 12px">등록된 차시별 수업 날짜와 출결을 표시합니다.</p><div id="attendance-overview" class="loading">불러오는 중</div></div></div>${classmatesCard()}${pastClassesCard()}`);
+  wirePastClasses(body);startClassmatesLive();
   $('#student-name-form')?.addEventListener('submit',async e=>{
     e.preventDefault();const form=e.currentTarget,name=String(new FormData(form).get('displayName')||'').trim();
     if(name.length>35){toast('별명은 35자 이내로 입력해 주세요.',true);return}
@@ -590,24 +892,27 @@ async function drawAttendanceOverview(){
 // 질문 · 답변: 질문은 본인과 강사만, 댓글은 질문 작성자와 강사만 볼 수 있습니다.
 function questionPath(qid){return ['classes',S.classId,'questions',qid]}
 function renderQuestions(body){
-  const newQuestionCard=S.past?'':`<div class="card stack"><h3>새 질문</h3><form id="question-create" class="stack"><div class="field"><label>제목</label><input name="title" required maxlength="100" placeholder="예: 오늘 배운 표현이 궁금해요"></div><div class="field"><label>질문 내용</label><textarea name="content" required maxlength="8000" rows="6" placeholder="질문을 자세히 작성해 주세요."></textarea></div><button class="btn" type="submit">질문 보내기</button></form></div>`;
+  const newQuestionCard=S.past?'':`<div class="card stack"><h3>새 질문</h3><form id="question-create" class="stack"><div class="field"><label>제목</label><input name="title" required maxlength="100" placeholder="예: 오늘 배운 표현이 궁금해요"></div><div class="field"><label>질문 내용</label><textarea name="content" required maxlength="8000" rows="6" placeholder="질문을 자세히 작성해 주세요."></textarea></div><div class="field"><label for="question-week">어느 차시에 대한 질문인가요? (선택)</label><select id="question-week" name="weekId"><option value="">차시 선택 안 함</option>${S.weeks.map(w=>`<option value="${esc(w.id)}">${esc(w.label)}</option>`).join('')}</select></div><button class="btn" type="submit">질문 보내기</button></form></div>`;
   // 지난 반: 주고받은 질문과 답변만 읽을 수 있습니다. 새 질문은 현재 반에서 남깁니다.
   body.innerHTML=(S.past?bodyHeader('질문 기록','지난 반에서 주고받은 질문과 답변이에요. 새 질문은 현재 반에서 남겨 주세요.'):bodyHeader('질문하기','궁금한 점을 선생님께 남겨보세요. 답변은 실시간으로 표시됩니다.'))+`<div class="${S.past?'stack':'grid2'}" style="align-items:start">${newQuestionCard}<div class="stack"><div class="between"><h3>내 질문</h3><span class="pill brand" id="question-count">0건</span></div><div id="question-list" class="question-list"><div class="loading">질문 확인 중</div></div></div></div><div id="student-thread" style="margin-top:17px"></div>`;
-  if($('#question-create'))$('#question-create').onsubmit=async e=>{e.preventDefault();const form=e.currentTarget,fd=new FormData(form);const title=String(fd.get('title')||'').trim(),content=String(fd.get('content')||'').trim();if(!title||!content)return;const btn=$('button[type="submit"]',form);btn.disabled=true;try{await addDoc(collection(db,'classes',S.classId,'questions'),{uid:S.user.uid,studentName:S.profile.displayName||'수강생',title,content,createdAt:serverTimestamp(),status:'open',needsTeacherReply:true,lastMessageAt:serverTimestamp(),lastSenderRole:'student'});form.reset();toast('질문이 전송되었습니다.')}catch(err){toast(ex(err),true)}finally{btn.disabled=false}};
+  if($('#question-create'))$('#question-create').onsubmit=async e=>{e.preventDefault();const form=e.currentTarget,fd=new FormData(form);const title=String(fd.get('title')||'').trim(),content=String(fd.get('content')||'').trim(),weekId=String(fd.get('weekId')||'');if(!title||!content)return;const btn=$('button[type="submit"]',form);btn.disabled=true;try{await createQuestion({title,content,weekId});form.reset();toast('질문이 전송되었습니다.')}catch(err){toast(ex(err),true)}finally{btn.disabled=false}};
   S.live.questions=onSnapshot(query(collection(db,'classes',S.classId,'questions'),where('uid','==',S.user.uid)),snap=>{
     if(S.tab!=='questions')return;const list=$('#question-list');if(!list)return;
     const docs=snap.docs.map(d=>({id:d.id,...d.data()})).sort(byLastActivity); // 최근 대화순(P0-03)
     $('#question-count').textContent=docs.length+'건';list.classList.remove('loading');
-    list.innerHTML=docs.map(q=>`<button class="question-thread ${S.activeQuestionId===q.id?'thread-open':''}" type="button" data-qid="${esc(q.id)}" style="text-align:left"><div class="between"><strong>${esc(q.title)}</strong>${studentQuestionBadge(q)}</div><p class="hint" style="margin-top:5px">${esc(formatDateTime(q.lastMessageAt||q.createdAt))}</p><p class="muted" style="font-size:13px;margin-top:7px">${esc(q.content.slice(0,110))}</p></button>`).join('')||empty('아직 질문이 없습니다','첫 질문을 남겨 보세요.');
+    list.innerHTML=docs.map(q=>`<button class="question-thread ${S.activeQuestionId===q.id?'thread-open':''}" type="button" data-qid="${esc(q.id)}" style="text-align:left"><div class="between"><strong>${esc(q.title)}</strong>${studentQuestionBadge(q)}</div><p class="hint" style="margin-top:5px">${questionTag(q)?`<span class="question-session-tag">${esc(questionTag(q))}</span>`:''}${esc(formatDateTime(q.lastMessageAt||q.createdAt))}</p><p class="muted" style="font-size:13px;margin-top:7px">${esc(q.content.slice(0,110))}</p></button>`).join('')||empty('아직 질문이 없습니다','첫 질문을 남겨 보세요.');
     $$('[data-qid]',list).forEach(el=>el.onclick=()=>{S.activeQuestionId=el.dataset.qid;$$('[data-qid]',list).forEach(b=>b.classList.toggle('thread-open',b===el));showStudentThread(docs.find(q=>q.id===S.activeQuestionId))});
     if(S.activeQuestionId)markQuestionSeen(docs.find(q=>q.id===S.activeQuestionId)); // 대화를 연 채로 새 답변이 오면 확인한 것으로
     if(S.activeQuestionId&&!docs.some(q=>q.id===S.activeQuestionId)){S.activeQuestionId='';stopLive('replies');$('#student-thread').innerHTML=''}
     else if(S.activeQuestionId && !S.live.replies)showStudentThread(docs.find(q=>q.id===S.activeQuestionId));
   },err=>{showLoadFailed($('#question-list'),()=>renderBody(),err);onLiveError(err)});
 }
+// 질문의 차시 이름은 반 일정 사본에서 찾습니다(차시가 비공개로 바뀌어도 이름은 보이도록).
+const questionTag=q=>questionSessionTag(q,(S.weeks.find(w=>w.id===q.weekId)||currentClass()?.schedule?.find(x=>x.weekId===q.weekId))?.label);
 // 학생 목록 배지: 선생님이 마지막으로 답했으면 '답변 도착', 학생이 마지막이면 '답변 대기'(P0-03)
 function studentQuestionBadge(q){
   if(needsReply(q))return statusPill('warning','답변 대기');
+  if(hasNewAnswer(q))return statusPill('brand','새 답변');
   return statusPill('success',q.lastSenderRole==='admin'?'답변 도착':'답변 완료');
 }
 // 질문 대화를 연 시각(P1-05): 마지막으로 연 뒤 새 대화가 있을 때만 기록합니다(새 답변 배지의 기준).
@@ -629,13 +934,17 @@ function showStudentThread(q){if(!q)return;stopLive('replies');const holder=$('#
     await batch.commit();form.reset()}catch(err){toast(ex(err),true)}finally{btn.disabled=false}};
   S.live.replies=onSnapshot(collection(db,...questionPath(q.id),'replies'),snap=>{if(S.activeQuestionId!==q.id)return;const list=$('#student-replies');if(!list)return;const replies=snap.docs.map(d=>d.data()).sort((a,b)=>(a.createdAt?.seconds||0)-(b.createdAt?.seconds||0));loaded(list,replies.map(r=>`<div class="reply-bubble ${r.role==='admin'?'teacher':'student'}"><p class="hint">${r.role==='admin'?'선생님':'나'} · ${fmt(r.createdAt)}</p><p style="white-space:pre-wrap">${esc(r.text)}</p></div>`).join('')||'<p class="hint">아직 댓글이 없습니다.</p>')},onLiveError);
 }
-function renderClassmates(body){body.innerHTML=bodyHeader('우리 반','함께 스페인어를 공부하는 친구들이에요.')+`<div class="card"><div class="between" style="margin-bottom:18px"><h3>${esc(currentClass()?.name||'수강반')}</h3><span class="pill brand" id="classmate-count">—</span></div><div id="classmates-list" class="grid3"><div class="loading">수강생 확인 중</div></div><p class="hint" style="margin-top:17px">개인정보 보호를 위해 이름만 공개되며, 이메일이나 개별 학습 성적은 보이지 않습니다.</p></div>`;
+// 우리 반 친구들(배치 10: 하단 메뉴에서 내 정보 안으로 옮김). 반 명단에는 이름(별명)만 공개합니다.
+const classmatesCard=()=>`<div class="card classmates-card"><div class="between" style="margin-bottom:18px"><h3>우리 반 친구들 <small>${esc(currentClass()?.name||'')}</small></h3><span class="pill brand" id="classmate-count">—</span></div><div id="classmates-list" class="grid3"><div class="loading">수강생 확인 중</div></div><p class="hint" style="margin-top:17px">개인정보 보호를 위해 이름만 공개되며, 이메일이나 개별 학습 성적은 보이지 않습니다.</p></div>`;
+function startClassmatesLive(){
   S.live.classmates=onSnapshot(collection(db,'classes',S.classId,'members'),snap=>{
-    if(S.tab!=='classmates')return;const list=$('#classmates-list');if(!list)return;const members=snap.docs.map(d=>d.data()).filter(m=>m.status==='active').sort((a,b)=>(a.name||'').localeCompare(b.name||'','ko'));$('#classmate-count').textContent=members.length+'명';loaded(list,members.map(m=>`<div class="classmate-card"><span class="classmate-avatar">${esc((m.name||'?')[0])}</span><div><strong>${esc(m.name||'이름 미등록')}</strong>${m.uid===S.user.uid?'<p class="hint">나</p>':''}</div></div>`).join('')||empty('아직 반 명단이 없습니다','강사가 수강생 관리를 열면 기존 명단도 동기화됩니다.'));
+    if(S.tab!=='mypage')return;const list=$('#classmates-list');if(!list)return;const members=snap.docs.map(d=>d.data()).filter(m=>m.status==='active').sort((a,b)=>(a.name||'').localeCompare(b.name||'','ko'));$('#classmate-count').textContent=members.length+'명';loaded(list,members.map(m=>`<div class="classmate-card"><span class="classmate-avatar">${esc((m.name||'?')[0])}</span><div><strong>${esc(m.name||'이름 미등록')}</strong>${m.uid===S.user.uid?'<p class="hint">나</p>':''}</div></div>`).join('')||empty('아직 반 명단이 없습니다','강사가 수강생 관리를 열면 기존 명단도 동기화됩니다.'));
   },err=>{showLoadFailed($('#classmates-list'),()=>renderBody(),err);onLiveError(err)});
 }
 
-if(CONFIGURED){onAuthStateChanged(auth,async user=>{try{if(!user){resetStudentSession();mountAuth(root);return}S.user=user;root.innerHTML='<div class="loading" style="min-height:90vh">학습 정보를 준비하고 있습니다</div>';S.profile=await ensureProfile(user);if(S.profile.role==='admin'){root.innerHTML=`<div style="max-width:450px;margin:100px auto;padding:24px" class="card"><h2>강사 계정입니다</h2><p style="margin:15px 0">강사 관리 페이지를 이용해 주세요.</p><a class="btn" href="admin.html">강사 페이지로 이동 →</a></div>`;return}await loadStudent()}catch(e){console.error(e);root.innerHTML=`<div class="card" style="max-width:550px;margin:70px auto"><h3>불러오기 실패</h3><p class="error">${esc(ex(e))}</p><button class="btn secondary" id="retry-student">다시 시도</button></div>`;$('#retry-student').onclick=()=>location.reload()}})}else mountAuth(root);
+// 새로고침하면 보던 화면(주소의 #과제 등)으로 돌아갑니다. 페이지를 연 뒤 처음 로그인할 때 한 번만 씁니다.
+let tabFromHash=location.hash.slice(1);
+if(CONFIGURED){onAuthStateChanged(auth,async user=>{try{if(!user){resetStudentSession();mountAuth(root);return}S.user=user;if(['home','assignment','quiz','questions','mypage','preview'].includes(tabFromHash))S.tab=tabFromHash;tabFromHash='';root.innerHTML='<div class="loading" style="min-height:90vh">학습 정보를 준비하고 있습니다</div>';S.profile=await ensureProfile(user);if(S.profile.role==='admin'){root.innerHTML=`<div style="max-width:450px;margin:100px auto;padding:24px" class="card"><h2>강사 계정입니다</h2><p style="margin:15px 0">강사 관리 페이지를 이용해 주세요.</p><a class="btn" href="admin.html">강사 페이지로 이동 →</a></div>`;return}await loadStudent()}catch(e){console.error(e);root.innerHTML=`<div class="card" style="max-width:550px;margin:70px auto"><h3>불러오기 실패</h3><p class="error">${esc(ex(e))}</p><button class="btn secondary" id="retry-student">다시 시도</button></div>`;$('#retry-student').onclick=()=>location.reload()}})}else mountAuth(root);
 
 
 </script>

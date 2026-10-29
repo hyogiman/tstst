@@ -14,6 +14,8 @@
 .side-menu-group{display:block}
 .side-link{display:flex;align-items:center;gap:12px;width:100%;min-height:44px;padding:0 12px;border:0;border-radius:11px;background:transparent;color:var(--ink-2);font-size:14px;font-weight:650;text-align:left;transition:background .15s,color .15s}
 .side-link svg{width:20px;height:20px;flex-shrink:0;color:var(--subtle)}
+/* 배치 10: 처리할 일이 있는 메뉴 배지(숫자는 화면 읽기 도구용 문장과 함께) */
+.side-badge{margin-left:auto;min-width:22px;height:22px;padding:0 7px;border-radius:var(--r-pill);background:var(--wine-600);color:#fff;font-size:12px;font-weight:800;line-height:22px;text-align:center;font-variant-numeric:tabular-nums}
 .side-link>span:nth-child(2){flex:1}
 .side-link:hover{background:var(--surface-2);color:var(--ink)}
 .side-link.active{background:var(--wine-50);color:var(--wine-700);font-weight:750;box-shadow:inset 3px 0 0 var(--wine-600)}
@@ -267,6 +269,8 @@ button.dash-action:hover{border-color:var(--wine-200);box-shadow:var(--shadow-md
 .feedback-directory-head h3{font-size:16px}
 .feedback-tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .question-tools{display:flex;gap:8px;flex-wrap:wrap}
+.question-session-tag{display:inline-block;margin-right:6px;padding:1px 8px;border-radius:var(--r-pill);background:var(--surface-2);border:1px solid var(--line);color:var(--ink-2);font-size:11px;font-weight:700}
+.question-session-tag+.question-subject{margin-top:4px}
 .question-tools input{flex:1 1 160px;min-width:0}
 .question-tools select{flex:0 1 130px;min-height:44px}
 .feedback-tools .field{flex:1 1 150px}

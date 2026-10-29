@@ -15,8 +15,8 @@
 <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;1,9..144,500&display=swap">
 <!-- 배포할 때 CSS를 바꾸면 ?v= 값을 함께 올려 브라우저 캐시를 갱신하세요 -->
-<link rel="stylesheet" href="common.css?v=20261029g">
-<link rel="stylesheet" href="admin.css?v=20261029g">
+<link rel="stylesheet" href="common.css?v=20261029h">
+<link rel="stylesheet" href="admin.css?v=20261029h">
 </head>
 <body>
 <div id="root"></div>
@@ -36,8 +36,8 @@ window.__appStarted=true; // 모듈(외부 SDK 포함)을 모두 불러와 앱�
 import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import { doc, getDoc, getDocs, collection, query, where, setDoc, updateDoc, deleteDoc, serverTimestamp, arrayUnion, onSnapshot, writeBatch, runTransaction, deleteField } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
 import { ref as storageRef, deleteObject } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-storage.js';
-import { CONFIGURED, auth, db, storage, $, $$, esc, fmt, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, mountAuth, formatDuration, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalDialog, modalConfirm, modalInput, formatDateTime, todayKey, statusPill, paintPill, needsReply, byLastActivity, feedbackItems, reviewState, REVIEW_LABEL, openModalLayer, toDate, quizContentKey, answersFor, audioMarkup, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded, modalChoice, sessionState, sessionDateText, parseYouTube, SIZE_LABEL, uploadsInProgress, wasActiveAt, daysBetween, partsInZone, attendanceValue, normalizeQuizQuestion, isCorrectAnswer } from './common.js?v=20261029g';
-import { computeDashboard, analyzeQuiz, WATCH_RULES, TREND_SESSIONS } from './dashboard.js?v=20261029g';
+import { CONFIGURED, auth, db, storage, $, $$, esc, fmt, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, mountAuth, formatDuration, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalDialog, modalConfirm, modalInput, formatDateTime, todayKey, statusPill, paintPill, needsReply, byLastActivity, feedbackItems, reviewState, REVIEW_LABEL, openModalLayer, toDate, quizContentKey, answersFor, audioMarkup, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded, modalChoice, sessionState, sessionDateText, parseYouTube, SIZE_LABEL, uploadsInProgress, wasActiveAt, daysBetween, partsInZone, attendanceValue, normalizeQuizQuestion, isCorrectAnswer, questionSessionTag } from './common.js?v=20261029h';
+import { computeDashboard, analyzeQuiz, feedbackQueue, WATCH_RULES, TREND_SESSIONS } from './dashboard.js?v=20261029h';
 
 
 // ===== ADMIN PAGE =====
@@ -55,7 +55,7 @@ function adminClearLive(){for(const key of Object.keys(A.live))adminStopLive(key
 // 로그아웃 때 실시간 연결·녹음·음성 초안·화면 상태를 모두 정리합니다(P0-09).
 function resetAdminSession(){
   stopRecordingForNavigation();
-  adminClearLive();
+  adminClearLive();stopAdminBadges();
   Object.assign(A,adminInitialState());
 }
 window.addEventListener('beforeunload',e=>{flushFeedbackDraft();if(A.user&&(isRecording()||Object.keys(A.voiceDrafts).length||isFeedbackTextDirty()||isWeekEditorDirty()||uploadsInProgress()>0)){e.preventDefault();e.returnValue=''}});
@@ -203,6 +203,36 @@ async function showStudentAttendance(student){
    btn.disabled=true;
    try{const batch=writeBatch(db);changes.forEach(({r,value,note})=>{const ref=doc(db,'classes',cid,'weeks',r.weekId,'attendance',student.uid);if(value)batch.set(ref,{status:value,note,updatedAt:serverTimestamp()},{merge:true});else if(r.exists)batch.delete(ref)});await batch.commit();toast(`${student.studentName}님의 출결 ${changes.length}건을 저장했어요.`);close()}catch(err){toast(ex(err),true);btn.disabled=false}};
 }
+// ===== 사이드바 배지 (배치 10 · P2-08) =====
+// '질문함' = 지금 반의 답변 대기 질문(needsReply), '과제 · 복습 관리' = 피드백 대기 + 재검토 대기(대시보드 처리할 일과 같은 feedbackQueue 기준).
+// 화면을 옮겨도 유지하는 구독: 질문 1 + 수강 등록 1 + 차시별 제출 목록(지난·오늘 차시와 과제가 켜진 다가오는 차시). 반이 바뀌면 다시 엽니다.
+const badges={live:{},counts:{questions:0,feedback:0},cid:''};
+function paintSideBadges(){
+  for(const [page,n,what] of [['questions',badges.counts.questions,'답변 대기 질문'],['feedback',badges.counts.feedback,'피드백·재검토 대기']]){
+    const link=$(`.side-link[data-page="${page}"]`);if(!link)continue;
+    $('.side-badge',link)?.remove();$('.side-badge-text',link)?.remove();
+    if(n)link.insertAdjacentHTML('beforeend',`<span class="side-badge" aria-hidden="true">${n>99?'99+':n}</span><span class="sr-only side-badge-text">, ${what} ${n}건</span>`);
+  }
+}
+function stopAdminBadges(){for(const off of Object.values(badges.live))off();badges.live={};badges.counts={questions:0,feedback:0};badges.cid='';paintSideBadges()}
+function startAdminBadges(){
+  stopAdminBadges();
+  const cid=A.classId;if(!cid||!A.user)return;
+  badges.cid=cid;
+  const data={questions:[],active:new Set(),subs:{}},today=todayKey();
+  const recount=()=>{
+    if(badges.cid!==cid)return;
+    let feedback=0;for(const list of Object.values(data.subs)){const q=feedbackQueue(list,data.active,reviewState);feedback+=q.pending+q.rereview}
+    badges.counts={questions:data.questions.filter(needsReply).length,feedback};paintSideBadges();
+  };
+  const warn=key=>err=>console.warn('사이드바 배지 구독 실패',key,err);
+  badges.live.questions=onSnapshot(collection(db,'classes',cid,'questions'),snap=>{data.questions=snap.docs.map(d=>d.data());recount()},warn('questions'));
+  badges.live.enrollments=onSnapshot(query(collection(db,'enrollments'),where('classId','==',cid)),snap=>{data.active=new Set(snap.docs.map(d=>d.data()).filter(e=>e.status==='active').map(e=>e.uid));recount()},warn('enrollments'));
+  for(const w of A.weeks){
+    if(sessionState({date:sessionDateOf(w)},today)==='upcoming'&&!w.assignment?.enabled)continue;
+    badges.live['sub:'+w.id]=onSnapshot(collection(db,'classes',cid,'weeks',w.id,'submissions'),snap=>{data.subs[w.id]=snap.docs.map(d=>({id:d.id,...d.data()}));recount()},warn('submissions '+w.id));
+  }
+}
 function frame(){
   enterHistory();
   const sidebarEntries=[['overview','대시보드'],['classes','클래스 관리'],['weeks','차시별 학습자료'],['feedback','과제 · 복습 관리'],['questions','질문함'],['attendance','출석체크']];
@@ -219,6 +249,7 @@ function frame(){
   $('#admin-class-switch')?.addEventListener('change',async e=>{if(!(await confirmLeaveWeekEditor())){e.target.value=A.classId;return}adminClearLive();A.classId=e.target.value;localStorage.setItem(classPrefKey(),A.classId);A.weekId='';if(A.classId)await loadWeeks();renderPage()});
   $$('[data-page]').forEach(el=>el.onclick=()=>navigateAdminPage(el.dataset.page));
   $$('[data-side-class]').forEach(el=>el.onclick=()=>openClassRoster(el.dataset.sideClass));
+  paintSideBadges();
   renderPage();
 }
 function renderPage(){
@@ -228,7 +259,7 @@ function renderPage(){
   if(A.page==='overview')showOverview(b);if(A.page==='classes')showClasses(b);if(A.page==='weeks')showWeeks(b);if(A.page==='feedback')showFeedback(b);if(A.page==='attendance')showAttendance(b);if(A.page==='students')showStudents(b);if(A.page==='questions')showAdminQuestions(b);
 }
 async function loadAdmin(preferred=''){const cs=await getDocs(collection(db,'classes'));A.classes=cs.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.name||'').localeCompare(b.name||'','ko'));await syncJoinCodes(A.classes);const choice=preferred||A.classId||localStorage.getItem(classPrefKey());A.classId=A.classes.some(c=>c.id===choice)?choice:(A.classes.find(c=>!c.archived)?.id||A.classes[0]?.id||'');if(A.classId){localStorage.setItem(classPrefKey(),A.classId);await loadWeeks();await syncMemberDirectory().catch(e=>console.warn('명단 동기화 실패',e))}else{A.weeks=[];A.weekId=''}frame()}
-async function loadWeeks(){const snap=await getDocs(collection(db,'classes',A.classId,'weeks'));A.weeks=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.order||0)-(b.order||0));if(!A.weeks.some(w=>w.id===A.weekId))A.weekId=A.weeks.at(-1)?.id||'';}
+async function loadWeeks(){const snap=await getDocs(collection(db,'classes',A.classId,'weeks'));A.weeks=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.order||0)-(b.order||0));if(!A.weeks.some(w=>w.id===A.weekId))A.weekId=A.weeks.at(-1)?.id||'';startAdminBadges();}
 async function roster(){
   const snap=await getDocs(query(collection(db,'enrollments'),where('classId','==',A.classId)));
   const members=snap.docs.map(d=>({id:d.id,...d.data()}));
@@ -808,7 +839,9 @@ async function loadQuizVersions(cid,wid,list){
 }
 function attemptMarkup(x,versions,w){
   const snapshot=x.quizVersion?versions.get(Number(x.quizVersion)):null;
-  const questions=(snapshot||w.quiz?.questions||[]).map((q,i)=>({...normalizeQuestion(q),id:q.id||'idx'+i}));
+  const all=(snapshot||w.quiz?.questions||[]).map((q,i)=>({...normalizeQuestion(q),id:q.id||'idx'+i}));
+  // 배치 10: 학생의 '틀린 문제만 다시 풀기'는 그 문항만 풀고(mode:'wrongOnly'), 점수·첫 응시에는 들어가지 않습니다.
+  const practice=x.mode==='wrongOnly',questions=practice?all.filter(q=>(x.questionIds||[]).includes(q.id)):all;
   const answers=answersFor(x,questions);
   const pct=Math.round((Number(x.score)||0)/Math.max(1,Number(x.total)||1)*100);
   const note=x.legacy?'이전 기록에서 가져온 첫 결과 · 문제 버전 미상':!x.quizVersion?'이전 기록 · 문제 버전 미상':snapshot?`문제 버전 ${x.quizVersion}`:`문제 버전 ${x.quizVersion} 사본 없음`;
@@ -817,7 +850,7 @@ function attemptMarkup(x,versions,w){
     const display=arr=>arr.length?arr.map(v=>q.options[Number(v)]||'?').join(', '):'미응답';
     return `<p class="hint" style="padding:4px 0">${i+1}. ${esc(q.stem)} · 학생: ${esc(display(answer))} ${correct?'✓':'✗'} · 정답: ${esc(display(q.correctIndices))}</p>`;
   }).join('');
-  return `<details style="padding:9px 0;border-bottom:1px solid var(--line)"><summary class="between" style="cursor:pointer;list-style:none"><div><strong>${Number(x.attemptNumber)||1}번째 응시</strong><p class="hint">${x.legacy?'':esc(formatDateTime(x.submittedAt))+' · '}${esc(note)}</p></div><span class="pill brand">${x.attemptNumber===1?'첫 응시 · ':''}${Number(x.score)||0}/${Number(x.total)||0} · ${pct}%</span></summary><div style="margin-top:10px">${lines}${snapshot?'':'<p class="notice warn" style="margin-top:8px">현재 문제 기준 추정 · 응시 이후 문제가 바뀌었다면 해석이 다를 수 있어요.</p>'}</div></details>`;
+  return `<details style="padding:9px 0;border-bottom:1px solid var(--line)"><summary class="between" style="cursor:pointer;list-style:none"><div><strong>${practice?'틀린 문제 다시 풀기':`${Number(x.attemptNumber)||1}번째 응시`}</strong><p class="hint">${x.legacy?'':esc(formatDateTime(x.submittedAt))+' · '}${esc(note)}${practice?' · 점수·첫 응시에 넣지 않는 연습':''}</p></div><span class="pill brand">${!practice&&x.attemptNumber===1?'첫 응시 · ':''}${practice?'연습 ':''}${Number(x.score)||0}/${Number(x.total)||0} · ${pct}%</span></summary><div style="margin-top:10px">${lines}${snapshot?'':'<p class="notice warn" style="margin-top:8px">현재 문제 기준 추정 · 응시 이후 문제가 바뀌었다면 해석이 다를 수 있어요.</p>'}</div></details>`;
 }
 function teacherComments(data,uid,kind){
   const lines=[...(data?.feedbacks||[])].map((f,i)=>({...f,_position:i}));
@@ -946,8 +979,9 @@ async function drawFeedbackList(){
         if(!attempt.open)return;
         const uid=attempt.dataset.attemptHistory,holder=$('[data-attempt-content]',attempt);loading(holder);
         try{const snap=await getDocs(collection(db,weekKey(cid,wid),'quizResults',uid,'attempts'));
-          const history=snap.docs.map(x=>x.data()).sort((a,b)=>(a.attemptNumber||0)-(b.attemptNumber||0));
-          const prev=map.get(uid);if(prev?.firstAttempt?.legacy&&!history.some(x=>x.attemptNumber===1))history.unshift({...prev.firstAttempt,attemptNumber:1,legacy:true});
+          const at=x=>toDate(x.submittedAt)?.getTime()||0;
+          const history=snap.docs.map(x=>x.data()).sort((a,b)=>(a.attemptNumber||0)-(b.attemptNumber||0)||at(a)-at(b)); // 틀린 문제 연습은 그 앞 응시 바로 뒤에
+          const prev=map.get(uid);if(prev?.firstAttempt?.legacy&&!history.some(x=>x.attemptNumber===1&&x.mode!=='wrongOnly'))history.unshift({...prev.firstAttempt,attemptNumber:1,legacy:true});
           // P1-02: 각 응시를 그 응시의 문제 버전으로 해석합니다. 버전이 없는 이전 기록은 현재 문제로 추정해 표시합니다.
           const versions=await loadQuizVersions(cid,wid,history.map(x=>x.quizVersion).filter(Boolean));
           loaded(holder,history.map(x=>attemptMarkup(x,versions,w)).join('')||'<p class="hint">저장된 응시 기록이 없습니다.</p>');
@@ -1045,7 +1079,7 @@ function showAdminQuestions(body){
       const term=A.questionSearch.trim().toLocaleLowerCase();
       const waitingOnly=A.questionFilter==='waiting';
       const filtered=questions.filter(q=>(!waitingOnly||needsReply(q))&&(!term||`${liveDisplayName(q)} ${q.title||''} ${q.content||''}`.toLocaleLowerCase().includes(term)));
-      loaded(list,filtered.map(q=>`<button type="button" class="question-thread ${A.activeQuestionId===q.id?'thread-open':''}" data-admin-qid="${esc(q.id)}" aria-pressed="${A.activeQuestionId===q.id}"><div class="between" style="align-items:center;gap:8px"><span class="question-person-main"><span class="person-avatar" aria-hidden="true">${esc(liveDisplayName(q).slice(0,1))}</span><strong>${esc(liveDisplayName(q))}</strong></span>${questionBadge(q,'style="flex-shrink:0"')}</div><div class="question-item-title">${esc(q.title||'제목 없음')}</div><p class="question-item-excerpt">${esc(String(q.content||'').replace(/\s+/g,' ').slice(0,110))}</p><p class="question-item-meta">${esc(formatDateTime(q.lastMessageAt||q.createdAt))}${needsReply(q)&&q.answeredAt?' · 학생 추가 질문':''}</p></button>`).join('')||(term?empty('검색 결과가 없습니다','다른 학생 이름이나 질문을 입력해 보세요.'):waitingOnly&&questions.length?empty('답변을 기다리는 질문이 없어요','모든 질문에 답했어요. 전체 질문을 보려면 위에서 \'전체 질문\'을 고르세요.'):empty('아직 질문이 없습니다','학생이 질문을 등록하면 실시간으로 표시됩니다.')));
+      loaded(list,filtered.map(q=>`<button type="button" class="question-thread ${A.activeQuestionId===q.id?'thread-open':''}" data-admin-qid="${esc(q.id)}" aria-pressed="${A.activeQuestionId===q.id}"><div class="between" style="align-items:center;gap:8px"><span class="question-person-main"><span class="person-avatar" aria-hidden="true">${esc(liveDisplayName(q).slice(0,1))}</span><strong>${esc(liveDisplayName(q))}</strong></span>${questionBadge(q,'style="flex-shrink:0"')}</div><div class="question-item-title">${esc(q.title||'제목 없음')}</div><p class="question-item-excerpt">${esc(String(q.content||'').replace(/\s+/g,' ').slice(0,110))}</p><p class="question-item-meta">${adminQuestionTag(q)?`<span class="question-session-tag">${esc(adminQuestionTag(q))}</span>`:''}${esc(formatDateTime(q.lastMessageAt||q.createdAt))}${needsReply(q)&&q.answeredAt?' · 학생 추가 질문':''}</p></button>`).join('')||(term?empty('검색 결과가 없습니다','다른 학생 이름이나 질문을 입력해 보세요.'):waitingOnly&&questions.length?empty('답변을 기다리는 질문이 없어요','모든 질문에 답했어요. 전체 질문을 보려면 위에서 \'전체 질문\'을 고르세요.'):empty('아직 질문이 없습니다','학생이 질문을 등록하면 실시간으로 표시됩니다.')));
       $$('[data-admin-qid]',list).forEach(el=>el.onclick=()=>{
         A.activeQuestionId=el.dataset.adminQid;
         $$('[data-admin-qid]',list).forEach(button=>{button.classList.toggle('thread-open',button.dataset.adminQid===A.activeQuestionId);button.setAttribute('aria-pressed',String(button.dataset.adminQid===A.activeQuestionId))});
@@ -1061,6 +1095,8 @@ function showAdminQuestions(body){
     else if(A.activeQuestionId)paintQuestionHeader(A.questionCache.get(A.activeQuestionId)); // 열린 상세의 배지·버튼도 최신 상태로
   },adminLiveError);
 }
+// 배치 10: 학생이 차시를 골랐거나 피드백에서 보낸 질문은 '3차시 과제'처럼 차시를 표시합니다.
+const adminQuestionTag=q=>questionSessionTag(q,A.weeks.find(w=>w.id===q.weekId)?.label);
 // 상세 화면 머리(배지·상태 버튼)는 지역 변수가 아니라 최신 질문 데이터로 그립니다.
 function paintQuestionHeader(q){
   const badge=$('#admin-question-badge'),toggle=$('#question-status');
@@ -1075,7 +1111,7 @@ function showAdminQuestionThread(q){
   const el=$('#admin-question-detail');if(!el)return;
   const qid=q.id,cid=A.classId;
   const latest=()=>A.questionCache?.get(qid)||q;
-  el.innerHTML=`<div class="stack"><div class="between"><div><div class="question-student-title">${esc(q.displayStudentName||A.questionNameMap.get(q.uid)||q.studentName||'수강생')}</div><p class="hint">${esc(formatDateTime(q.createdAt))}</p></div><span class="pill" id="admin-question-badge"></span></div><div><div class="question-subject">${esc(q.title||'제목 없음')}</div><div class="subtle question-body">${esc(q.content||'')}</div></div><div id="admin-replies" class="stack"><div class="loading">답변 불러오는 중</div></div><form id="admin-reply-form" class="stack"><div class="field"><label for="admin-reply-text">강사 답변</label><textarea id="admin-reply-text" name="text" rows="5" required maxlength="8000" placeholder="학생에게 전달할 답변을 작성해 주세요."></textarea></div><button class="btn" type="submit">답변 등록</button></form><button id="question-status" type="button" class="btn secondary small"></button></div>`;
+  el.innerHTML=`<div class="stack"><div class="between"><div><div class="question-student-title">${esc(q.displayStudentName||A.questionNameMap.get(q.uid)||q.studentName||'수강생')}</div><p class="hint">${esc(formatDateTime(q.createdAt))}</p></div><span class="pill" id="admin-question-badge"></span></div><div>${adminQuestionTag(q)?`<span class="question-session-tag">${esc(adminQuestionTag(q))}</span>`:''}<div class="question-subject">${esc(q.title||'제목 없음')}</div><div class="subtle question-body">${esc(q.content||'')}</div></div><div id="admin-replies" class="stack"><div class="loading">답변 불러오는 중</div></div><form id="admin-reply-form" class="stack"><div class="field"><label for="admin-reply-text">강사 답변</label><textarea id="admin-reply-text" name="text" rows="5" required maxlength="8000" placeholder="학생에게 전달할 답변을 작성해 주세요."></textarea></div><button class="btn" type="submit">답변 등록</button></form><button id="question-status" type="button" class="btn secondary small"></button></div>`;
   paintQuestionHeader(latest());
   $('#admin-reply-form').onsubmit=async e=>{
     e.preventDefault();
