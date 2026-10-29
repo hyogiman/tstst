@@ -13,7 +13,7 @@
 
 | 배치 | 상태 | 비고 |
 |---|---|---|
-| 01 검증 환경 | **완료 (배치마다 확장)** | 모의 Firebase 하네스 + 시나리오 테스트(`node tests/run.cjs`, 76개), 규칙 에뮬레이터 테스트(`tests/rules`, 98개), 정적 검사(`node tests/lint.cjs`), 반응형 스크린샷(`node tests/screens.cjs`) |
+| 01 검증 환경 | **완료 (배치마다 확장)** | 모의 Firebase 하네스 + 시나리오 테스트(`node tests/run.cjs`, 76개), 규칙 에뮬레이터 테스트(`tests/rules`, 108개), 정적 검사(`node tests/lint.cjs`), 반응형 스크린샷(`node tests/screens.cjs`) |
 | 02 보안 규칙 | **완료 (v3 수정안)** | 저장소의 `firestore.rules`·`storage.rules`가 v3 수정안. 게시된 규칙은 v2(cad3afc). **배포는 사용자가 콘솔에서 직접, 화면 파일보다 먼저** |
 | 03 공통 모듈 | **완료** | `common.js`(두 화면 공용), 정적 검사 |
 | 04 기록 보호·오전달 | **완료** | P0-01(D2: 출석·불참 2단계), P0-02, P0-08(D4), P0-09, P0-10 |
