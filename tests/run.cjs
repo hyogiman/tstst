@@ -905,8 +905,8 @@ test('DB01 computeDashboard: 대상자·출석률·입력률·제출률·참여�
     const sessions = [
       { id: 's1', label: '1차시 · 인사', date: day(-14), published: true, assignment: { enabled: true }, quiz, preview: { enabled: true } },
       { id: 's2', label: '2차시', date: day(-7), published: true, assignment: { enabled: true }, quiz, preview: { enabled: true } },
-      { id: 's3', label: '3차시', date: today, published: true, assignment: { enabled: true }, quiz: off, preview: off },
-      { id: 's4', label: '4차시', date: day(2), published: false, assignment: off, quiz: off, preview: off },
+      { id: 's3', label: '3차시', date: today, published: true, assignment: { enabled: true }, quiz: off, preview: { enabled: false, mode: 'rich', richHtml: '<p>인사 표현 읽어 오기</p>' } }, // 만든 예습이 꺼짐
+      { id: 's4', label: '4차시', date: day(2), published: false, assignment: off, quiz: off, preview: { enabled: true, videos: [{ kind: 'youtube', videoId: 'v1', name: '영상' }] } }, // 예습은 켰지만 차시 비공개
       { id: 's5', label: '5차시', date: day(10), published: false, assignment: off, quiz: off, preview: off },
     ];
     const enrollments = [
@@ -1044,6 +1044,34 @@ test('DB05 대시보드: 0건이면 "처리할 일이 없어요", 문항 분석�
   eq(order, ['1번 정답률 0% 0/2명', '2번 정답률 50% 1/2명', '3번 정답률 100% 2/2명'], '정답률 낮은 순');
   assert((await page.innerText('.dash-item:first-child .is-top-wrong')).includes('가장 많이 고른 오답'), '오답 강조 없음');
   assert((await page.innerText('#dash-item-body')).includes('첫 응시를 알 수 없는 이전 기록 1명'), '이전 기록 분리 안내 없음');
+});
+
+test('DB06 공개 누락: 만들어 둔 예습이 안 보이는 차시만 셈(예습을 쓰지 않는 차시·빈 편집기·이미지 없는 이미지 모드는 제외)', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  const r = await page.evaluate(async () => {
+    const { computeDashboard, previewPrepared } = await import('/dashboard.js');
+    const c = await import('/common.js?v=test');
+    const today = c.todayKey(), day = n => c.todayKey(new Date(Date.now() + n * 86400000));
+    const text = html => ({ enabled: false, mode: 'rich', richHtml: html });
+    const s = (id, date, published, preview) => ({ id, label: id + '차시', date, published, assignment: { enabled: false }, quiz: { enabled: false, questions: [] }, preview });
+    const sessions = [
+      s('1', today, true, { enabled: false, mode: 'rich', richHtml: '', imagePath: '', videos: [], files: [] }), // 예습을 쓰지 않음
+      s('2', today, true, text('<p>읽어 올 표현</p>')),                                                          // 만든 글이 꺼짐 → 셈
+      s('3', day(1), true, text('<p><br></p><div>&nbsp;</div>')),                                               // 편집기에 빈 줄만
+      s('4', day(1), true, { enabled: false, mode: 'image', imagePath: '', richHtml: '<p>예전 글</p>' }),        // 이미지 모드인데 이미지 없음
+      s('5', day(2), true, { enabled: false, mode: 'image', imagePath: 'classes/c/previews/5/image/a.png' }),    // 이미지가 꺼짐 → 셈
+      s('6', day(2), false, { enabled: true, files: [{ path: 'p', name: '단어장.pdf' }] }),                      // 차시 비공개 → 셈
+      s('7', day(3), false, { enabled: false, mode: 'rich', richHtml: '' }),                                     // 빈 차시가 비공개(아직 준비 전)
+      s('8', day(3), true, { enabled: true, mode: 'rich', richHtml: '<p>공개됨</p>' }),                          // 이미 보임
+      s('9', day(5), true, text('<p>멀리 있는 차시</p>')),                                                        // 3일 밖
+    ];
+    const deps = { sessionState: c.sessionState, wasActiveAt: c.wasActiveAt, reviewState: c.reviewState, needsReply: c.needsReply, attendanceValue: c.attendanceValue, daysBetween: c.daysBetween };
+    const d = computeDashboard({ sessions, enrollments: [], events: {}, names: {}, attendance: {}, submissions: {}, quizResults: {}, questions: [] }, today, deps);
+    return { publish: d.actions.publish.sessions.map(x => x.id + ':' + x.reason), total: d.actions.total, none: [previewPrepared(null), previewPrepared(undefined), previewPrepared({ title: '제목만' })] };
+  });
+  eq(r.publish, ['2:예습 꺼짐', '5:예습 꺼짐', '6:비공개'], '공개 누락 차시');
+  eq(r.total, 3, '처리할 일 합계');
+  eq(r.none, [false, false, false], '예습 없음·제목만');
 });
 
 // ----- 배치 10: 학생 동선 · 새 소식 -----
@@ -1322,6 +1350,16 @@ test('A11Y03 긴 이름·긴 스페인어 문장·확대(좁은 폭)에서도 �
     assert(overflow <= 0, `${file} ${width}px 가로 넘침 ${overflow}px`);
     await context.close();
   }
+});
+
+test('A11Y04 소제목: 승인한 스페인어로 통일(영어 없음) · 스페인어 글자에는 lang="es"', async () => {
+  const fsx = require('node:fs'), pathx = require('node:path');
+  const src = ['index.html', 'admin.html', 'common.js'].map(n => fsx.readFileSync(pathx.join(__dirname, '..', n), 'utf8')).join('\n');
+  const tags = [...src.matchAll(/<(p|div|span) class="(?:eyebrow|kicker)"([^>]*)>(.*?)<\/\1>/g)].map(m => ({ attrs: m[2], inner: m[3], text: m[3].replace(/<[^>]*>/g, '') }));
+  assert(tags.length >= 20, '소제목 수: ' + tags.length);
+  const latin = /[A-Za-zÁÉÍÓÚÑÜáéíóúñü¡¿]/;
+  eq(tags.filter(t => latin.test(t.text) && !/lang="es"/.test(t.attrs) && !t.inner.includes('<span lang="es">')).map(t => t.text), [], 'lang="es"가 없는 스페인어 소제목');
+  eq(tags.filter(t => /\b(LEARNING|JOURNEY|CLASS|INSIGHTS|MANAGEMENT|SCHEDULE|LESSON|PLANNER|FEEDBACK|STUDENT|DIRECTORY|INSTRUCTOR|WORKSPACE|WELCOME|ACCESS|CONTROL|QUIZ|COMPLETE)\b/i.test(t.text)).map(t => t.text), [], '영어 소제목');
 });
 
 test('기본: 학생 과제 텍스트 제출, 퀴즈 3/3, 강사 화면 주요 메뉴 오류 없음', async b => {

@@ -11,10 +11,12 @@
 // - 복습 참여율: 공개된 복습 × 대상자 중 응시한 비율.
 // - 첫 응시 정답률: 실제 첫 응시만 평균합니다. 첫 응시를 알 수 없는 이전 기록은 빼고 건수를 셉니다.
 // - 미제출·미응시는 0점으로 계산하지 않습니다. 참여(비율)와 성취(정답률)를 따로 보여 줍니다.
+// - 공개 누락: 3일 안에 수업인데, 만들어 둔 예습(글·이미지·영상·첨부)이 학생에게 안 보이는 차시(차시 비공개 또는 예습 꺼짐).
+//   예습을 쓰지 않는 차시는 세지 않습니다(2026-10-29 결정).
 
 export const TREND_SESSIONS = 8;     // 차시별 추이: 최근 완료 8차시
 export const GRID_SESSIONS = 6;      // 학생 × 차시 진행표: 최근 완료 6차시
-export const PUBLISH_SOON_DAYS = 3;  // 공개 누락: 오늘부터 3일 안에 수업인 차시
+export const PUBLISH_SOON_DAYS = 3;  // 공개 누락: 오늘부터 3일 안에 수업인 차시만 봅니다
 // '챙겨 볼 학생' 규칙. 설명할 수 있는 규칙만 쓰고, 점수·순위로 바꾸지 않습니다.
 export const WATCH_RULES = {
   absenceWindow: 3, absenceMin: 2, // 최근 완료 3차시 중 불참 2회 이상
@@ -44,6 +46,15 @@ export function feedbackQueue(submissions, activeUids, reviewState) {
   return { pending, rereview };
 }
 
+// 예습을 실제로 만들어 두었는지: 글(텍스트 모드)·안내 이미지(이미지 모드)·영상·첨부 중 하나라도 있으면 true.
+// 제목만 있거나 편집기에 빈 줄만 남은 예습은 만든 것으로 보지 않습니다.
+export function previewPrepared(preview) {
+  if (!preview) return false;
+  if ((preview.videos || []).length || (preview.files || []).length) return true;
+  if (preview.mode === 'image') return !!preview.imagePath;
+  return String(preview.richHtml || '').replace(/<[^>]*>/g, '').replace(/&nbsp;|&#160;/gi, ' ').trim() !== '';
+}
+
 // 첫 응시 기록 판정: {kind:'first', pct} · {kind:'legacy'}(첫 응시를 알 수 없는 이전 기록)
 export function firstAttemptOf(result) {
   const fa = result?.firstAttempt;
@@ -55,7 +66,7 @@ export function firstAttemptOf(result) {
 
 /**
  * input = {
- *   sessions: 정렬 번호 순 차시 [{id, label, order, date('YYYY-MM-DD'|''), published, assignment:{enabled}, quiz:{enabled, questions}, preview:{enabled}}]
+ *   sessions: 정렬 번호 순 차시 [{id, label, order, date('YYYY-MM-DD'|''), published, assignment:{enabled}, quiz:{enabled, questions}, preview:{enabled, mode, richHtml, imagePath, videos, files}}]
  *   enrollments: 이 반의 수강 등록 [{id, uid, status, joinedAt, studentName}]
  *   events: {등록ID: [수강 기간 기록]} · 읽지 못했으면 null(등록일 기준 추정)
  *   names: {uid: 표시 이름}
@@ -80,7 +91,7 @@ export function computeDashboard(input, today, deps) {
     const hasQuiz = !!(s.published && s.quiz?.enabled && (s.quiz.questions || []).length);
     const row = {
       id: s.id, label: s.label || '차시', short: shortLabel(s.label), date, state, published: !!s.published,
-      hasAssignment, hasQuiz, previewOn: !!s.preview?.enabled,
+      hasAssignment, hasQuiz, previewOn: !!s.preview?.enabled, previewReady: previewPrepared(s.preview),
       targets: 0, estimated: false,
       attendance: { present: 0, absent: 0, missing: 0 },
       assignment: hasAssignment ? { submitted: 0, targets: 0 } : null,
@@ -151,7 +162,7 @@ export function computeDashboard(input, today, deps) {
     return { total: rows.reduce((n, r) => n + r.count, 0), sessions: rows };
   };
   const reviewCount = wanted => s => feedbackQueue(input.submissions?.[s.id], activeNow, reviewState)[wanted];
-  const publishSoon = sessions.filter(s => s.state !== 'done' && s.date && daysBetween(today, s.date) >= 0 && daysBetween(today, s.date) <= PUBLISH_SOON_DAYS && (!s.published || !s.previewOn));
+  const publishSoon = sessions.filter(s => s.state !== 'done' && s.date && daysBetween(today, s.date) >= 0 && daysBetween(today, s.date) <= PUBLISH_SOON_DAYS && s.previewReady && (!s.published || !s.previewOn));
   const actions = {
     feedback: bySession(sessions, reviewCount('pending')),
     rereview: bySession(sessions, reviewCount('rereview')),
