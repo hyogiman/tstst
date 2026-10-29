@@ -1,0 +1,93 @@
+/* ==========================================================================
+   쎄뇨라유 스페인어 · 수강생 화면 (index.html)
+   공통 토큰과 컴포넌트는 common.css에 있습니다.
+   ========================================================================== */
+
+.student-app{max-width:980px;min-height:100vh;margin:0 auto;padding:0 24px 150px}
+
+/* 머리말: 스크롤해도 위에 붙어 있는 반투명 바 */
+.student-header{position:sticky;top:0;z-index:30;display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 -24px 28px;padding:14px 24px;background:rgba(250,247,242,.88);backdrop-filter:saturate(1.4) blur(12px);-webkit-backdrop-filter:saturate(1.4) blur(12px);border-bottom:1px solid var(--line)}
+.student-header .logo{width:34px;height:40px}
+.student-header .row{gap:6px;flex-wrap:nowrap}
+.student-header .user-pill,.student-header .pill{background:var(--surface);border:1px solid var(--line);color:var(--ink-2);font-size:13px;padding:6px 12px}
+
+/* 하단 메뉴: 떠 있는 탭 바 + 선 아이콘 */
+.student-nav{position:fixed;z-index:40;left:50%;bottom:14px;transform:translateX(-50%);width:min(620px,calc(100% - 20px));padding:6px calc(6px + env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) calc(6px + env(safe-area-inset-left));border-radius:22px;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);border:1px solid var(--line);box-shadow:0 18px 50px rgba(42,32,36,.16)}
+.student-nav-inner{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:2px}
+.nav-item{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:0;min-height:58px;padding:6px 2px;border:0;border-radius:16px;background:transparent;color:var(--muted);font-size:12px;font-weight:700;letter-spacing:-.02em;transition:background .15s,color .15s}
+.nav-item>span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.nav-icon{display:grid;place-items:center;width:24px;height:24px}
+.nav-icon svg{width:22px;height:22px}
+.nav-item:hover{color:var(--ink)}
+.nav-item.active{color:var(--wine-600);background:var(--wine-50)}
+.nav-item.active::before{content:'';position:absolute;top:4px;width:18px;height:3px;border-radius:3px;background:var(--wine-600)}
+
+/* 페이지 머리 */
+.page-head{padding:2px 0}
+#student-body>.page-head{margin-bottom:24px}
+.page-head .eyebrow{margin-bottom:8px}
+.page-head h1{font-size:clamp(28px,3.4vw,36px)}
+.page-head p{color:var(--muted);font-size:15px;margin-top:8px}
+.student-app .section-title{align-items:flex-end;margin-bottom:24px}
+.student-app .section-title>.row{flex-wrap:nowrap}
+.week-chooser,#student-week-picker{width:auto;min-width:230px;max-width:320px;min-height:48px;font-weight:700;background-color:var(--surface)}
+#student-body>.card,#student-body>.grid2{animation:rise .25s var(--ease)}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}}
+.student-app #student-body>.card.stack{gap:20px}
+.student-app .card h2{font-size:22px}
+.join-card{max-width:560px}
+.join-card #join-code{font-size:18px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;min-height:54px}
+
+/* 과제 */
+.student-app .subtle.article{background:var(--surface-2);font-size:15px}
+#assignment-text{font-size:16px;line-height:1.8}
+
+/* 복습 퀴즈: 한 문제씩, 큰 선택지 카드 */
+.question-count{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--wine-600);font-size:12px;font-weight:800;letter-spacing:.12em}
+.progress{height:10px;margin:14px 0 24px;border-radius:var(--r-pill);background:var(--surface-3);overflow:hidden}
+.progress>div{height:100%;border-radius:var(--r-pill);background:linear-gradient(90deg,var(--wine-500),var(--wine-600));transition:width .3s var(--ease)}
+.answer-option{display:flex;align-items:center;gap:14px;width:100%;min-height:62px;margin-top:10px;padding:14px 18px;border:1.5px solid var(--line-strong);border-radius:16px;background:var(--surface);color:var(--ink);font-size:16px;font-weight:650;text-align:left;box-shadow:inset 0 -3px 0 var(--surface-2);transition:border-color .15s,background .15s,transform .1s}
+.answer-option:hover{border-color:var(--wine-200);background:#fffbfa}
+.answer-option:active{transform:translateY(1px)}
+.answer-option.selected{border-color:var(--wine-600);background:var(--wine-50);color:var(--wine-800);box-shadow:inset 0 -3px 0 var(--wine-100)}
+.answer-key{display:grid;place-items:center;flex-shrink:0;min-width:34px;height:34px;padding:0 6px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line);color:var(--muted);font-size:14px;font-weight:800}
+.answer-option.selected .answer-key{background:var(--wine-600);border-color:var(--wine-600);color:#fff}
+.score-ring{width:150px;height:150px;margin:20px auto;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--olive-600) var(--angle),var(--surface-3) 0)}
+.score-ring-inner{width:122px;height:122px;border-radius:50%;background:var(--surface);display:grid;place-items:center;text-align:center;line-height:1.2}
+.score-ring-inner strong{font-family:var(--font-display);font-size:32px;font-weight:600;color:var(--ink)}
+.score-ring-inner span{font-size:13px;color:var(--muted)}
+.review-line{padding:14px 0;border-bottom:1px solid var(--line)}
+.review-line:last-of-type{border-bottom:0}
+.quiz-missed{color:var(--danger)}.quiz-correct{color:var(--success)}
+
+/* 다음 차시(예습) 영상 */
+.lesson-video-block{margin:8px 0 16px}
+.lesson-video-label{display:flex;align-items:center;gap:10px;color:var(--ink-2);font-size:15px}
+.lesson-play-icon{display:grid;place-items:center;width:30px;height:30px;border-radius:10px;background:var(--wine-50);color:var(--wine-600);font-size:11px}
+
+/* 우리 반 */
+.classmate-card{display:flex;align-items:center;gap:12px;padding:14px 16px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface)}
+.classmate-avatar{width:40px;height:40px;flex-shrink:0;border-radius:13px;display:grid;place-items:center;background:var(--olive-50);color:var(--olive-700);font-weight:800}
+.focus-card{padding:24px;border-radius:var(--r-lg);background:var(--surface);border:1px solid var(--line)}
+
+/* 반응형 */
+@media (max-width:680px){
+  .student-app{padding:0 16px 128px}
+  .student-header{margin:0 -16px 22px;padding:12px 16px}
+  .student-header .brand small{display:none}
+  .student-header .brand strong{font-size:16px}
+  .student-header .user-pill,.student-header .pill{display:none}
+  .student-app .section-title{flex-direction:column;align-items:stretch;gap:14px}
+  .week-chooser,#student-week-picker{width:100%;max-width:none;min-width:0}
+  .page-head h1{font-size:27px}
+  .page-head p{font-size:14px}
+  .answer-option{font-size:15px;min-height:58px;padding:12px 14px}
+  .student-nav{bottom:8px;border-radius:20px;padding:5px}
+  .nav-item{min-height:56px;font-size:11.5px}
+}
+@media (max-width:360px){
+  .nav-item{font-size:11px}
+  .nav-icon svg{width:20px;height:20px}
+}
+/* 학생 화면에서는 토스트를 하단 메뉴 위에 띄웁니다 */
+body:has(.student-nav) .toast{bottom:96px}
