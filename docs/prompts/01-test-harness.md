@@ -1,5 +1,7 @@
 # [01] 검증 환경 구축 — 모의 Firebase 테스트 하네스
 
+> **2026-10-29 일부 완료.** `tests/mock/`(모의 Firebase), `tests/fixtures/seed.cjs`(가상 데이터), `tests/lib/harness.cjs`, `tests/run.cjs`(시나리오: 배치 04 범위), `tests/screens.cjs`(스크린샷)가 있습니다. 이 프롬프트와 다른 점: Playwright 테스트 러너 대신 의존성 없는 Node 스크립트로 작성했고, 이 환경에 설치된 Playwright를 그대로 씁니다. **남은 일:** B08~B17 시나리오(배치 05·07·09에서 해당 배치와 함께 추가), README.
+
 > 먼저 `docs/prompts/00-common.md`를 읽고 따르세요. 이 배치는 **운영 코드(index.html, admin.html)를 한 줄도 바꾸지 않는 것**이 원칙입니다.
 
 ## 1. 목표

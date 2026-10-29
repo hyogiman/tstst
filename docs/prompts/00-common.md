@@ -17,7 +17,10 @@
   - 이미지: `senorayu-mark.svg`, `senorayu-mark-white.svg`, `senorayu-icon.png`, `senorayu-hero-banner.jpg`
 - **참고 문서:** `docs/REVIEW.md`(Claude 리뷰), `docs/REVIEW-chatgpt-2026-10-29.md`(ChatGPT 리뷰), `docs/DEV-PLAN.md`(통합 우선순위·**결정사항 D1~D10**)
 - **라인 번호는 커밋 `cd043b9` 기준**입니다. 이후 수정으로 달라지므로 **함수명으로 찾으세요.**
-- **결정사항:** `docs/DEV-PLAN.md` 5장 표의 '확정' 값을 따르고, 비어 있으면 '권장값'을 따릅니다. 이 프롬프트를 ChatGPT 등에 쓸 때는 사용자가 확정값을 함께 적어 줍니다.
+- **결정사항:** `docs/DEV-PLAN.md` 5장 표의 **'확정' 값(2026-10-29 확정)**을 따릅니다. 이 프롬프트를 ChatGPT 등에 쓸 때는 확정값 표를 함께 붙여 넣습니다.
+- **이미 끝난 작업:** 배치 04, 디자인 개편(배치 12의 CSS 부분), 보안 규칙 저장소 관리(배치 02 일부), 테스트 하네스(배치 01 일부). `docs/DEV-PLAN.md`의 '진행 현황'을 먼저 확인하세요.
+- **화면 스타일:** `common.css`(토큰·공통 컴포넌트), `student.css`, `admin.css`. HTML 안에는 `<style>`이 없습니다.
+- **보안 규칙:** 저장소의 `firestore.rules`, `storage.rules`가 기준입니다(배포는 사용자가 콘솔에서). 규칙을 바꾸면 `tests/rules`의 에뮬레이터 테스트도 함께 고칩니다.
 
 ---
 
@@ -51,8 +54,8 @@ classes/{cid}             name, description, joinCode, archived,
                           attemptCount, firstAttempt{score, total, submittedAt, answers?, legacy},
                           feedbacks[]
       attempts/{aid}      userId, answers[], score, total, attemptNumber, submittedAt
-    attendance/{uid}      status('present'|'late'|'absent'|'excused'), note, updatedAt
-                          ← 문서 없음 = 미체크
+    attendance/{uid}      status('present'|'absent'), note, updatedAt   ← 문서 없음 = 미입력
+                          (D2: 출석·불참 두 가지. 이전 형식의 'late'는 출석, 'excused'는 불참으로 읽음)
 Storage
   classes/{cid}/submissions/{wid}/{uid}/…            학생 과제 음성
   classes/{cid}/feedback/{wid}/{uid}/…               강사 피드백 음성
@@ -82,7 +85,7 @@ Storage
    - 저장은 `serverTimestamp()`를 우선합니다.
    - `arrayUnion` 안처럼 `serverTimestamp()`를 쓸 수 없는 곳은 ISO 문자열을 쓰되, 표시할 때는 반드시 공통 포맷 함수로 변환합니다.
    - 표시 시간대는 D10(기본 `Asia/Seoul`)입니다.
-9. **CSS:** `/* v11 */` 같은 새 덮어쓰기 레이어를 추가하지 않습니다. 기존 스타일을 바꿀 때는 그 선택자의 **최종 적용 정의를 직접 수정**하고, 새 화면은 고유 접두사 클래스(예: `.dash-*`, `.home-*`)로 충돌을 피합니다. 배치 12 이후에는 디자인 토큰만 사용합니다.
+9. **CSS:** `common.css`의 디자인 토큰(`--wine-*`, `--olive-*`, `--saffron-*`, `--success` 등)만 사용하고, 새 덮어쓰기 레이어나 `!important`를 덧붙이지 않습니다. 공통 컴포넌트는 `common.css`, 화면별 스타일은 `student.css`/`admin.css`의 해당 선택자를 직접 고칩니다. CSS를 바꾸면 HTML의 `?v=` 값을 올립니다.
 10. **운영 영향 작업 금지:** 보안 규칙 배포, 운영 데이터 일괄 수정, Storage 파일 일괄 삭제는 직접 실행하지 않습니다. 명령어와 절차만 제시합니다.
 11. **커밋:** 항목 단위로 나누고, 메시지에 항목 ID를 포함합니다. 예: `fix(P0-01): 빠른 출석 재저장 시 기존 상태 보존`
 
@@ -90,7 +93,7 @@ Storage
 
 ## 4. 검증 방법
 
-- **테스트 하네스(배치 01)가 있으면:** `cd tests && npm test`가 전부 통과해야 합니다.
+- **테스트 하네스:** `node tests/run.cjs`(시나리오), `node tests/screens.cjs <출력폴더> 390,1440`(스크린샷), `cd tests/rules && npm test`(보안 규칙, Java 필요)가 있습니다. 모두 통과해야 합니다.
   - 이번 배치에서 고친 버그 테스트의 `test.fail()` 표시를 제거해 정상 통과로 바꿉니다.
   - 새 동작에 대한 시나리오를 추가합니다.
 - **하네스가 없으면:** 고친 항목마다 '재현 절차 → 기대 결과' 체크리스트를 작성합니다.

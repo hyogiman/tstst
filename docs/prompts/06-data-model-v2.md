@@ -68,6 +68,8 @@ weeks/{wid}/submissions/{uid}/revisions/{revNo}  ← 신규: 제출 1회 = 문�
 
 ### P1-03. 마감 시각 정규화 (D3, D10)
 
+> **D3 확정(2026-10-29):** 제출 권장일은 **통계 마감으로 쓰지 않습니다.** 통계는 실시간 제출 현황으로 보여 주고, 늦은 제출도 인정합니다. 따라서 아래의 `dueAtTs`는 **학생 화면의 D-day 표시와 정렬용**으로만 쓰고, 정시·늦음 판정(`submissionTiming`)은 만들지 않습니다(필요해지면 그때 추가).
+
 - 강사 저장 시 `assignment.dueAt`(문자열)은 유지하고, `assignment.dueAtTs`(Timestamp)를 추가합니다. 문자열은 D10 시간대(Asia/Seoul) 기준으로 해석합니다(배치 05의 `formatDateTime`과 같은 해석 함수 사용).
 - 학생 과제 화면 표시
   - 마감 전: `마감 10월 30일 (목) 오후 11:59 · 2일 남음`
