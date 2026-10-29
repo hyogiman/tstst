@@ -138,10 +138,13 @@ select.input,.field select{appearance:none;-webkit-appearance:none;padding-right
 
 /* ---------- 배지 (의미 색) ---------- */
 .pill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:var(--r-pill);background:var(--brand-bg);color:var(--brand-text);font-size:12px;font-weight:700;line-height:1.45;white-space:nowrap}
-.pill.green{background:var(--success-bg);color:var(--success)}
-.pill.amber{background:var(--warning-bg);color:var(--warning)}
-.pill.red{background:var(--danger-bg);color:var(--danger)}
-.pill.gray{background:var(--neutral-bg);color:var(--neutral)}
+/* 상태 배지는 statusPill()로 만들고 기호(✓ ! ✕ –)를 함께 씁니다. brand는 상태가 아닌 라벨(문항 유형·개수 등) */
+.pill.success{background:var(--success-bg);color:var(--success)}
+.pill.warning{background:var(--warning-bg);color:var(--warning)}
+.pill.danger{background:var(--danger-bg);color:var(--danger)}
+.pill.neutral{background:var(--neutral-bg);color:var(--neutral)}
+.pill.brand{background:var(--brand-bg);color:var(--brand-text)}
+.pill-symbol{font-weight:800;line-height:1}
 .name-avatar{width:36px;height:36px;flex:0 0 36px;border-radius:12px;background:var(--wine-50);color:var(--wine-700);display:grid;place-items:center;font-size:14px;font-weight:800}
 
 /* ---------- 안내·상태 ---------- */

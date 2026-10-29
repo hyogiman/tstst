@@ -24,7 +24,120 @@ export const storage = CONFIGURED ? getStorage(app) : null;
 export const $ = (s, el=document)=>el.querySelector(s);
 export const $$ = (s, el=document)=>Array.from(el.querySelectorAll(s));
 export const esc = v => String(v??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-export const fmt = ts => { if (!ts) return '기록 없음'; let d = ts.toDate?.() ?? new Date(ts); return Number.isNaN(+d)?'기록 없음':new Intl.DateTimeFormat('ko-KR',{dateStyle:'medium',timeStyle:'short'}).format(d); };
+// ---------- 날짜·시간 (P0-05, D10) ----------
+// 표시와 '시간대 없는 날짜 문자열' 해석은 모두 수업 운영 시간대로 합니다. 브라우저 시간대와 무관하게 같은 시각이 보입니다.
+export const TIME_ZONE = 'Asia/Seoul';
+const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+const zoneParts = new Intl.DateTimeFormat('en-US', {
+  timeZone: TIME_ZONE, hourCycle: 'h23',
+  year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric', weekday: 'short',
+});
+// Date → 운영 시간대의 연·월·일·시·분·요일
+export function partsInZone(date) {
+  const p = {};
+  for (const { type, value } of zoneParts.formatToParts(date)) p[type] = value;
+  return {
+    year: +p.year, month: +p.month, day: +p.day, hour: +p.hour % 24, minute: +p.minute, second: +p.second,
+    weekday: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(p.weekday),
+  };
+}
+// 운영 시간대의 벽시계 시각 → Date (서머타임이 있는 시간대도 맞도록 두 번 보정)
+function zonedToDate(y, mo, d, h = 0, mi = 0, sec = 0) {
+  const wall = Date.UTC(y, mo - 1, d, h, mi, sec);
+  const offsetAt = t => { const p = partsInZone(new Date(t)); return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - Math.floor(t / 1000) * 1000; };
+  let t = wall - offsetAt(wall);
+  const second = offsetAt(t);
+  if (wall - second !== t) t = wall - second;
+  return new Date(t);
+}
+// Firestore Timestamp · Date · 밀리초 · ISO 문자열 · 시간대 없는 'YYYY-MM-DD[THH:mm]' 문자열을 Date로 바꿉니다.
+// 시간대 없는 문자열은 운영 시간대(한국 시간)의 시각으로 해석합니다. new Date('YYYY-MM-DDTHH:mm')는 브라우저 시간대로 해석하므로 쓰지 않습니다.
+export function toDate(value) {
+  if (value === null || value === undefined || value === '') return null;
+  if (value instanceof Date) return Number.isNaN(+value) ? null : value;
+  if (typeof value.toDate === 'function') { const d = value.toDate(); return Number.isNaN(+d) ? null : d; }
+  if (typeof value === 'object' && typeof value.seconds === 'number') return new Date(value.seconds * 1000 + Math.floor((value.nanoseconds || 0) / 1e6));
+  if (typeof value === 'number') return Number.isFinite(value) ? new Date(value) : null;
+  if (typeof value === 'string') {
+    const text = value.trim();
+    const local = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?$/.exec(text);
+    if (local) return zonedToDate(+local[1], +local[2], +local[3], +(local[4] || 0), +(local[5] || 0), +(local[6] || 0));
+    const d = new Date(text);
+    return Number.isNaN(+d) ? null : d;
+  }
+  return null;
+}
+// 예) 10월 30일 (목) 오후 11:59 · 올해가 아니면 연도를 붙입니다.
+// options: time(시각 표시, 기본 true) · weekday(요일, 기본 true) · year('auto'|'always'|'never') · empty(값이 없을 때 문구)
+export function formatDateTime(value, { time = true, weekday = true, year = 'auto', empty = '기록 없음' } = {}) {
+  const d = toDate(value);
+  if (!d) return empty;
+  const p = partsInZone(d);
+  const showYear = year === 'always' || (year === 'auto' && p.year !== partsInZone(new Date()).year);
+  let out = `${showYear ? p.year + '년 ' : ''}${p.month}월 ${p.day}일`;
+  if (weekday) out += ` (${WEEKDAYS[p.weekday]})`;
+  if (time) out += ` ${p.hour < 12 ? '오전' : '오후'} ${p.hour % 12 || 12}:${String(p.minute).padStart(2, '0')}`;
+  return out;
+}
+// 운영 시간대 기준 오늘 날짜 'YYYY-MM-DD'
+export function todayKey(date = new Date()) {
+  const p = partsInZone(date);
+  return `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`;
+}
+export const fmt = value => formatDateTime(value);
+
+// ---------- 상태 표시 (P0-07) ----------
+// 상태는 색만으로 구분하지 않고 기호와 글자를 함께 씁니다.
+// success ✓ 완료·정답·출석 · warning ! 대기 · danger ✕ 오답·불참 · neutral – 미입력·해당 없음 · brand(기호 없음) 상태가 아닌 라벨
+const STATUS_SYMBOL = { success: '✓', warning: '!', danger: '✕', neutral: '–' };
+export function statusPill(kind, text, attrs = '') {
+  const symbol = STATUS_SYMBOL[kind];
+  return `<span class="pill ${kind}"${attrs ? ' ' + attrs : ''}>${symbol ? `<span class="pill-symbol" aria-hidden="true">${symbol}</span>` : ''}${esc(text)}</span>`;
+}
+// 이미 그려진 배지의 상태만 바꿀 때
+export function paintPill(el, kind, text) {
+  if (!el) return;
+  el.className = 'pill ' + kind;
+  const symbol = STATUS_SYMBOL[kind];
+  el.innerHTML = `${symbol ? `<span class="pill-symbol" aria-hidden="true">${symbol}</span>` : ''}${esc(text)}`;
+}
+
+// ---------- 질문 상태 (P0-03) ----------
+// 답변 대기 판정은 이 함수 하나로 합니다(강사 목록·개수·대시보드 공통).
+// needsTeacherReply가 없는 이전 질문은 status로 판단합니다.
+export function needsReply(q) {
+  if (!q) return false;
+  if (typeof q.needsTeacherReply === 'boolean') return q.needsTeacherReply;
+  return q.status !== 'answered';
+}
+// 최근 대화 시각(초). 방금 보낸 글처럼 서버 시각이 아직 정해지지 않은 값(null)은 가장 최근으로 봅니다.
+export function lastActivity(q) {
+  const stamp = v => v === null ? Number.MAX_SAFE_INTEGER : (toDate(v)?.getTime() || 0) / 1000;
+  if (q && 'lastMessageAt' in q) return stamp(q.lastMessageAt);
+  if (q && 'createdAt' in q) return stamp(q.createdAt);
+  return 0;
+}
+export const byLastActivity = (a, b) => lastActivity(b) - lastActivity(a);
+
+// ---------- 과제 피드백 상태 (P0-04) ----------
+// 'none' 미제출 · 'pending' 피드백 없음 · 'rereview' 최신 제출에 대한 피드백 없음 · 'done' 피드백 완료
+export function feedbackItems(d) {
+  const list = [...(d?.feedbacks || [])];
+  if (d?.feedback?.text || d?.feedback?.audioPath) list.unshift({ ...d.feedback, createdAt: d.feedback.updatedAt }); // 구버전 단일 피드백
+  return list.filter(f => f && (f.text || f.audioPath));
+}
+export function reviewState(d) {
+  if (!d) return 'none';
+  const items = feedbackItems(d);
+  if (!items.length) return 'pending';
+  const revision = Number(d.revision) || 0;
+  if (revision) return Math.max(...items.map(f => Number(f.forRevision) || 1)) >= revision ? 'done' : 'rereview';
+  // 회차 정보가 없는 이전 문서: 마지막 피드백이 최근 제출보다 앞서면 재검토 대기
+  const lastFeedback = Math.max(...items.map(f => toDate(f.createdAt)?.getTime() || 0));
+  const submitted = toDate(d.latestSubmittedAt || d.submittedAt)?.getTime() || 0;
+  return lastFeedback < submitted ? 'rereview' : 'done';
+}
+export const REVIEW_LABEL = { none: ['neutral', '미제출'], pending: ['warning', '피드백 대기'], rereview: ['warning', '재검토 대기'], done: ['success', '피드백 완료'] };
 export const ex = e => { console.error(e); const c=e?.code||''; return ({'auth/invalid-credential':'이메일 또는 비밀번호를 확인해 주세요.','auth/email-already-in-use':'이미 가입된 이메일입니다.','auth/weak-password':'비밀번호는 6자 이상으로 설정해 주세요.','auth/invalid-email':'올바른 이메일을 입력해 주세요.','auth/unauthorized-domain':'Firebase Authentication에서 현재 도메인을 승인해 주세요.','auth/too-many-requests':'로그인 시도가 많습니다. 잠시 후 다시 시도해 주세요.','permission-denied':'접근 권한이 없습니다. 보안 규칙 또는 계정 권한을 확인해 주세요.','storage/unauthorized':'파일 저장 권한이 없습니다. Storage 보안 규칙을 확인해 주세요.','storage/quota-exceeded':'Storage 사용량 또는 요금제 제한을 확인해 주세요.'})[c] || e?.message || '처리 중 오류가 발생했습니다.'; };
 let toastTimer; export function toast(message,bad=false){const box=$('#toast');if(!box)return;box.textContent=message;box.className='toast show'+(bad?' bad':'');clearTimeout(toastTimer);toastTimer=setTimeout(()=>box.className='toast',4200)}
 export function loading(el){el.classList.add('loading');el.textContent='불러오는 중입니다'}
@@ -186,23 +299,82 @@ export function showLiveNotice(host,message,actionText,onAction){
 }
 
 
-// 모든 확인/수정은 브라우저 기본 팝업 대신 접근 가능한 앱 내부 모달로 처리합니다.
-export function modalDialog({title='확인',message='',value=null,choices=null,placeholder='',danger=false,confirmText='확인',verify=null,multiline=false,allowEmpty=false}={}){
-  return new Promise(resolve=>{
-    document.querySelector('.app-modal-backdrop')?.remove();
-    const layer=document.createElement('div');layer.className='app-modal-backdrop';
-    layer.innerHTML=`<section class="app-modal" role="dialog" aria-modal="true" aria-labelledby="app-modal-title"><div class="app-modal-head"><div><span class="eyebrow">쎄뇨라유 · 안내</span><h2 id="app-modal-title">${esc(title)}</h2></div><button type="button" class="app-modal-x" aria-label="닫기">×</button></div><p class="app-modal-message">${esc(message)}</p>${choices?`<div class="field"><label>선택</label><select class="input app-modal-input">${choices.map(x=>`<option value="${esc(x.value)}">${esc(x.label)}</option>`).join('')}</select></div>`:value!==null?`<div class="field"><label>${verify?'삭제할 반 이름':'입력'}</label>${multiline?`<textarea class="input app-modal-input" rows="7" maxlength="500" placeholder="${esc(placeholder)}">${esc(value)}</textarea>`:`<input class="input app-modal-input" maxlength="1000" placeholder="${esc(placeholder)}" value="${esc(value)}" ${verify?'autocomplete="off"':''}>`}</div>`:''}${verify?`<p class="app-modal-verify">확인을 위해 <strong>${esc(verify)}</strong>을(를) 정확히 입력해 주세요.</p>`:''}<div class="app-modal-actions"><button type="button" class="btn secondary app-modal-cancel">취소</button><button type="button" class="btn ${danger?'danger-solid':''} app-modal-ok">${esc(confirmText)}</button></div></section>`;
-    document.body.appendChild(layer);document.body.classList.add('modal-open');const input=layer.querySelector('.app-modal-input'),ok=layer.querySelector('.app-modal-ok');
-    if(verify)ok.disabled=true;
-    const done=v=>{document.removeEventListener('keydown',keyHandler);layer.remove();document.body.classList.remove('modal-open');resolve(v)};
-    function keyHandler(e){if(e.key==='Escape'){e.preventDefault();done(null)}if(e.key==='Enter'&&document.activeElement===input){e.preventDefault();if(!ok.disabled)ok.click()}}
-    document.addEventListener('keydown',keyHandler);
-    layer.querySelector('.app-modal-cancel').onclick=()=>done(null);layer.querySelector('.app-modal-x').onclick=()=>done(null);
-    layer.onclick=e=>{if(e.target===layer)done(null)};
-    input?.addEventListener('input',()=>{if(verify)ok.disabled=input.value.trim()!==verify});
-    ok.onclick=()=>{if(input&&value!==null&&!verify&&!allowEmpty&&!input.value.trim()){input.focus();return}done(input?input.value:true)};
-    requestAnimationFrame(()=>{(input||ok).focus();if(input&&value!==null&&!verify)input.select()});
+// ---------- 모달 (P0-06) ----------
+// 모든 확인·수정은 브라우저 기본 팝업 대신 앱 안의 모달로 처리합니다.
+// 열면 첫 입력칸으로 포커스가 가고, Tab은 모달 안에서만 돌며, 닫으면 모달을 연 버튼으로 포커스가 돌아갑니다.
+const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+export const IS_MAC = /Mac|iPhone|iPad|iPod/i.test(globalThis.navigator?.platform || globalThis.navigator?.userAgent || '');
+// 한글 등 조합 중인 Enter는 입력 확정용이므로 저장으로 처리하지 않습니다.
+export const isComposingKey = e => e.isComposing || e.keyCode === 229;
+// 화면에 모달 층을 띄우고 Escape·포커스 가두기·포커스 복귀를 처리합니다. 반환값 close()로 닫습니다.
+// 모달 위에 확인 창을 또 띄우면 위에 쌓이고, 키 입력은 맨 위 모달만 처리합니다.
+export function openModalLayer(layer, { onEscape = null } = {}) {
+  const opener = document.activeElement;
+  document.body.appendChild(layer);
+  document.body.classList.add('modal-open');
+  const onKey = e => {
+    if (e.defaultPrevented || layer !== [...document.querySelectorAll('.app-modal-backdrop')].at(-1)) return;
+    if (e.key === 'Escape' && onEscape) { e.preventDefault(); onEscape(); return; }
+    if (e.key !== 'Tab') return;
+    const items = [...layer.querySelectorAll(FOCUSABLE)].filter(el => el.offsetParent !== null || el === document.activeElement);
+    if (!items.length) return;
+    const first = items[0], last = items.at(-1);
+    if (e.shiftKey && (document.activeElement === first || !layer.contains(document.activeElement))) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && (document.activeElement === last || !layer.contains(document.activeElement))) { e.preventDefault(); first.focus(); }
+  };
+  document.addEventListener('keydown', onKey);
+  return function close() {
+    document.removeEventListener('keydown', onKey);
+    layer.remove();
+    if (!document.querySelector('.app-modal-backdrop')) document.body.classList.remove('modal-open');
+    if (opener?.isConnected && typeof opener.focus === 'function') opener.focus();
+  };
+}
+// value가 null이 아니면 입력칸을 보여 줍니다. multiline이면 여러 줄 입력(Enter = 줄바꿈, Ctrl/⌘+Enter = 저장).
+// verify를 주면 그 문구를 정확히 입력해야 확인 버튼이 켜집니다(verifyLabel: 입력칸 이름).
+export function modalDialog({
+  title = '확인', message = '', value = null, choices = null, placeholder = '', danger = false, confirmText = '확인',
+  verify = null, verifyLabel = '확인 문구', multiline = false, allowEmpty = false, maxLength = null, label = '입력',
+} = {}) {
+  return new Promise(resolve => {
+    const limit = maxLength ?? (multiline ? 500 : 1000);
+    const saveHint = IS_MAC ? '⌘+Enter로 저장' : 'Ctrl+Enter로 저장';
+    const layer = document.createElement('div');
+    layer.className = 'app-modal-backdrop';
+    const field = choices
+      ? `<div class="field"><label for="app-modal-input">선택</label><select id="app-modal-input" class="input app-modal-input">${choices.map(x => `<option value="${esc(x.value)}">${esc(x.label)}</option>`).join('')}</select></div>`
+      : value !== null
+        ? `<div class="field"><label for="app-modal-input">${esc(verify ? verifyLabel : label)}</label>${multiline
+          ? `<textarea id="app-modal-input" class="input app-modal-input" rows="7" maxlength="${limit}" placeholder="${esc(placeholder)}" aria-describedby="app-modal-hint">${esc(value)}</textarea><p class="hint app-modal-hint" id="app-modal-hint">Enter는 줄바꿈 · ${saveHint}</p>`
+          : `<input id="app-modal-input" class="input app-modal-input" maxlength="${limit}" placeholder="${esc(placeholder)}" value="${esc(value)}" ${verify ? 'autocomplete="off"' : ''}>`}</div>`
+        : '';
+    layer.innerHTML = `<section class="app-modal" role="dialog" aria-modal="true" aria-labelledby="app-modal-title"${message ? ' aria-describedby="app-modal-message"' : ''}><div class="app-modal-head"><div><span class="eyebrow">쎄뇨라유 · 안내</span><h2 id="app-modal-title">${esc(title)}</h2></div><button type="button" class="app-modal-x" aria-label="닫기">×</button></div>${message ? `<p class="app-modal-message" id="app-modal-message">${esc(message)}</p>` : ''}${field}${verify ? `<p class="app-modal-verify">확인을 위해 <strong>${esc(verify)}</strong>을(를) 정확히 입력해 주세요.</p>` : ''}<div class="app-modal-actions"><button type="button" class="btn secondary app-modal-cancel">취소</button><button type="button" class="btn ${danger ? 'danger-solid' : ''} app-modal-ok">${esc(confirmText)}</button></div></section>`;
+    let settled = false;
+    const close = openModalLayer(layer, { onEscape: () => done(null) });
+    const input = layer.querySelector('.app-modal-input'), ok = layer.querySelector('.app-modal-ok');
+    function done(v) { if (settled) return; settled = true; close(); resolve(v); }
+    if (verify) ok.disabled = true;
+    layer.querySelector('.app-modal-cancel').onclick = () => done(null);
+    layer.querySelector('.app-modal-x').onclick = () => done(null);
+    layer.onclick = e => { if (e.target === layer) done(null); };
+    input?.addEventListener('input', () => { if (verify) ok.disabled = input.value.trim() !== verify; });
+    input?.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' || isComposingKey(e)) return;
+      if (input.tagName === 'TEXTAREA' && !(e.ctrlKey || e.metaKey)) return; // 여러 줄 입력: Enter는 줄바꿈
+      e.preventDefault();
+      if (!ok.disabled) ok.click();
+    });
+    ok.onclick = () => {
+      if (input && value !== null && !verify && !allowEmpty && !input.value.trim()) { input.focus(); return; }
+      done(input ? input.value : true);
+    };
+    requestAnimationFrame(() => { (input || ok).focus(); if (input && value !== null && !verify && !multiline) input.select(); });
   });
 }
-export async function modalConfirm(message){return !!(await modalDialog({title:'변경사항 확인',message,confirmText:'진행하기'}));}
-export async function modalInput(message,value=''){return await modalDialog({title:'정보 수정',message,value,confirmText:'저장하기'});}
+// 확인 창: 동작마다 알맞은 제목과 버튼 문구를 붙입니다.
+export async function modalConfirm(message, { title = '확인해 주세요', confirmText = '진행하기', danger = false } = {}) {
+  return !!(await modalDialog({ title, message, confirmText, danger }));
+}
+export async function modalInput(message, value = '', { title = '정보 수정', confirmText = '저장하기', label = '입력', maxLength = null } = {}) {
+  return await modalDialog({ title, message, value, confirmText, label, maxLength });
+}

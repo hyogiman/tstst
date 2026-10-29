@@ -115,11 +115,21 @@ service cloud.firestore {
           get(/databases/$(database)/documents/classes/$(cid)/questions/$(qid)).data.uid == request.auth.uid;}
         allow get, list: if admin() || owner();
         allow create: if member(cid) &&
-          request.resource.data.keys().hasOnly(['uid','studentName','title','content','createdAt','status']) &&
+          request.resource.data.keys().hasOnly(['uid','studentName','title','content','createdAt','status','needsTeacherReply','lastMessageAt','lastSenderRole']) &&
           request.resource.data.uid == request.auth.uid && request.resource.data.status == 'open' &&
+          request.resource.data.get('needsTeacherReply', true) == true &&
+          request.resource.data.get('lastSenderRole', 'student') == 'student' &&
           request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 100 &&
           request.resource.data.content is string && request.resource.data.content.size() > 0 && request.resource.data.content.size() <= 8000;
-        allow update, delete: if admin();
+        // P0-03: 학생은 자기 질문에 추가 질문을 남길 때 '답변 대기'로 되돌리는 필드만 바꿀 수 있습니다.
+        allow update: if admin() ||
+          (signedIn() && resource.data.uid == request.auth.uid && member(cid) &&
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','needsTeacherReply','lastMessageAt','lastSenderRole','updatedAt']) &&
+           request.resource.data.status == 'open' &&
+           request.resource.data.needsTeacherReply == true &&
+           request.resource.data.lastSenderRole == 'student' &&
+           request.resource.data.lastMessageAt == request.time);
+        allow delete: if admin();
 
         match /replies/{rid} {
           allow get, list: if admin() || ownsQuestion();
@@ -140,11 +150,14 @@ service cloud.firestore {
         allow create, update, delete: if admin();
 
         match /submissions/{uid} {
+          function changed(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasAny(keys); }
           allow get, list: if admin() ||
             (signedIn() && request.auth.uid == uid && enrolled(cid) && visible(cid,wid));
           allow create: if signedIn() && request.auth.uid == uid && member(cid) &&
             visible(cid,wid) && get(weekDoc(cid,wid)).data.assignment.enabled == true &&
-            request.resource.data.keys().hasOnly(['userId','studentName','email','text','audioPath','submittedAt']) &&
+            request.resource.data.keys().hasOnly(['userId','studentName','email','text','audioPath','submittedAt','revision','firstSubmittedAt','latestSubmittedAt']) &&
+            request.resource.data.get('revision', 1) == 1 &&
+            request.resource.data.get('firstSubmittedAt', request.time) == request.time &&
             request.resource.data.userId == uid && request.resource.data.text is string &&
             request.resource.data.text.size() <= 20000 && request.resource.data.audioPath is string &&
             (request.resource.data.audioPath == '' || request.resource.data.audioPath.matches('^classes/' + cid + '/submissions/' + wid + '/' + uid + '/.*$'));
@@ -152,7 +165,11 @@ service cloud.firestore {
             (signedIn() && request.auth.uid == uid && member(cid) && visible(cid,wid) &&
              get(weekDoc(cid,wid)).data.assignment.enabled == true &&
              request.resource.data.userId == uid &&
-             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['studentName','email','text','audioPath','submittedAt']) &&
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['studentName','email','text','audioPath','submittedAt','revision','firstSubmittedAt','latestSubmittedAt']) &&
+             // P0-04: 제출 회차는 1씩만 오르고, 처음 제출 시각은 한 번 정해지면 바뀌지 않습니다(이전 문서는 기존 submittedAt으로 정함).
+             (!changed(['revision']) || request.resource.data.revision == resource.data.get('revision', 1) + 1) &&
+             (!changed(['firstSubmittedAt']) || (!('firstSubmittedAt' in resource.data) && request.resource.data.firstSubmittedAt == resource.data.submittedAt)) &&
+             (!changed(['latestSubmittedAt']) || request.resource.data.latestSubmittedAt == request.time) &&
              request.resource.data.text is string && request.resource.data.text.size() <= 20000 &&
              request.resource.data.audioPath is string &&
              (request.resource.data.audioPath == '' || request.resource.data.audioPath.matches('^classes/' + cid + '/submissions/' + wid + '/' + uid + '/.*$')));

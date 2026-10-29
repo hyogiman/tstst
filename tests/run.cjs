@@ -311,6 +311,154 @@ test('F04 강사: 보관된 반의 등록은 활성 반 중복으로 보지 않�
   assert((await dump(page, 'enrollments/s5_c3')).status === 'active', '보관된 반 등록이 바뀜(지난 자료 열람 불가)');
 });
 
+// ---------- 배치 05: 소통 누락 · 표시 오류 ----------
+test('B08 답변 완료된 질문에 학생이 추가 질문 → 답변 대기 (학생 쓰기 + 강사 목록)', async b => {
+  let r = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 } });
+  await r.page.click('[data-tab="questions"]'); await pause(r.page, 600);
+  await r.page.click('[data-qid="q1"]'); await pause(r.page, 500);
+  await r.page.fill('#student-reply-form textarea', '그럼 Encantada는 여자일 때만 쓰나요?');
+  await r.page.click('#student-reply-form button[type="submit"]'); await pause(r.page, 700);
+  const q = await dump(r.page, 'classes/c1/questions/q1');
+  assert(q.status === 'open' && q.needsTeacherReply === true && q.lastSenderRole === 'student' && q.lastMessageAt, '질문 상태가 바뀌지 않음: ' + JSON.stringify(q));
+  assert((await r.page.innerText('[data-qid="q1"]')).includes('답변 대기'), '학생 목록 배지가 답변 대기가 아님');
+  await r.context.close();
+  r = await openAs(b, 'admin.html', 'admin1');
+  await r.page.evaluate(() => window.__mock.remoteWrite('classes/c1/questions/q1', { status: 'open', needsTeacherReply: true, lastSenderRole: 'student', lastMessageAt: window.__mock.ts(Date.now()) }));
+  await r.page.click('[data-page="questions"]'); await pause(r.page, 700);
+  assert((await r.page.innerText('#admin-question-pending')).includes('2건'), '답변 대기 개수: ' + await r.page.innerText('#admin-question-pending'));
+  const first = await r.page.$eval('[data-admin-qid]', el => el.dataset.adminQid);
+  assert(first === 'q1', '추가 질문이 맨 위로 오지 않음: ' + first);
+  assert((await r.page.innerText('[data-admin-qid="q1"]')).includes('답변 대기'), '강사 목록 배지가 답변 대기가 아님');
+});
+
+test('B09 강사 답변 직후 열린 상세의 배지가 답변 완료, 버튼은 답변 대기로 변경', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  await page.click('[data-page="questions"]'); await pause(page, 700);
+  await page.click('[data-admin-qid="q2"]'); await pause(page, 500);
+  assert((await page.innerText('#admin-question-badge')).includes('답변 대기'), '처음 배지가 답변 대기가 아님');
+  await page.fill('#admin-reply-text', 'cinco-quince-cincuenta를 소리 내어 비교해 보세요.');
+  await page.click('#admin-reply-form button[type="submit"]'); await pause(page, 700);
+  assert((await page.innerText('#admin-question-badge')).includes('답변 완료'), '답변 후 배지: ' + await page.innerText('#admin-question-badge'));
+  assert((await page.innerText('#question-status')).includes('답변 대기로 변경'), '버튼 문구: ' + await page.innerText('#question-status'));
+  const q = await dump(page, 'classes/c1/questions/q2');
+  assert(q.status === 'answered' && q.needsTeacherReply === false && q.lastSenderRole === 'admin', '저장 상태: ' + JSON.stringify(q));
+  await page.click('#question-status'); await pause(page, 500);
+  assert((await page.innerText('#admin-question-badge')).includes('답변 대기'), '답변 대기로 변경 후 배지가 그대로');
+  assert((await dump(page, 'classes/c1/questions/q2')).needsTeacherReply === true, '답변 대기로 변경이 저장되지 않음');
+});
+
+test('B10 피드백 받은 학생이 재제출 → 2차 제출 기록, 강사 목록 재검토 대기', async b => {
+  let r = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 } });
+  await r.page.selectOption('#student-week-picker', 'w1'); await pause(r.page, 700);
+  const before = await dump(r.page, 'classes/c1/weeks/w1/submissions/s1');
+  await r.page.fill('#assignment-text', '¡Hola! Me llamo Minji. Soy de Corea y soy estudiante.');
+  await r.page.click('#submit-assignment'); await pause(r.page, 900);
+  let d = await dump(r.page, 'classes/c1/weeks/w1/submissions/s1');
+  assert(d.revision === 2, '재제출 회차: ' + d.revision);
+  assert(JSON.stringify(d.firstSubmittedAt) === JSON.stringify(before.submittedAt), '처음 제출 시각이 기존 제출 시각이 아님');
+  assert((await r.page.innerText('#assignment-form-area')).includes('수정본을 제출했어요'), '학생 화면에 재검토 대기 안내가 없음');
+  await r.page.fill('#assignment-text', '세 번째 답안');
+  await r.page.click('#submit-assignment'); await pause(r.page, 900);
+  d = await dump(r.page, 'classes/c1/weeks/w1/submissions/s1');
+  assert(d.revision === 3 && JSON.stringify(d.firstSubmittedAt) === JSON.stringify(before.submittedAt), '3차 제출 후 회차/처음 제출 시각 이상');
+  await r.context.close();
+  r = await openAs(b, 'admin.html', 'admin1');
+  await r.page.evaluate(() => window.__mock.remoteWrite('classes/c1/weeks/w1/submissions/s1', { revision: 2, latestSubmittedAt: window.__mock.ts(Date.now()), submittedAt: window.__mock.ts(Date.now()) }));
+  await r.page.click('[data-page="feedback"]'); await pause(r.page, 500);
+  await r.page.selectOption('#admin-week-picker', 'w1'); await pause(r.page, 700);
+  assert((await r.page.innerText('[data-feedback-uid="s1"]')).includes('재검토 대기'), '강사 목록에 재검토 대기가 없음');
+  await r.page.selectOption('#feedback-status-filter', 'rereview'); await pause(r.page, 300);
+  const rows = await r.page.$$eval('[data-feedback-uid]', els => els.map(e => e.dataset.feedbackUid));
+  assert(rows.length === 1 && rows[0] === 's1', '재검토 대기 필터: ' + rows.join(','));
+  await r.page.click('[data-feedback-uid="s1"]'); await pause(r.page, 400);
+  await r.page.fill('[data-feedback-text]', '수정본 좋아요.');
+  await r.page.click('[data-feedback-save]'); await pause(r.page, 800);
+  const fb = (await dump(r.page, 'classes/c1/weeks/w1/submissions/s1')).feedbacks.at(-1);
+  assert(fb.forRevision === 2, '피드백 대상 회차: ' + fb.forRevision);
+  assert(!(await r.page.$('[data-feedback-uid="s1"]')), '피드백 후에도 재검토 대기 필터에 남음');
+  await r.page.selectOption('#feedback-status-filter', 'all'); await pause(r.page, 300);
+  assert((await r.page.innerText('[data-feedback-uid="s1"]')).includes('피드백 완료'), '피드백 후 상태가 피드백 완료가 아님');
+});
+
+test('B11 피드백·마감 시각은 브라우저 시간대와 상관없이 한국 시간으로 표시', async b => {
+  for (const timezoneId of ['Asia/Seoul', 'Europe/Madrid', 'America/Los_Angeles']) {
+    const { page, context } = await openApp(b, { file: 'index.html', user: 's1', timezoneId, viewport: { width: 390, height: 844 } });
+    await pause(page, 600);
+    await page.selectOption('#student-week-picker', 'w1'); await pause(page, 700);
+    const text = await page.innerText('#student-body');
+    assert(/선생님 · \d+월 \d+일 \(.\) 오전 10:00/.test(text), `${timezoneId}: 피드백 시각이 한국 시간 오전 10:00이 아님`);
+    assert(/제출 권장일: \d+월 \d+일 \(.\) 오후 11:59/.test(text), `${timezoneId}: 마감 표시가 한국 시간이 아님`);
+    await context.close();
+  }
+});
+
+test('B12 강사 메모: Enter는 줄바꿈, Ctrl+Enter는 저장', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  await page.click('[data-page="classes"]'); await pause(page, 400);
+  await page.click('[data-open-roster="c1"]'); await pause(page, 900);
+  await page.click('[data-student-memo="s1"]'); await pause(page, 500);
+  await page.click('.app-modal-input');
+  await page.keyboard.type('수업 전에 일찍 옴');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('발음 연습을 좋아함');
+  assert(await page.$('.app-modal'), 'Enter에 모달이 닫힘(저장됨)');
+  assert((await page.inputValue('.app-modal-input')).includes('\n'), '줄바꿈이 들어가지 않음');
+  assert((await page.innerText('.app-modal-hint')).includes('Enter로 저장'), '저장 단축키 안내가 없음');
+  await page.keyboard.press('Control+Enter'); await pause(page, 600);
+  assert(!(await page.$('.app-modal')), 'Ctrl+Enter로 저장되지 않음');
+  assert(((await dump(page, 'classes/c1/teacherNotes/s1'))?.text || '').includes('\n'), '저장된 메모에 줄바꿈이 없음');
+});
+
+test('B13 여러 줄 피드백을 수정해도 줄바꿈 유지', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  await page.click('[data-page="feedback"]'); await pause(page, 500);
+  await page.selectOption('#admin-week-picker', 'w1'); await pause(page, 700);
+  await page.click('[data-feedback-uid="s1"]'); await pause(page, 400);
+  await page.click('[data-edit-feedback="s1:0"]'); await pause(page, 400);
+  assert(await page.$('textarea.app-modal-input'), '피드백 수정창이 여러 줄 입력이 아님');
+  assert((await page.inputValue('.app-modal-input')).includes('\n'), '기존 줄바꿈이 사라짐');
+  await page.click('.app-modal-input'); await page.keyboard.press('End'); await page.keyboard.press('Enter'); await page.keyboard.type('세 번째 줄');
+  await page.keyboard.press('Control+Enter'); await pause(page, 800);
+  const text = (await dump(page, 'classes/c1/weeks/w1/submissions/s1')).feedbacks[0].text;
+  assert(text.split('\n').length === 3, '수정 후 줄 수: ' + JSON.stringify(text));
+});
+
+test('B13b 한글 조합 중 Enter는 저장하지 않음 (한 줄 입력 모달)', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  await page.click('[data-page="classes"]'); await pause(page, 400);
+  await page.click('[data-open-roster="c1"]'); await pause(page, 900);
+  await page.click('[data-edit-name="s1"]'); await pause(page, 400);
+  await page.fill('.app-modal-input', '김민지');
+  await page.$eval('.app-modal-input', el => el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true, cancelable: true })));
+  await pause(page, 300);
+  assert(await page.$('.app-modal'), '조합 중 Enter에 저장됨');
+  await page.keyboard.press('Enter'); await pause(page, 600);
+  assert(!(await page.$('.app-modal')), '조합이 끝난 Enter로 저장되지 않음');
+});
+
+test('B13c 모달: Tab은 모달 안에서만 돌고, 닫으면 연 버튼으로 포커스가 돌아감', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  await page.click('[data-page="classes"]'); await pause(page, 400);
+  await page.focus('[data-rotate-class="c1"]'); await page.keyboard.press('Enter'); await pause(page, 400);
+  for (let i = 0; i < 6; i++) { await page.keyboard.press('Tab'); assert(await page.evaluate(() => !!document.activeElement.closest('.app-modal')), 'Tab으로 모달 밖에 포커스'); }
+  assert((await page.innerText('#app-modal-title')) === '수강 코드 재발급', '확인 창 제목: ' + await page.innerText('#app-modal-title'));
+  await page.keyboard.press('Escape'); await pause(page, 300);
+  assert(await page.evaluate(() => document.activeElement?.dataset.rotateClass === 'c1'), '닫은 뒤 포커스가 원래 버튼으로 돌아가지 않음');
+});
+
+test('P0-07 상태 배지: 색 + 기호 + 글자 (정답·오답·출석·불참·답변 대기)', async b => {
+  const { page } = await openAs(b, 'index.html', 's2', { viewport: { width: 390, height: 844 } });
+  await page.click('[data-tab="quiz"]'); await pause(page, 500);
+  await page.selectOption('#student-week-picker', 'w4'); await pause(page, 700);
+  for (const pick of ['20살', 'X', 'quince']) { await page.click(`.answer-option:has-text("${pick}")`); await page.click('#quiz-next'); await pause(page, 250); }
+  await pause(page, 600);
+  const pills = await page.$$eval('.review-line .pill', els => els.map(e => e.className + '|' + e.textContent));
+  assert(pills.some(x => x.includes('success') && x.includes('✓정답')) && pills.some(x => x.includes('danger') && x.includes('✕오답')), '정답/오답 배지: ' + pills.join(' / '));
+  await page.click('[data-tab="mypage"]'); await pause(page, 800);
+  const att = await page.$$eval('#attendance-overview .pill', els => els.map(e => e.className + '|' + e.textContent));
+  assert(att.some(x => x.includes('danger') && x.includes('✕불참')) && att.some(x => x.includes('neutral') && x.includes('–미입력')), '출석 배지: ' + att.join(' / '));
+});
+
 test('기본: 학생 과제 텍스트 제출, 퀴즈 3/3, 강사 화면 주요 메뉴 오류 없음', async b => {
   const r = await openAs(b, 'index.html', 's2', { viewport: { width: 390, height: 844 } });
   await r.page.selectOption('#student-week-picker', 'w4'); await pause(r.page, 700);

@@ -37,7 +37,9 @@ classes/{cid}             name, description, joinCode, archived,
   members/{uid}           uid, name(공개 표시명), status, joinedAt       ← 같은 반 학생에게 공개
   teacherNotes/{uid}      text, studentUid, updatedAt, updatedBy         ← 강사 전용
   questions/{qid}         uid, studentName, title, content, status('open'|'answered'),
-                          createdAt, answeredAt
+                          createdAt, answeredAt,
+                          needsTeacherReply(bool), lastMessageAt, lastSenderRole('student'|'admin')  ← 배치 05
+                          (필드 없는 이전 질문은 status로 판단: common.js needsReply())
     replies/{rid}         uid, role('student'|'admin'), author, text, createdAt
   weeks/{wid}             label, order, sessionDate, published, createdAt, updatedAt,
                           assignment{enabled, title, instructions, allowText, allowAudio,
@@ -48,7 +50,8 @@ classes/{cid}             name, description, joinCode, archived,
                                   videos[{path,name,size}], files[{path,name,size}]}
     submissions/{uid}     userId, studentName, email, text, audioPath,
                           submittedAt(재제출 시 덮어씀),
-                          feedbacks[{id, text, audioPath, createdAt(ISO 문자열), author}],
+                          revision(1부터, 재제출마다 +1), firstSubmittedAt(불변), latestSubmittedAt  ← 배치 05
+                          feedbacks[{id, text, audioPath, createdAt(ISO 문자열), author, forRevision}],
                           (구버전) feedback{text, audioPath, updatedAt}
     quizResults/{uid}     userId, studentName, email, answers[], score, total, submittedAt,
                           attemptCount, firstAttempt{score, total, submittedAt, answers?, legacy},
@@ -63,6 +66,10 @@ Storage
 ```
 
 이 구조가 배치 06·08 등에서 바뀌면, 해당 배치의 결과 보고에 바뀐 구조를 적고 이 표도 갱신하세요.
+
+**보관된 반(2026-10-29 요청):** 수강 등록이 active인 학생은 반이 보관된 뒤에도 그 반의 기록을 읽을 수 있습니다(읽기 전용, 강의 영상 제외). 규칙의 `enrolled(cid)`(읽기)와 `member(cid)`(쓰기, 운영 중인 반)를 구분해 씁니다.
+
+**공통 판정 함수(common.js):** `formatDateTime`·`toDate`·`todayKey`(D10 시간대), `needsReply`·`byLastActivity`(질문), `reviewState`·`feedbackItems`(과제 피드백), `statusPill`(상태 배지).
 
 ---
 
