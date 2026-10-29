@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "cp ../../firestore.rules ../../storage.rules . && firebase emulators:exec --only firestore,storage --project demo-tstst \"node enrollment.test.mjs && node archive.test.mjs && node communication.test.mjs && node datamodel.test.mjs && node studentflow.test.mjs && node legacyclient.test.mjs\""
+    "test": "cp ../../firestore.rules ../../storage.rules . && firebase emulators:exec --only firestore,storage --project demo-tstst \"node enrollment.test.mjs && node archive.test.mjs && node communication.test.mjs && node datamodel.test.mjs && node studentflow.test.mjs && node legacyclient.test.mjs && node noticerecap.test.mjs\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.2",

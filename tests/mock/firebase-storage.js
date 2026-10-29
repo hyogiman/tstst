@@ -34,6 +34,8 @@ export function uploadBytesResumable(r, file, metadata = {}) {
       setTimeout(() => {
         try {
           if (!state.user) throw Object.assign(new Error('unauthorized'), { code: 'storage/unauthorized' });
+          // v4 규칙 전에는 복습 수업 영상 경로가 없어 거부됨
+          if (/^classes\/[^/]+\/recaps\//.test(r.fullPath) && !rulesAt('v4')) throw Object.assign(new Error('unauthorized'), { code: 'storage/unauthorized' });
           const total = file.size || 1;
           next?.({ bytesTransferred: Math.floor(total / 2), totalBytes: total });
           next?.({ bytesTransferred: total, totalBytes: total });
@@ -47,8 +49,9 @@ export function uploadBytesResumable(r, file, metadata = {}) {
 }
 export async function getDownloadURL(r) {
   (state.urlRequests ||= []).push(r.fullPath);
-  // v3 규칙: 보관된 반의 강의 영상은 강사만 열 수 있음
-  const video = String(r.fullPath).match(/^classes\/([^/]+)\/previews\/[^/]+\/video\//);
+  // v3 규칙: 보관된 반의 강의 영상은 강사만 열 수 있음. 복습 수업 영상(recaps)은 v4 규칙부터 같은 조건
+  if (/^classes\/[^/]+\/recaps\//.test(r.fullPath) && !rulesAt('v4')) throw Object.assign(new Error('unauthorized'), { code: 'storage/unauthorized' });
+  const video = String(r.fullPath).match(/^classes\/([^/]+)\/(?:previews|recaps)\/[^/]+\/video\//);
   if (video && rulesAt('v3')) {
     const uid = state.user?.uid, admin = state.docs.get('users/' + uid)?.role === 'admin';
     const e = state.docs.get(`enrollments/${uid}_${video[1]}`), c = state.docs.get('classes/' + video[1]);

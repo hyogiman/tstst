@@ -511,3 +511,12 @@ button.dash-action:hover{border-color:var(--wine-200);box-shadow:var(--shadow-md
 .link-row input{flex:1;min-width:0}
 @media (max-width:700px){.week-basic{grid-template-columns:1fr 1fr}.week-basic .field:first-child{grid-column:1/-1}}
 @media (max-width:640px){.week-save-bar{margin:4px -18px -18px;padding:12px 18px}}
+/* 공지사항(2026-10-29) */
+.announce-card.is-pinned{border-color:var(--wine-200)}
+.announce-card h3{overflow-wrap:anywhere}
+.announce-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.announce-reads{display:grid;gap:4px;min-width:0}
+.announce-unread summary{cursor:pointer;color:var(--wine-600);font-size:13px;font-weight:700}
+.announce-unread p{margin-top:6px;font-size:13px;color:var(--ink-2);overflow-wrap:anywhere}
+.announce-modal{width:min(640px,100%)}
+.week-visibility-line span{white-space:nowrap} /* '복습 퀴즈 ✓'처럼 항목 중간에서 줄이 바뀌지 않게 */

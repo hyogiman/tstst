@@ -323,3 +323,6 @@ a.media-item:hover{border-color:var(--wine-200);background:var(--wine-50);color:
 /* 유튜브 '일부 공개' 영상 임베드(D9) */
 .video-embed{position:relative;width:100%;aspect-ratio:16/9;border-radius:var(--r-md);overflow:hidden;background:#111}
 .video-embed iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+/* 공지 본문(2026-10-29): 쓴 줄바꿈 그대로, 긴 주소도 화면 안에서 줄바꿈 */
+.announce-body{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7;margin-top:10px;color:var(--ink)}
+.announce-body a{color:var(--wine-700);text-decoration:underline;text-underline-offset:3px}

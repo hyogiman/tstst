@@ -845,7 +845,7 @@ test('S06 차시 편집: 학생에게 보이는 범위 요약과 수업 흐름 �
   await page.click('[data-week-open="w6"]'); await pause(page, 400);
   assert((await page.innerText('#week-visibility')).includes('비공개 초안'), '비공개 요약: ' + await page.innerText('#week-visibility'));
   await page.click('label.switch:has(#week-published)'); await pause(page, 150);
-  assert((await page.innerText('#week-visibility')).includes('공개됨 — 예습 ✕ · 과제 ✕ · 복습 ✕'), '공개 요약: ' + await page.innerText('#week-visibility'));
+  assert((await page.innerText('#week-visibility')).includes('공개됨 — 예습 ✕ · 과제 ✕ · 복습 퀴즈 ✕ · 수업 영상 ✕'), '공개 요약: ' + await page.innerText('#week-visibility'));
   const tabs = await page.$$eval('[data-week-tab]', els => els.map(e => e.textContent));
   assert(JSON.stringify(tabs) === JSON.stringify(['수업 전 · 예습', '수업 후 · 과제', '수업 후 · 복습']), '탭: ' + tabs.join('|'));
   assert((await page.innerText('[data-week-panel="preview"] .notice')).includes('수업(') , '예습 탭 안내 없음');
@@ -1360,6 +1360,190 @@ test('A11Y04 소제목: 승인한 스페인어로 통일(영어 없음) · 스�
   const latin = /[A-Za-zÁÉÍÓÚÑÜáéíóúñü¡¿]/;
   eq(tags.filter(t => latin.test(t.text) && !/lang="es"/.test(t.attrs) && !t.inner.includes('<span lang="es">')).map(t => t.text), [], 'lang="es"가 없는 스페인어 소제목');
   eq(tags.filter(t => /\b(LEARNING|JOURNEY|CLASS|INSIGHTS|MANAGEMENT|SCHEDULE|LESSON|PLANNER|FEEDBACK|STUDENT|DIRECTORY|INSTRUCTOR|WORKSPACE|WELCOME|ACCESS|CONTROL|QUIZ|COMPLETE)\b/i.test(t.text)).map(t => t.text), [], '영어 소제목');
+});
+
+// ----- 2026-10-29 추가: 복습 수업 영상 · 공지사항 (v4 규칙) -----
+const RECAP = { enabled: true, videos: [{ kind: 'upload', path: 'classes/c1/recaps/w4/video/class4.mp4', name: 'class4.mp4', size: 734003200 }, { kind: 'youtube', videoId: 'dQw4w9WgXcQ', url: 'https://youtu.be/dQw4w9WgXcQ', name: '유튜브 영상 (dQw4w9WgXcQ)' }] };
+const recapSeed = () => { const seed = makeSeed(); seed.docs['classes/c1/weeks/w4'].recap = JSON.parse(JSON.stringify(RECAP)); seed.files['classes/c1/recaps/w4/video/class4.mp4'] = 'video'; return seed; };
+const HOUR = 3600 * 1000;
+const noticeSeed = () => {
+  const seed = makeSeed(), at = h => new Date(Date.now() - h * HOUR).toISOString();
+  const n = (id, title, body, pinned, hoursAgo) => { seed.docs[`classes/c1/notices/${id}`] = { title, body, pinned, createdAt: at(hoursAgo), updatedAt: at(hoursAgo), createdBy: 'admin1', authorName: '유진' }; };
+  n('n1', '교재는 3과까지 준비해 주세요', '교재: 「Hola 스페인어」\n서점: https://example.com/book', true, 240);
+  n('n2', '11월 5일 수업은 쉽니다', '보강은 11월 12일(목)입니다.', false, 1);
+  n('n3', '단어 시험 범위 안내', '1~3차시 단어', false, 120);
+  seed.docs['classes/c1/noticeReads/s1'] = { seenAt: at(48) }; // 이틀 전에 공지 화면을 봄 → n2만 새 공지
+  return seed;
+};
+
+test('RC01 복습 수업 영상(강사): 복습 탭에 영상 올리기 · 유튜브 링크 · 영상 없이 켜면 안내 · 저장 경로', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1', { rules: 'v4' });
+  await page.click('[data-page="weeks"]'); await pause(page, 500);
+  await page.click('[data-week-open="w4"]'); await pause(page, 400);
+  await page.click('[data-week-tab="quiz"]'); await pause(page, 200);
+  const order = await page.$$eval('[data-week-panel="quiz"] h3', els => els.map(e => e.textContent.trim()));
+  eq(order, ['🎬 수업 영상', '📝 복습 퀴즈'], '복습 탭 순서');
+  await page.click('label.switch:has(#recap-enabled)');
+  await page.click('#save-week'); await pause(page, 400);
+  assert((await lastToast(page)).includes('수업 영상을 공개하려면'), '영상 없이 켠 채 저장됨: ' + await lastToast(page));
+  await page.setInputFiles('#recap-video-file', { name: 'class4.mp4', mimeType: 'video/mp4', buffer: Buffer.from('fake-video') }); await pause(page, 500);
+  await page.fill('#recap-video-link', 'https://youtu.be/dQw4w9WgXcQ'); await page.click('#add-recap-link'); await pause(page, 200);
+  const list = await page.innerText('#recap-videos-list');
+  assert(list.includes('class4.mp4') && list.includes('직접 업로드') && list.includes('유튜브 링크'), '수업 영상 목록: ' + list);
+  assert((await page.innerText('#week-visibility')).includes('수업 영상 ✓'), '공개 범위 요약: ' + await page.innerText('#week-visibility'));
+  assert((await page.innerText('#week-save-status')).includes('저장하지 않은 변경'), '저장 전 표시 없음');
+  await page.click('#save-week'); await pause(page, 900);
+  const recap = (await dump(page, 'classes/c1/weeks/w4')).recap;
+  assert(recap.enabled === true && recap.videos.length === 2, '저장 형식: ' + JSON.stringify(recap));
+  assert(/^classes\/c1\/recaps\/w4\/video\/.+class4\.mp4$/.test(recap.videos[0].path) && recap.videos[0].kind === 'upload' && recap.videos[1].kind === 'youtube', '영상 경로·종류: ' + JSON.stringify(recap.videos));
+  // 영상을 지우고 저장하면 Storage 파일도 정리
+  await page.click('[data-week-tab="quiz"]'); await pause(page, 200);
+  await page.click('[data-remove-recap="0"]'); await pause(page, 100);
+  await page.click('#save-week'); await pause(page, 900);
+  assert((await page.evaluate(() => window.__mock.deletedFiles())).includes(recap.videos[0].path), '지운 영상 파일이 남음');
+});
+
+test('RC02 복습 수업 영상(학생): 홈 할 일 → 수업 영상 화면, 퀴즈와 다른 화면으로 전환, 메뉴로 다시 와도 고른 화면 유지', async b => {
+  const { page, errors } = await openApp(b, { file: 'index.html', user: 's1', rules: 'v4', seed: recapSeed(), viewport: { width: 390, height: 844 } });
+  await pause(page, 900);
+  const row = page.locator('.todo-row', { hasText: '수업 영상' });
+  assert((await row.innerText()).includes('영상 2개'), '할 일에 수업 영상 없음: ' + await page.innerText('.home-todo'));
+  await row.locator('[data-view="video"]').click(); await pause(page, 600);
+  assert(await page.$('.review-tabs [data-review-view="video"][aria-pressed="true"]'), '수업 영상 탭이 선택되지 않음');
+  // 모의 저장소는 영상 파일 주소를 비워 두므로, 영상 칸 수와 직접 올린 영상의 주소 요청으로 확인합니다.
+  eq(await page.$$eval('.recap-card .lesson-video-block strong', els => els.map(e => e.textContent)), ['수업 영상 1', '수업 영상 2'], '수업 영상 칸');
+  assert((await page.evaluate(() => window.__mock.urlRequests())).includes('classes/c1/recaps/w4/video/class4.mp4'), '직접 올린 영상 주소를 요청하지 않음');
+  assert((await page.getAttribute('.recap-card iframe', 'src')) === 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?rel=0', '유튜브 임베드 주소');
+  assert(!(await page.$('#quiz-stage')), '영상 화면에 퀴즈가 함께 보임');
+  await page.click('.review-tabs [data-review-view="quiz"]'); await pause(page, 600);
+  assert(await page.$('#quiz-stage') && !(await page.$('.recap-card')), '퀴즈 화면으로 바뀌지 않음');
+  assert(await page.evaluate(() => document.activeElement?.dataset.reviewView === 'quiz'), '화면을 바꾼 뒤 포커스가 탭에 없음');
+  await page.click('[data-tab="home"]'); await pause(page, 500);
+  await page.click('[data-tab="quiz"]'); await pause(page, 600);
+  assert(await page.$('#quiz-stage'), '메뉴로 다시 왔을 때 고른 화면(퀴즈)이 유지되지 않음');
+  await page.click('.review-tabs [data-review-view="video"]'); await pause(page, 500);
+  await page.click('.recap-card [data-review-view="quiz"]'); await pause(page, 500);
+  assert(await page.$('#quiz-stage'), '영상 화면의 "복습 퀴즈 풀러 가기"가 동작하지 않음');
+  // 수업 영상이 없는 차시는 탭 없이 퀴즈만
+  await page.selectOption('#student-week-picker', 'w3'); await pause(page, 600);
+  assert(!(await page.$('.review-tabs')) && await page.$('#quiz-stage'), '영상 없는 차시에 탭이 보임');
+  assert(!errors.length, '오류: ' + errors.join(' | '));
+});
+
+test('RC03 복습 수업 영상: 보관된 반에서는 영상 대신 안내만, 영상 주소도 요청하지 않음', async b => {
+  const seed = makeSeed();
+  seed.docs['classes/c3/weeks/ow1'].recap = { enabled: true, videos: [{ kind: 'upload', path: 'classes/c3/recaps/ow1/video/c.mp4', name: 'c.mp4', size: 1 }, { kind: 'youtube', videoId: 'dQw4w9WgXcQ', url: '', name: '유튜브' }] };
+  seed.files['classes/c3/recaps/ow1/video/c.mp4'] = 'video';
+  const { page } = await openApp(b, { file: 'index.html', user: 's5', rules: 'v4', seed, viewport: { width: 390, height: 844 } });
+  await pause(page, 900);
+  await page.click('[data-past-class="c3"]'); await pause(page, 700);
+  await page.selectOption('#student-week-picker', 'ow1'); await pause(page, 400);
+  await page.click('[data-tab="quiz"]'); await pause(page, 600);
+  assert((await page.innerText('.review-past-note')).includes('수업 영상 2개는 수강 기간에만'), '지난 반 안내 없음');
+  assert(!(await page.$('.review-tabs')) && !(await page.$('video')) && !(await page.$('iframe')), '지난 반에 수업 영상이 보임');
+  assert(await page.$('#quiz-content'), '지난 반 복습 연습이 사라짐');
+  const asked = (await page.evaluate(() => window.__mock.urlRequests())).filter(x => x.includes('/recaps/'));
+  assert(!asked.length, '수업 영상 주소를 요청함: ' + asked.join(','));
+});
+
+test('NT01 공지사항(강사): 올리기·수정·상단 고정·삭제, 쓰던 내용이 있으면 닫기 전에 확인', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1', { rules: 'v4' });
+  await page.click('[data-page="notices"]'); await pause(page, 600);
+  assert((await page.innerText('#notice-admin-list')).includes('아직 올린 공지가 없어요'), '빈 목록 안내 없음');
+  await page.click('#notice-new'); await pause(page, 200);
+  assert(await page.evaluate(() => document.activeElement?.id === 'notice-title'), '작성 창을 열면 제목에 포커스가 없음');
+  await page.click('#notice-save'); await pause(page, 200);
+  assert((await page.innerText('#notice-error')).includes('제목을 입력'), '제목 없이 저장됨');
+  await page.fill('#notice-title', '11월 5일 수업은 쉽니다');
+  await page.fill('#notice-body', '보강은 11월 12일입니다.\n자료: https://example.com/a.pdf.');
+  await page.click('#notice-cancel'); await pause(page, 200);
+  assert(await page.$('.app-modal-ok'), '쓰던 내용이 있는데 바로 닫힘');
+  await page.click('.app-modal-cancel'); await pause(page, 200);
+  assert(await page.$('#notice-form'), '닫기를 취소했는데 작성 창이 사라짐');
+  await page.click('#notice-save'); await pause(page, 700);
+  const ids = await page.evaluate(() => window.__mock.list('classes/c1/notices/'));
+  assert(ids.length === 1, '공지 문서: ' + ids.join(','));
+  const saved = await dump(page, ids[0]);
+  assert(saved.title === '11월 5일 수업은 쉽니다' && saved.pinned === false && saved.createdBy === 'admin1', '저장 내용: ' + JSON.stringify(saved));
+  assert((await page.getAttribute('.announce-body a', 'href')) === 'https://example.com/a.pdf', '본문 주소 링크(끝 마침표 제외)');
+  assert(/읽음 0\/\d+명/.test(await page.innerText('.announce-reads')), '읽음 수: ' + await page.innerText('.announce-reads'));
+  // 수정
+  await page.click('[data-notice-edit]'); await pause(page, 200);
+  assert((await page.inputValue('#notice-title')) === '11월 5일 수업은 쉽니다', '수정 창에 기존 제목이 없음');
+  await page.fill('#notice-title', '11월 5일(수) 휴강'); await page.click('#notice-save'); await pause(page, 600);
+  assert((await dump(page, ids[0])).title === '11월 5일(수) 휴강', '수정이 저장되지 않음');
+  // 상단 고정: 다시 그린 뒤에도 누른 버튼에 포커스
+  await page.click('[data-notice-pin]'); await pause(page, 600);
+  assert((await dump(page, ids[0])).pinned === true && (await page.innerText('.announce-card')).includes('상단 고정'), '고정되지 않음');
+  assert(await page.evaluate(() => document.activeElement?.hasAttribute('data-notice-pin')), '고정 뒤 포커스를 잃음');
+  // 삭제
+  await page.click('[data-notice-delete]'); await pause(page, 200); await ok(page);
+  assert(!(await dump(page, ids[0])) && (await page.innerText('#notice-admin-list')).includes('아직 올린 공지가 없어요'), '삭제되지 않음');
+});
+
+test('NT02 공지사항(학생): 홈 맨 위에 고정·새 공지, 홈 배지, 공지 화면을 열면 확인 시각 기록 → 새 공지 표시 사라짐', async b => {
+  const { page, errors } = await openApp(b, { file: 'index.html', user: 's1', rules: 'v4', seed: noticeSeed(), viewport: { width: 390, height: 844 } });
+  await pause(page, 900);
+  const rows = await page.$$eval('.home-notices .announce-row', els => els.map(e => e.innerText.replace(/\s+/g, ' ')));
+  assert(rows.length === 2 && rows[0].includes('상단 고정') && rows[0].includes('교재는 3과까지') && rows[1].includes('새 공지') && rows[1].includes('11월 5일 수업은 쉽니다'), '홈 공지: ' + rows.join(' | '));
+  assert(!rows.some(r => r.includes('단어 시험')), '이미 본 공지가 홈 맨 위에 보임');
+  assert((await page.getAttribute('.nav-item[data-tab="home"]', 'aria-label')) === '홈, 새 공지 1개', '홈 배지: ' + await page.getAttribute('.nav-item[data-tab="home"]', 'aria-label'));
+  const firstCard = await page.$eval('#home-main', el => el.firstElementChild.className);
+  assert(firstCard.includes('home-notices'), '공지 카드가 홈 맨 위가 아님: ' + firstCard);
+  await page.evaluate(() => window.__mock.clearWrites());
+  await page.click('.announce-row:has-text("11월 5일")'); await pause(page, 700);
+  const titles = await page.$$eval('.announce-item h2', els => els.map(e => e.textContent));
+  eq(titles, ['교재는 3과까지 준비해 주세요', '11월 5일 수업은 쉽니다', '단어 시험 범위 안내'], '공지 순서(고정 → 최근)');
+  assert(await page.evaluate(() => document.activeElement?.id === 'notice-n2'), '누른 공지로 이동하지 않음');
+  assert((await page.innerText('#notice-n2')).includes('새 공지'), '보는 동안 새 공지 표시가 바로 사라짐');
+  assert((await page.getAttribute('#notice-n1 .announce-body a', 'target')) === '_blank', '본문 링크가 새 탭이 아님');
+  const writes = await page.evaluate(() => window.__mock.writes().filter(w => w.source === 'local').map(w => w.path));
+  eq(writes, ['classes/c1/noticeReads/s1'], '확인 시각 기록');
+  assert((await page.getAttribute('.nav-item[data-tab="home"]', 'aria-label')) === '홈', '확인 뒤에도 홈 배지가 남음');
+  await page.click('#notices-back'); await pause(page, 600);
+  const after = await page.$$eval('.home-notices .announce-row', els => els.map(e => e.innerText.replace(/\s+/g, ' ')));
+  assert(after.length === 1 && after[0].includes('상단 고정'), '확인 뒤 홈 공지: ' + after.join(' | '));
+  assert(!errors.length, '오류: ' + errors.join(' | '));
+});
+
+test('NT03 공지사항: 강사 화면의 읽음 수와 안 읽은 학생', async b => {
+  const seed = noticeSeed();
+  seed.docs['classes/c1/noticeReads/s1'] = { seenAt: new Date().toISOString() }; // s1은 모든 공지를 봄
+  const active = Object.entries(seed.docs).filter(([p, d]) => /^enrollments\/[^/]+$/.test(p) && d.classId === 'c1' && d.status === 'active').length;
+  const { page } = await openApp(b, { file: 'admin.html', user: 'admin1', rules: 'v4', seed });
+  await pause(page, 900);
+  await page.click('[data-page="notices"]'); await pause(page, 900);
+  const reads = await page.$$eval('.announce-reads > .hint', els => els.map(e => e.textContent));
+  eq(reads, Array(3).fill(`읽음 1/${active}명`), '공지별 읽음 수');
+  assert((await page.innerText('.announce-unread summary')).includes(`안 읽은 학생 ${active - 1}명`), '안 읽은 학생 수');
+});
+
+test('NT04 공지사항: 보관된 반은 지난 반 안내 줄에서 읽기만(확인 시각을 쓰지 않음)', async b => {
+  const seed = makeSeed();
+  seed.docs['classes/c3/notices/p1'] = { title: '수료 안내', body: '수료증은 메일로 보내 드려요.', pinned: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), createdBy: 'admin1', authorName: '유진' };
+  const { page } = await openApp(b, { file: 'index.html', user: 's5', rules: 'v4', seed, viewport: { width: 390, height: 844 } });
+  await pause(page, 900);
+  await page.click('[data-past-class="c3"]'); await pause(page, 700);
+  await page.evaluate(() => window.__mock.clearWrites());
+  await page.click('#past-notices'); await pause(page, 700);
+  assert((await page.innerText('#announce-feed')).includes('수료 안내') && !(await page.innerText('#announce-feed')).includes('새 공지'), '지난 반 공지: ' + await page.innerText('#announce-feed'));
+  const writes = await page.evaluate(() => window.__mock.writes().filter(w => w.source === 'local'));
+  assert(!writes.length, '지난 반에서 확인 시각을 씀: ' + JSON.stringify(writes));
+  await page.click('#notices-back'); await pause(page, 500);
+  assert(await page.$('.past-banner') && await page.$('[data-tab="assignment"][aria-current="page"]'), '돌아가기 후 지난 반 과제 화면이 아님');
+});
+
+test('NT05 공지사항: 공지 규칙을 게시하기 전(v3)에도 학생 홈은 그대로, 강사 공지 화면은 권한 안내', async b => {
+  let r = await openApp(b, { file: 'index.html', user: 's1', rules: 'v3', seed: noticeSeed(), viewport: { width: 390, height: 844 } });
+  await pause(r.page, 900);
+  assert(!(await r.page.$('.home-notices')) && await r.page.$('.home-next'), '규칙 게시 전 홈이 달라짐');
+  assert((await r.page.getAttribute('.nav-item[data-tab="home"]', 'aria-label')) === '홈', '규칙 게시 전 홈 배지가 뜸');
+  assert(!r.errors.length, '학생 오류: ' + r.errors.join(' | '));
+  await r.context.close();
+  r = await openApp(b, { file: 'admin.html', user: 'admin1', rules: 'v3', seed: noticeSeed() });
+  await pause(r.page, 900);
+  await r.page.click('[data-page="notices"]'); await pause(r.page, 700);
+  assert((await r.page.innerText('#notice-admin-list')).includes('보안 규칙'), '강사 화면 권한 안내: ' + await r.page.innerText('#notice-admin-list'));
 });
 
 test('기본: 학생 과제 텍스트 제출, 퀴즈 3/3, 강사 화면 주요 메뉴 오류 없음', async b => {

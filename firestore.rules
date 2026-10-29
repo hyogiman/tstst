@@ -119,6 +119,23 @@ service cloud.firestore {
           request.resource.data.keys().hasOnly(['text','updatedAt','updatedBy']) &&
           request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 200;
       }
+      // 공지사항(2026-10-29 추가): 강사가 쓰고, 이 반 수강생이 읽습니다. 보관된 반도 읽을 수 있습니다.
+      match /notices/{nid} {
+        allow get, list: if admin() || enrolled(cid);
+        allow create, update: if admin() &&
+          request.resource.data.keys().hasOnly(['title','body','pinned','createdAt','updatedAt','createdBy','authorName']) &&
+          request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 100 &&
+          request.resource.data.body is string && request.resource.data.body.size() <= 5000 &&
+          request.resource.data.get('pinned', false) is bool;
+        allow delete: if admin();
+      }
+      // 공지 확인 시각: 학생이 공지 화면을 연 서버 시각 하나. '새 공지' 표시와 강사 화면의 '읽음' 수에 씁니다.
+      match /noticeReads/{uid} {
+        allow get: if admin() || (signedIn() && request.auth.uid == uid && enrolled(cid));
+        allow list, delete: if admin();
+        allow create, update: if signedIn() && request.auth.uid == uid && member(cid) &&
+          request.resource.data.keys().hasOnly(['seenAt']) && request.resource.data.seenAt == request.time;
+      }
 
       // 공개 반명단: 이메일/성적/과제는 넣지 않으며 같은 반 학생만 읽습니다.
       match /members/{uid} {

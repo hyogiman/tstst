@@ -20,7 +20,7 @@ async function launch() {
   return chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required'] });
 }
 
-async function openApp(browser, { file = 'index.html', user = null, viewport = { width: 1280, height: 860 }, rules = 'v3', seed = makeSeed(), timezoneId = 'Asia/Seoul', blockCdn = false, bootTimeoutMs = null, context: existing = null } = {}) {
+async function openApp(browser, { file = 'index.html', user = null, viewport = { width: 1280, height: 860 }, rules = 'v4', seed = makeSeed(), timezoneId = 'Asia/Seoul', blockCdn = false, bootTimeoutMs = null, context: existing = null } = {}) {
   const context = existing || await browser.newContext({ viewport, timezoneId, locale: 'ko-KR', permissions: ['microphone'], deviceScaleFactor: 1 });
   await context.route('**/*', route => {
     const url = route.request().url();

@@ -310,6 +310,23 @@ export const ex = e => {
 let toastTimer; export function toast(message,bad=false){const box=$('#toast');if(!box)return;box.textContent=message;box.className='toast show'+(bad?' bad':'');clearTimeout(toastTimer);toastTimer=setTimeout(()=>box.className='toast',4200)}
 export function loading(el){el.classList.add('loading');el.textContent='불러오는 중입니다'}
 export function loaded(el,html){if(!el)return;el.classList.remove('loading');el.innerHTML=html}
+// 공지 본문(2026-10-29): http(s) 주소만 링크로 바꾸고 나머지는 글자 그대로 둡니다. 새 탭으로 열고 원래 창에는 접근하지 못하게 합니다.
+// 주소는 영문·숫자·URL 기호까지만 보고(바로 뒤 한글은 제외), 끝에 붙은 문장부호도 링크에서 뺍니다.
+export function linkifyText(text) {
+  const s = String(text ?? ''), rx = /https?:\/\/[A-Za-z0-9\-._~:/?#[\]@!$&'()*+,;=%]+/g;
+  let out = '', last = 0, m;
+  while ((m = rx.exec(s))) {
+    const link = m[0].replace(/[.,;:!?')\]]+$/, '');
+    out += esc(s.slice(last, m.index)) + `<a href="${esc(link)}" target="_blank" rel="noopener noreferrer">${esc(link)}</a>`;
+    last = m.index + link.length; rx.lastIndex = last;
+  }
+  return out + esc(s.slice(last));
+}
+// 공지 정렬: 상단 고정 먼저, 그다음 최근에 올린 것부터
+export function sortNotices(list) {
+  const at = n => toDate(n.createdAt)?.getTime() || 0;
+  return [...(list || [])].sort((a, b) => (b.pinned === true) - (a.pinned === true) || at(b) - at(a));
+}
 export function empty(title,detail=''){return `<div class="empty"><span class="symbol" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M9 41C17 31 26 21 39 9" stroke="#56781f" stroke-width="2.2" stroke-linecap="round"/><ellipse cx="19" cy="28" rx="7.5" ry="3.1" transform="rotate(-52 19 28)" fill="#8ba65a"/><ellipse cx="27" cy="20" rx="7.5" ry="3.1" transform="rotate(-38 27 20)" fill="#a7c072"/><ellipse cx="16" cy="34.5" rx="6.2" ry="2.7" transform="rotate(18 16 34.5)" fill="#a7c072"/><ellipse cx="31" cy="25.5" rx="6.2" ry="2.7" transform="rotate(24 31 25.5)" fill="#8ba65a"/><circle cx="35" cy="13.5" r="3.6" fill="#3f5f14"/></svg></span><strong>${esc(title)}</strong><p>${esc(detail)}</p></div>`;}
 export function makeId(){return (globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2));}
 export const enId = (uid,cid)=>`${uid}_${cid}`;

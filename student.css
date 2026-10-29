@@ -162,3 +162,23 @@
 }
 /* 학생 화면에서는 토스트를 하단 메뉴 위에 띄웁니다 */
 body:has(.student-nav) .toast{bottom:96px}
+/* 공지사항(2026-10-29): 홈 맨 위 카드 · 공지 화면 */
+.home-notices .between{align-items:center;gap:10px}
+.home-notices .eyebrow{margin-bottom:0}
+.announce-list{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}
+.announce-row{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);text-align:left;color:var(--ink);font:inherit}
+.announce-row:hover{border-color:var(--wine-200);background:var(--wine-50)}
+.announce-row-main{display:grid;gap:4px;min-width:0}
+.announce-row-title{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.announce-row-title strong{font-size:15px;overflow-wrap:anywhere}
+.announce-row small{color:var(--muted);font-size:13px;overflow-wrap:anywhere}
+.home-notices-link{display:inline-block;margin-top:12px}
+.announce-back{margin:0 0 14px}
+.announce-item-head{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:8px}
+.announce-item-head h2{font-size:18px;line-height:1.4;overflow-wrap:anywhere}
+.announce-item .hint{margin-top:4px}
+.announce-item.is-target{border-color:var(--wine-200);box-shadow:0 0 0 3px var(--wine-50)}
+/* 복습: 수업 영상 · 복습 퀴즈 화면 고르기(2026-10-29) */
+.review-tabs{margin:0 0 16px}
+.review-tab-count{display:inline-block;min-width:20px;margin-left:4px;padding:0 6px;border-radius:999px;background:var(--wine-50);color:var(--wine-700);font-size:12px;line-height:20px;text-align:center}
+.past-banner-actions{flex-shrink:0}

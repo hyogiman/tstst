@@ -1,7 +1,7 @@
 // 테스트 전용: Firebase(Auth·Firestore·Storage)를 흉내 내는 메모리 저장소.
 // 운영 코드에서는 절대 불러오지 않습니다. tests/lib/harness.cjs가 gstatic 요청을 가로채 이 파일을 제공합니다.
 // 보안 규칙은 핵심 일부(수강 등록·반 접근)만 흉내 냅니다.
-// window.__MOCK_RULES__ = 'v1'(처음 받은 규칙) | 'v2'(2026-10-29 게시, = 'current') | 'v3'(이번 수정안, = 'proposed')
+// window.__MOCK_RULES__ = 'v1'(처음 받은 규칙) | 'v2'(cad3afc) | 'v3'(2026-10-29 게시, = 'current') | 'v4'(공지·복습 영상 추가안, = 'proposed')
 
 const SENTINEL = Symbol('mock-sentinel');
 export const state = (globalThis.__mockState ||= {
@@ -113,9 +113,9 @@ export function makeUser(u) {
 export function autoId() { state.seq += 1; return 'auto' + String(state.seq).padStart(4, '0') + Math.random().toString(36).slice(2, 6); }
 
 // ---------- 보안 규칙(일부) 흉내 ----------
-const RULE_VERSIONS = { v1: 1, v2: 2, v3: 3, current: 2, proposed: 3 };
+const RULE_VERSIONS = { v1: 1, v2: 2, v3: 3, v4: 4, current: 3, proposed: 4 };
 // 지금 흉내 내는 규칙이 해당 버전 이상인지
-export function rulesAt(v) { return (RULE_VERSIONS[state.rulesMode] ?? 3) >= RULE_VERSIONS[v]; }
+export function rulesAt(v) { return (RULE_VERSIONS[state.rulesMode] ?? 4) >= RULE_VERSIONS[v]; }
 export function permissionError(message) { return Object.assign(new Error('Missing or insufficient permissions. ' + (message || '')), { code: 'permission-denied' }); }
 function me() { return state.user?.uid || null; }
 function isAdmin() { const u = me(); return !!u && state.docs.get('users/' + u)?.role === 'admin'; }
@@ -140,6 +140,8 @@ function finishedAssigned(uid, assigned) {
 export function canReadDoc(path, data) {
   if (state.readFailures.some(rx => new RegExp(rx).test(path))) return false;
   const u = me(); if (!u) return false;
+  // v4: 공지·공지 확인 시각은 새 규칙을 게시해야 읽을 수 있음(그 전에는 강사도 거부)
+  if (/^classes\/[^/]+\/(notices|noticeReads)(\/|$)/.test(path) && !rulesAt('v4')) return false;
   if (isAdmin()) return true;
   const s = path.split('/');
   if (s[0] === 'users') return s[1] === u;
@@ -152,6 +154,8 @@ export function canReadDoc(path, data) {
     if (s[2] === 'teacherNotes') return false;
     if (s[2] === 'studentGoals') return rulesAt('v3') && s[3] === u; // 배치 11: 본인 목표만
     if (s[2] === 'members') return true;
+    if (s[2] === 'notices') return true;                // v4: 이 반 수강생(지난 반 포함)
+    if (s[2] === 'noticeReads') return s[3] === u;      // v4: 본인 확인 시각만
     if (s[2] === 'questions') {
       const q = state.docs.get(`classes/${cid}/questions/${s[3]}`);
       if (s.length <= 4) return !data || data.uid === u;
@@ -173,6 +177,7 @@ export function checkWrite(op) {
   const s = op.path.split('/');
   const admin = isAdmin();
   const after = op.type === 'delete' ? null : op.after;
+  if (s[0] === 'classes' && ['notices', 'noticeReads'].includes(s[2]) && !rulesAt('v4')) throw permissionError('notices (before v4 rules)');
   if (s[0] === 'enrollments' && s.length > 2) {
     // P1-04 수강 기간 기록: v3 규칙부터. 학생은 자기 등록의 'joined' 기록만
     if (!rulesAt('v3')) throw permissionError('enrollment events (before v3 rules)');
@@ -212,6 +217,8 @@ export function checkWrite(op) {
     if (s.length <= 2) throw permissionError('class doc');
     if (!memberOf(cid)) throw permissionError('not a member');
     if (s[2] === 'teacherNotes') throw permissionError('teacher notes');
+    if (s[2] === 'notices') throw permissionError('notices are teacher-only');
+    if (s[2] === 'noticeReads' && (s[3] !== u || Object.keys(after || {}).some(k => k !== 'seenAt'))) throw permissionError('noticeReads shape');
     if (s[2] === 'questions' && s.length === 4 && before) {
       if (!rulesAt('v3')) throw permissionError('student question update (v2 rules)');
     }

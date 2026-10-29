@@ -39,6 +39,9 @@ classes/{cid}             name, description, joinCode, archived,
   members/{uid}           uid, name(공개 표시명), status, joinedAt       ← 같은 반 학생에게 공개
   teacherNotes/{uid}      text, studentUid, updatedAt, updatedBy         ← 강사 전용
   studentGoals/{uid}      text(200자 이하), updatedAt, updatedBy          ← 배치 11: 다음 학습 목표. 강사가 쓰고 그 학생만 읽음(학생 홈에 표시)
+  notices/{nid}           title(1~100자), body(5000자 이하), pinned(bool), createdAt, updatedAt, createdBy, authorName
+                          ← 2026-10-29 공지사항: 강사만 씀, 이 반 수강생(지난 반 포함)이 읽음
+  noticeReads/{uid}       seenAt(서버 시각)   ← 학생이 공지 화면을 연 시각. 본인만 씀(운영 중인 반), 강사는 '읽음 n/m명'에 씀
   questions/{qid}         uid, studentName, title, content, status('open'|'answered'),
                           createdAt, answeredAt,
                           needsTeacherReply(bool), lastMessageAt, lastSenderRole('student'|'admin')  ← 배치 05
@@ -54,6 +57,9 @@ classes/{cid}             name, description, joinCode, archived,
                                stem, options[], correctIndices[], explanation}]},   ← correctIndex는 배치 12부터 쓰지 않음(읽기만 호환)
                           preview{enabled, title, mode('rich'|'image'), richHtml, imagePath,
                                   videos[{path,name,size}], files[{path,name,size}]}
+                          recap{enabled, videos[]}   ← 2026-10-29 복습 수업 영상. 영상 형식은 preview.videos와 같음
+                                  ({kind:'upload',path,name,size} 또는 {kind:'youtube',videoId,url,name}),
+                                  직접 올린 파일은 Storage classes/{cid}/recaps/{wid}/video/ (보관된 반은 학생 재생 차단)
     submissions/{uid}     userId, studentName, email, text, audioPath,
                           submittedAt(재제출 시 덮어씀),
                           revision(1부터, 재제출마다 +1), firstSubmittedAt(불변), latestSubmittedAt  ← 배치 05
