@@ -19,6 +19,8 @@ const scenes = [
   ['student-questions', 'index.html', 's1', async p => { await click(p, '[data-tab="questions"]'); const q = await p.$('[data-qid]'); if (q) { await q.click(); await pause(p, 400); } }],
   ['student-mypage', 'index.html', 's1', async p => click(p, '[data-tab="mypage"]')],
   ['student-returning', 'index.html', 's5', async () => {}],
+  ['student-past-assignment', 'index.html', 's5', async p => { await click(p, '[data-past-class="c3"]'); await p.selectOption('#student-week-picker', 'ow1'); await pause(p, 600); }],
+  ['student-past-preview', 'index.html', 's5', async p => { await click(p, '[data-past-class="c3"]'); await p.selectOption('#student-week-picker', 'ow1'); await pause(p, 400); await click(p, '[data-tab="preview"]'); }],
   ['admin-login', 'admin.html', null, async () => {}],
   ['admin-dashboard', 'admin.html', 'admin1', async p => pause(p, 600)],
   ['admin-modal', 'admin.html', 'admin1', async p => { await click(p, '[data-page="classes"]'); await click(p, '#create-class'); }],

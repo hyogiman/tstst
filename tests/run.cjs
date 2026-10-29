@@ -1,5 +1,6 @@
 // 시나리오 테스트: node tests/run.cjs [이름필터]
-// 배치 04(P0-01·02·08·09·10) 수정이 실제로 동작하는지 모의 Firebase 위에서 확인합니다.
+// 모의 Firebase 위에서 배치별 수정이 실제로 동작하는지 확인합니다.
+// 규칙 흉내: 'v1'(처음 받은 규칙) · 'v2'(2026-10-29 게시) · 'v3'(이번 수정안). 기본은 v3.
 'use strict';
 const { launch, openApp, lastToast, pause } = require('./lib/harness.cjs');
 
@@ -16,7 +17,7 @@ const trackStreams = page => page.addInitScript(() => {
   navigator.mediaDevices.getUserMedia = async c => { const s = await orig(c); window.__streams.push(s); return s; };
 });
 async function openAs(browser, file, user, opts = {}) {
-  const r = await openApp(browser, { file, user, rules: opts.rules || 'proposed', viewport: opts.viewport || { width: 1280, height: 900 } });
+  const r = await openApp(browser, { file, user, rules: opts.rules || 'v3', viewport: opts.viewport || { width: 1280, height: 900 } });
   await pause(r.page, 600);
   return r;
 }
@@ -125,16 +126,16 @@ test('B04 반 이동 학생 재등록: 활성 반은 1개만', async b => {
   assert((await dump(page, 'users/s3')).assignedClassId === 'c2', 'assignedClassId가 갱신되지 않음');
 });
 
-test('B04b 반 이동(강사가 새 반 등록 생성) — 현재 규칙에서는 친절한 오류, 수정 규칙에서는 성공', async b => {
-  for (const rules of ['current', 'proposed']) {
+test('B04b 반 이동(강사가 새 반 등록 생성) — v1 규칙에서는 친절한 오류, v2 이후 규칙에서는 성공', async b => {
+  for (const rules of ['v1', 'v2']) {
     const { page } = await openAs(b, 'admin.html', 'admin1', { rules });
     await page.click('[data-page="classes"]'); await pause(page, 400);
     await page.click('[data-open-roster="c1"]'); await pause(page, 900);
     await page.click('[data-move-student="s1"]'); await pause(page, 300);
     await page.selectOption('.app-modal-input', 'c2'); await ok(page); await ok(page); await pause(page, 600);
     const e = await dump(page, 'enrollments/s1_c2');
-    if (rules === 'current') assert(!e && (await lastToast(page)).includes('권한'), '현재 규칙에서 안내 없이 실패/성공: ' + JSON.stringify(e));
-    else assert(e?.status === 'active' && (await dump(page, 'enrollments/s1_c1')).status === 'transferred', '수정 규칙에서 반 이동 실패');
+    if (rules === 'v1') assert(!e && (await lastToast(page)).includes('권한'), 'v1 규칙에서 안내 없이 실패/성공: ' + JSON.stringify(e));
+    else assert(e?.status === 'active' && (await dump(page, 'enrollments/s1_c1')).status === 'transferred', 'v2 규칙에서 반 이동 실패');
     await page.context().close();
   }
 });
@@ -148,19 +149,19 @@ test('B05 수강 중지 학생·종료된 반 학생: 새 코드 입력 화면�
   }
 });
 
-test('B05b 같은 반 재입장은 막고, 종료된 반 학생은 새 반에 입장(수정 규칙)', async b => {
+test('B05b 같은 반 재입장은 막고, 종료된 반 학생은 새 반에 입장(v2 이후 규칙)', async b => {
   let r = await openAs(b, 'index.html', 's4', { viewport: { width: 390, height: 844 } });
   await r.page.fill('#join-code', 'HOLA2026'); await r.page.click('#join-form button[type="submit"]'); await pause(r.page, 700);
   assert((await lastToast(r.page)).includes('이전에 등록한 기록'), '같은 반 재입장 안내가 없음: ' + await lastToast(r.page));
   await r.context.close();
-  for (const rules of ['current', 'proposed']) {
+  for (const rules of ['v1', 'v2']) {
     r = await openAs(b, 'index.html', 's5', { rules, viewport: { width: 390, height: 844 } });
     await r.page.fill('#join-code', 'HOLA2026'); await r.page.click('#join-form button[type="submit"]'); await pause(r.page, 1200);
     const e = await dump(r.page, 'enrollments/s5_c1');
-    if (rules === 'current') assert(!e && (await lastToast(r.page)).includes('선생님께 문의'), '현재 규칙: 안내가 없음 ' + await lastToast(r.page));
+    if (rules === 'v1') assert(!e && (await lastToast(r.page)).includes('선생님께 문의'), 'v1 규칙: 안내가 없음 ' + await lastToast(r.page));
     else {
-      assert(e?.status === 'active', '수정 규칙: 새 반 입장 실패');
-      assert((await dump(r.page, 'users/s5')).assignedClassId === 'c1', '수정 규칙: assignedClassId 미갱신');
+      assert(e?.status === 'active', 'v2 규칙: 새 반 입장 실패');
+      assert((await dump(r.page, 'users/s5')).assignedClassId === 'c1', 'v2 규칙: assignedClassId 미갱신');
       assert(await r.page.$('#student-week-picker'), '입장 후 학습 화면이 보이지 않음');
     }
     await r.context.close();
@@ -229,6 +230,85 @@ test('B07c 강사가 내용 변경 없이 저장해도 학생 화면을 다시 �
   await page.evaluate(() => window.__mock.remoteWrite('classes/c1/weeks/w4', { updatedAt: window.__mock.ts(Date.now()) }));
   await pause(page, 700);
   assert(await page.$('#assignment-text[data-marker="kept"]'), '변경 없는 저장에 화면이 다시 그려짐');
+});
+
+// ---------- 보관된 반: 강의 영상만 막고 나머지 지난 자료는 읽기 전용으로 (2026-10-29 요청) ----------
+test('F01 보관된 반 학생: 지난 반 자료를 읽기 전용으로 열람, 영상은 요청조차 하지 않음 (v3)', async b => {
+  const { page } = await openAs(b, 'index.html', 's5', { viewport: { width: 390, height: 844 } });
+  assert(await page.$('#join-form'), '입장 폼이 없음');
+  assert((await page.innerText('.past-classes')).includes('왕초보반 1기'), '지난 반 목록이 없음');
+  await page.click('[data-past-class="c3"]'); await pause(page, 700);
+  assert((await page.innerText('.past-banner')).includes('강의 영상은 볼 수 없어요'), '지난 반 안내 띠가 없음');
+  assert(!(await page.$('[data-tab="classmates"]')), '지난 반에서 우리 반 탭이 보임');
+  await page.selectOption('#student-week-picker', 'ow1'); await pause(page, 600);
+  // 과제: 제출한 답안과 피드백이 보이고 제출 버튼은 없음
+  const assignment = await page.innerText('#student-body');
+  assert(assignment.includes('A, B, C, D, E') && assignment.includes('ñ 발음'), '제출 답안·피드백이 보이지 않음');
+  assert(!(await page.$('#submit-assignment')), '지난 반에 제출 버튼이 있음');
+  // 예습 자료: 글·첨부는 보이고 영상은 안내만
+  await page.click('[data-tab="preview"]'); await pause(page, 600);
+  assert(!(await page.$('video')), '지난 반에 영상 플레이어가 그려짐');
+  assert((await page.innerText('#student-body')).includes('수강 기간에만 볼 수 있어요'), '영상 안내 문구가 없음');
+  assert(await page.$('a[data-media-path$="abc.pdf"]'), '첨부 자료가 보이지 않음');
+  // 복습: 연습 모드, 저장하지 않음
+  await page.evaluate(() => window.__mock.clearWrites());
+  await page.click('[data-tab="quiz"]'); await pause(page, 600);
+  for (let i = 0; i < 2; i++) { await page.click('.answer-option >> nth=0'); await page.click('#quiz-next'); await pause(page, 250); }
+  await pause(page, 300);
+  assert((await page.innerText('#quiz-content')).includes('연습 결과는 저장되지 않아요'), '연습 모드 안내가 없음');
+  const writes = await page.evaluate(() => window.__mock.writes().filter(w => w.source === 'local'));
+  assert(!writes.length, '연습 모드인데 저장함: ' + JSON.stringify(writes));
+  // 질문: 기록과 답변은 보이고, 새 질문·답장 입력칸은 없음
+  await page.click('[data-tab="questions"]'); await pause(page, 600);
+  assert(!(await page.$('#question-create')), '지난 반에 새 질문 폼이 있음');
+  await page.click('[data-qid="oq1"]'); await pause(page, 500);
+  assert((await page.innerText('#student-replies')).includes('예이스모'), '선생님 답변이 보이지 않음');
+  assert(!(await page.$('#student-reply-form')), '지난 반에 답장 폼이 있음');
+  // 출석
+  await page.click('[data-tab="mypage"]'); await pause(page, 600);
+  assert((await page.innerText('#attendance-overview')).includes('출석'), '지난 반 출석 기록이 없음');
+  const videoRequests = (await page.evaluate(() => window.__mock.urlRequests())).filter(x => x.includes('/video/'));
+  assert(!videoRequests.length, '영상 주소를 요청함: ' + videoRequests.join(','));
+  // 돌아가기
+  await page.click('#past-exit'); await pause(page, 700);
+  assert(await page.$('#join-form') && !(await page.$('.past-banner')), '돌아가기 후 입장 화면이 아님');
+});
+
+test('F02 보관된 반: 게시 중인 v2 규칙에서는 지난 반 목록 없이 기존처럼 입장 화면 (오류 없음)', async b => {
+  const { page, errors } = await openAs(b, 'index.html', 's5', { rules: 'v2', viewport: { width: 390, height: 844 } });
+  assert(await page.$('#join-form'), '입장 폼이 없음');
+  assert(!(await page.$('.past-classes')), 'v2 규칙에서 지난 반 목록이 보임');
+  assert(!(await page.evaluate(() => document.querySelector('#toast')?.classList.contains('bad'))), '오류 토스트: ' + await lastToast(page));
+  const real = errors.filter(e => !/Failed to load resource/.test(e));
+  assert(!real.length, '콘솔 오류: ' + real.join(' | '));
+});
+
+test('F03 현재 반 + 지난 반 학생: 내 정보에서 지난 반을 열고 돌아오면 현재 반 그대로 (v3)', async b => {
+  const { page } = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 } });
+  // 실시간 등록 구독이 지난 반 목록을 갱신합니다(새로고침하면 모의 데이터가 초기화되므로 하지 않음).
+  await page.evaluate(() => window.__mock.remoteWrite('enrollments/s1_c3', { uid: 's1', classId: 'c3', studentName: '김민지', email: 'minji@example.com', joinCode: 'OLA2025', status: 'active', joinedAt: window.__mock.ts(Date.now() - 200 * 86400000) }, { merge: false }));
+  await pause(page, 700);
+  await page.click('[data-tab="mypage"]'); await pause(page, 600);
+  assert(await page.$('[data-past-class="c3"]'), '내 정보에 지난 반이 없음');
+  await page.click('[data-past-class="c3"]'); await pause(page, 700);
+  assert(await page.$('.past-banner'), '지난 반 화면이 아님');
+  await page.click('#past-exit'); await pause(page, 900);
+  assert(!(await page.$('.past-banner')) && (await page.$('[data-tab="mypage"].active')), '내 정보로 돌아오지 않음');
+  assert((await page.innerText('.info-grid')).includes('스페인어 기초반 2기'), '현재 반이 바뀜');
+});
+
+test('F04 강사: 보관된 반의 등록은 활성 반 중복으로 보지 않고, 반 이동 때도 건드리지 않음', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  // s5: 보관된 c3 수강(완료) + c1 새로 입장
+  await page.evaluate(() => window.__mock.remoteWrite('enrollments/s5_c1', { uid: 's5', classId: 'c1', studentName: '정하은', email: 'haeun@example.com', joinCode: 'HOLA2026', status: 'active', joinedAt: window.__mock.ts(Date.now()) }, { merge: false }));
+  await page.click('[data-page="classes"]'); await pause(page, 400);
+  await page.click('[data-open-roster="c1"]'); await pause(page, 900);
+  assert(!(await page.$('[data-keep-class="s5"]')), '보관된 반 등록을 중복으로 경고함');
+  await page.click('[data-move-student="s5"]'); await pause(page, 300);
+  await page.selectOption('.app-modal-input', 'c2'); await ok(page); await ok(page); await pause(page, 600);
+  assert((await dump(page, 'enrollments/s5_c2'))?.status === 'active', '반 이동 실패');
+  assert((await dump(page, 'enrollments/s5_c1')).status === 'transferred', '이전 반이 반 이동 처리되지 않음');
+  assert((await dump(page, 'enrollments/s5_c3')).status === 'active', '보관된 반 등록이 바뀜(지난 자료 열람 불가)');
 });
 
 test('기본: 학생 과제 텍스트 제출, 퀴즈 3/3, 강사 화면 주요 메뉴 오류 없음', async b => {

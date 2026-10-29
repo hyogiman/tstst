@@ -3,3 +3,5 @@ tests/screenshots/
 tests/node_modules/
 tests/rules/node_modules/
 tests/rules/*.log
+tests/rules/*.rules
+tests/rules/package-lock.json

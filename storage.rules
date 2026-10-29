@@ -2,7 +2,8 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     function signedIn() { return request.auth != null; }
-    // Storage 규칙은 요청당 Firestore 문서 조회 최대 2개: 관리자 프로필 1 + 수강 등록 1.
+    // Storage 규칙이 한 번에 읽을 수 있는 Firestore 문서는 서로 다른 문서 2개까지입니다(같은 문서 재조회는 캐시).
+    // 관리자 프로필 1 + 수강 등록 1, 또는 수강 등록 1 + 반 문서 1 조합으로 한도를 넘지 않게 씁니다.
     function admin() {
       return signedIn() &&
         firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
@@ -13,13 +14,20 @@ service firebase.storage {
         firestore.exists(/databases/(default)/documents/enrollments/$(request.auth.uid + '_' + cid)) &&
         firestore.get(/databases/(default)/documents/enrollments/$(request.auth.uid + '_' + cid)).data.status == 'active';
     }
+    // 운영 중인(보관되지 않은) 반의 수강생: 수강 등록 1 + 반 문서 1 = 문서 2개.
+    function openMember(cid) {
+      return member(cid) &&
+        firestore.get(/databases/(default)/documents/classes/$(cid)).data.archived == false;
+    }
     match /classes/{cid}/previews/{wid}/image/{file} {
       allow read: if admin() || member(cid);
       allow create, update: if admin() && request.resource.size < 8 * 1024 * 1024 && request.resource.contentType.matches('image/.*');
       allow delete: if admin();
     }
+    // 강의 영상은 반이 보관되면 학생이 볼 수 없습니다(2026-10-29 요청). 다른 지난 자료는 계속 열람할 수 있습니다.
+    // 문서 2개 한도: 학생은 openMember(등록+반)에서 끝나고, 강사는 등록 없음(1) + 관리자 프로필(1)로 끝나도록 순서를 지킵니다.
     match /classes/{cid}/previews/{wid}/video/{file} {
-      allow read: if admin() || member(cid);
+      allow read: if openMember(cid) || admin();
       allow create, update: if admin() && request.resource.size <= 2 * 1024 * 1024 * 1024 && request.resource.contentType.matches('video/.*');
       allow delete: if admin();
     }
@@ -30,7 +38,8 @@ service firebase.storage {
     }
     match /classes/{cid}/submissions/{wid}/{uid}/{file} {
       allow read: if admin() || (signedIn() && request.auth.uid == uid && member(cid));
-      allow create, update: if signedIn() && request.auth.uid == uid && member(cid) &&
+      // 과제 음성은 운영 중인 반에서만 올릴 수 있습니다(보관된 반은 읽기 전용).
+      allow create, update: if signedIn() && request.auth.uid == uid && openMember(cid) &&
         request.resource.size < 15 * 1024 * 1024 && request.resource.contentType.matches('audio/.*');
       allow delete: if admin() || (signedIn() && request.auth.uid == uid && member(cid));
     }

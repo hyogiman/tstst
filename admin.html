@@ -15,8 +15,8 @@
 <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;1,9..144,500&display=swap">
 <!-- 배포할 때 CSS를 바꾸면 ?v= 값을 함께 올려 브라우저 캐시를 갱신하세요 -->
-<link rel="stylesheet" href="common.css?v=20261029">
-<link rel="stylesheet" href="admin.css?v=20261029">
+<link rel="stylesheet" href="common.css?v=20261029b">
+<link rel="stylesheet" href="admin.css?v=20261029b">
 </head>
 <body>
 <div id="root"></div>
@@ -26,7 +26,7 @@
 import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import { doc, getDoc, getDocs, collection, query, where, addDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, arrayUnion, onSnapshot, writeBatch, runTransaction, deleteField } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
 import { ref as storageRef, deleteObject } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-storage.js';
-import { CONFIGURED, auth, db, storage, $, $$, esc, fmt, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, mountAuth, formatDuration, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalDialog, modalConfirm, modalInput } from './common.js?v=20261029';
+import { CONFIGURED, auth, db, storage, $, $$, esc, fmt, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, mountAuth, formatDuration, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalDialog, modalConfirm, modalInput } from './common.js?v=20261029b';
 
 
 // ===== ADMIN PAGE =====
@@ -319,7 +319,7 @@ function showClasses(b){
   $$('[data-copy-class]',list).forEach(el=>el.onclick=async()=>{const c=A.classes.find(x=>x.id===el.dataset.copyClass);try{await navigator.clipboard.writeText(`쎄뇨라유 스페인어 수강 안내\n반: ${c.name}\n수강 코드: ${c.joinCode}\n로그인 후 수강 코드만 입력해 주세요.`);toast('수강 코드를 복사했습니다.')}catch(e){toast('클립보드 권한을 확인해 주세요.',true)}});
   $$('[data-edit-class]',list).forEach(el=>el.onclick=()=>classEditor(A.classes.find(x=>x.id===el.dataset.editClass)));
   $$('[data-rotate-class]',list).forEach(el=>el.onclick=async()=>{const c=A.classes.find(x=>x.id===el.dataset.rotateClass);if(!await modalConfirm(`${c.name} 반의 수강 코드를 새로 발급할까요? 기존 코드는 사용할 수 없지만 등록된 수강생은 유지됩니다.`))return;try{const code=await uniqueJoinCode(),batch=writeBatch(db);batch.update(doc(db,'classes',c.id),{joinCode:code,updatedAt:serverTimestamp()});batch.set(doc(db,'joinCodes',code),{classId:c.id,createdBy:A.user.uid,updatedAt:serverTimestamp()});if(c.joinCode)batch.delete(doc(db,'joinCodes',c.joinCode));await batch.commit();toast('수강 코드를 변경했습니다.');await loadAdmin(c.id)}catch(e){toast(ex(e),true)}});
-  $$('[data-archive-class]',list).forEach(el=>el.onclick=async()=>{const c=A.classes.find(x=>x.id===el.dataset.archiveClass);if(!await modalConfirm(c.archived?`${c.name} 반을 다시 운영할까요?`:`${c.name} 반을 보관할까요? 학습 기록은 유지되며 보관 중 수강생에게는 표시되지 않습니다.`))return;try{await updateDoc(doc(db,'classes',c.id),{archived:!c.archived,updatedAt:serverTimestamp()});toast(c.archived?'반을 복원했습니다.':'반을 보관했습니다.');await loadAdmin(c.id)}catch(e){toast(ex(e),true)}});
+  $$('[data-archive-class]',list).forEach(el=>el.onclick=async()=>{const c=A.classes.find(x=>x.id===el.dataset.archiveClass);if(!await modalConfirm(c.archived?`${c.name} 반을 다시 운영할까요?\n학생들이 이 반에서 다시 과제를 제출하고 질문할 수 있게 됩니다.`:`${c.name} 반을 보관할까요?\n학습 기록은 그대로 남고, 학생은 지난 자료(과제·피드백·복습·질문·출석·수업 자료)를 읽기 전용으로 볼 수 있어요. 강의 영상은 볼 수 없어요.\n학생은 다음 반의 수강 코드로 새 반에 입장할 수 있어요.`))return;try{await updateDoc(doc(db,'classes',c.id),{archived:!c.archived,updatedAt:serverTimestamp()});toast(c.archived?'반을 복원했습니다.':'반을 보관했습니다.');await loadAdmin(c.id)}catch(e){toast(ex(e),true)}});
   $$('[data-delete-class]',list).forEach(el=>el.onclick=async()=>{const c=A.classes.find(x=>x.id===el.dataset.deleteClass);const answer=await modalDialog({title:'반 영구 삭제',message:`${c.name} 반에 속한 출석·과제·퀴즈·질문·학생 메모·수강 등록 및 연결된 파일이 삭제 대상입니다. 이 작업은 복원할 수 없습니다. 보관을 원하시면 취소 후 '보관'을 선택하세요.`,value:'',verify:c.name,danger:true,confirmText:'반과 관련 기록 영구 삭제'});if(answer===null)return;el.disabled=true;try{await deleteClassDeep(c);toast(`${c.name} 반 삭제가 완료되었습니다.`);await loadAdmin()}catch(e){toast('삭제 중 오류가 발생했습니다: '+ex(e)+' · 남은 기록을 확인하고 다시 시도해 주세요.',true)}finally{if(el.isConnected)el.disabled=false}});
 }
 // Firestore는 상위 문서만 삭제해도 하위 컬렉션이 지워지지 않습니다. 모든 알려진 하위 경로를 먼저 지웁니다.
@@ -786,6 +786,8 @@ async function showAttendance(b){
 }
 // D4: 한 학생은 동시에 한 반만 수강합니다. 반 이동·재등록은 모두 이 함수로 처리합니다(P0-08).
 // 대상 반 등록을 수강 중으로 만들고, 그 학생의 다른 수강 중 등록은 '반 이동'으로 바꿉니다.
+// 보관된 반(수업이 끝난 반)의 등록은 그대로 둡니다. 학생이 지난 자료를 계속 볼 수 있게 하기 위해서입니다.
+const isArchivedClass=cid=>!!A.classes.find(c=>c.id===cid)?.archived;
 async function activateEnrollment(student,targetClassId){
   const uid=student.uid,target=A.classes.find(c=>c.id===targetClassId);
   if(!target)throw Error('반 정보를 찾을 수 없습니다.');
@@ -794,7 +796,7 @@ async function activateEnrollment(student,targetClassId){
   const publicName=student.publicName||student.studentName||'',realName=student.realName||student.studentName||'';
   for(const d of snap.docs){
     const e=d.data();
-    if(d.id!==targetId&&e.status==='active'){
+    if(d.id!==targetId&&e.status==='active'&&!isArchivedClass(e.classId)){
       batch.update(d.ref,{status:'transferred'});
       batch.set(doc(db,'classes',e.classId,'members',uid),{uid,name:publicName,status:'transferred'},{merge:true});
     }
@@ -808,12 +810,12 @@ async function activateEnrollment(student,targetClassId){
 }
 async function otherActiveClasses(uid,exceptClassId){
   const snap=await getDocs(query(collection(db,'enrollments'),where('uid','==',uid)));
-  return snap.docs.map(d=>d.data()).filter(e=>e.status==='active'&&e.classId!==exceptClassId).map(e=>A.classes.find(c=>c.id===e.classId)||{id:e.classId,name:'다른 반'});
+  return snap.docs.map(d=>d.data()).filter(e=>e.status==='active'&&e.classId!==exceptClassId&&!isArchivedClass(e.classId)).map(e=>A.classes.find(c=>c.id===e.classId)||{id:e.classId,name:'다른 반'});
 }
 async function duplicateActiveStudents(){
   try{
     const snap=await getDocs(query(collection(db,'enrollments'),where('status','==','active')));
-    const count={};snap.docs.forEach(d=>{const u=d.data().uid;count[u]=(count[u]||0)+1});
+    const count={};snap.docs.forEach(d=>{const e=d.data();if(isArchivedClass(e.classId))return;count[e.uid]=(count[e.uid]||0)+1});
     return new Set(Object.keys(count).filter(u=>count[u]>1));
   }catch(e){console.warn('중복 수강 확인 실패',e);return new Set()}
 }

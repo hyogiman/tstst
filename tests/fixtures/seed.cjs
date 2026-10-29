@@ -150,6 +150,34 @@ function makeSeed(now = Date.now()) {
     assignment: { enabled: false, title: '', instructions: '', allowText: true, allowAudio: true, dueAt: '' },
     quiz: { enabled: false, title: '단어 복습', questions: [] }, preview: emptyPreview, createdAt: ts(now - 200 * DAY),
   }));
+  // 보관된 반(c3)의 지난 자료: 학생 s5가 영상만 빼고 열람할 수 있어야 함
+  Object.assign(docs['classes/c3/weeks/ow1'], {
+    label: '1차시 · 알파벳과 발음',
+    assignment: { enabled: true, title: '알파벳 읽고 녹음하기', instructions: 'A부터 Z까지 읽어 보세요.', allowText: true, allowAudio: true, dueAt: '' },
+    quiz: { enabled: true, title: '알파벳 복습', questions: [
+      q('oq1', 'single', 'ñ는 어떻게 읽나요?', ['에네', '에녜', '엔', '니'], [1], 'ñ는 "에녜"라고 읽습니다.'),
+      q('oq2', 'ox', 'h는 스페인어에서 보통 소리 내지 않는다.', ['O', 'X'], [0], ''),
+    ] },
+    preview: { enabled: true, title: '알파벳 수업 자료', mode: 'rich', richHtml: '<p>스페인어 알파벳은 27자입니다.</p>', imagePath: '',
+      videos: [{ path: 'classes/c3/previews/ow1/video/lesson1.mp4', name: '1차시 강의.mp4', size: 900000000 }],
+      files: [{ path: 'classes/c3/previews/ow1/file/abc.pdf', name: '알파벳 표.pdf', size: 50000 }] },
+  });
+  files['classes/c3/previews/ow1/video/lesson1.mp4'] = 'video';
+  files['classes/c3/previews/ow1/file/abc.pdf'] = 'file';
+  put('classes/c3/weeks/ow1/submissions/s5', {
+    userId: 's5', studentName: '정하은', email: 'haeun@example.com', text: 'A, B, C, D, E...', audioPath: '', submittedAt: ts(now - 110 * DAY),
+    feedbacks: [{ id: 'ofb1', text: '발음이 정확해요. ñ 발음을 한 번 더 들어 보세요.', audioPath: '', createdAt: iso(now - 109 * DAY), author: '유진' }],
+  });
+  put('classes/c3/weeks/ow1/quizResults/s5', {
+    userId: 's5', studentName: '정하은', email: 'haeun@example.com', answers: [1, 0], score: 2, total: 2, submittedAt: ts(now - 110 * DAY),
+    firstAttempt: { score: 1, total: 2, submittedAt: iso(now - 111 * DAY), answers: [0, 0], legacy: false }, attemptCount: 2,
+  });
+  put('classes/c3/weeks/ow1/attendance/s5', { status: 'present', note: '', updatedAt: ts(now - 113 * DAY) });
+  put('classes/c3/questions/oq1', {
+    uid: 's5', studentName: '정하은', title: 'll과 y 발음이 같은가요?', content: '지역마다 다르다고 들었어요.', status: 'answered',
+    createdAt: ts(now - 112 * DAY), answeredAt: ts(now - 111 * DAY),
+  });
+  put('classes/c3/questions/oq1/replies/or1', { uid: 'admin1', role: 'admin', author: '유진', text: '많은 지역에서 같게 발음해요(예이스모).', createdAt: ts(now - 111 * DAY) });
 
   // ----- 출결 (D2 이전 형식의 지각·인정결석 기록 일부 포함) -----
   const att = (wid, uid, status) => put(`classes/c1/weeks/${wid}/attendance/${uid}`, { status, note: '', updatedAt: ts(kstAt(c1Dates[+wid.slice(1) - 1], 21)) });

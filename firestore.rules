@@ -10,10 +10,14 @@ service cloud.firestore {
       return signedIn() && exists(userDoc(request.auth.uid)) &&
         get(userDoc(request.auth.uid)).data.role == 'admin';
     }
-    function member(cid) {
+    // 수강 중(active) 등록이 있는 학생. 반이 보관된 뒤에도 지난 자료를 읽을 수 있게 읽기 권한에 씁니다.
+    function enrolled(cid) {
       return signedIn() && exists(enrollmentDoc(request.auth.uid,cid)) &&
-        get(enrollmentDoc(request.auth.uid,cid)).data.status == 'active' &&
-        get(classDoc(cid)).data.archived == false;
+        get(enrollmentDoc(request.auth.uid,cid)).data.status == 'active';
+    }
+    // 운영 중인(보관되지 않은) 반의 수강생. 제출·질문 등 쓰기 권한에 씁니다.
+    function member(cid) {
+      return enrolled(cid) && get(classDoc(cid)).data.archived == false;
     }
     function visible(cid,wid) { return get(weekDoc(cid,wid)).data.published == true; }
     // D4(2026-10-29 확정): 한 학생은 동시에 한 반만 수강합니다.
@@ -81,7 +85,8 @@ service cloud.firestore {
       allow update, delete: if admin();
     }
     match /classes/{cid} {
-      allow get: if admin() || member(cid);
+      // 보관된 반도 수강했던 학생은 읽을 수 있습니다(지난 자료 열람, 2026-10-29 요청). 강의 영상 파일은 Storage 규칙에서 막습니다.
+      allow get: if admin() || enrolled(cid);
       allow list: if admin();
       allow create, update, delete: if admin();
 
@@ -92,7 +97,7 @@ service cloud.firestore {
 
       // 공개 반명단: 이메일/성적/과제는 넣지 않으며 같은 반 학생만 읽습니다.
       match /members/{uid} {
-        allow get, list: if admin() || member(cid);
+        allow get, list: if admin() || enrolled(cid);
         allow create: if admin() || (member(cid) && request.auth.uid == uid &&
           request.resource.data.keys().hasOnly(['uid','name','status','joinedAt']) &&
           request.resource.data.uid == uid && request.resource.data.name is string &&
@@ -105,8 +110,8 @@ service cloud.firestore {
 
       // 질문과 댓글: 본인 작성 질문 또는 강사 계정에서만 열람.
       match /questions/{qid} {
-        function owner() {return signedIn() && resource.data.uid == request.auth.uid && member(cid);}
-        function ownsQuestion() {return signedIn() && member(cid) &&
+        function owner() {return signedIn() && resource.data.uid == request.auth.uid && enrolled(cid);}
+        function ownsQuestion() {return signedIn() && enrolled(cid) &&
           get(/databases/$(database)/documents/classes/$(cid)/questions/$(qid)).data.uid == request.auth.uid;}
         allow get, list: if admin() || owner();
         allow create: if member(cid) &&
@@ -118,7 +123,7 @@ service cloud.firestore {
 
         match /replies/{rid} {
           allow get, list: if admin() || ownsQuestion();
-          allow create: if (admin() || ownsQuestion()) &&
+          allow create: if (admin() || (ownsQuestion() && member(cid))) &&
             request.resource.data.keys().hasOnly(['uid','role','author','text','createdAt']) &&
             request.resource.data.uid == request.auth.uid &&
             request.resource.data.role == (admin() ? 'admin' : 'student') &&
@@ -131,12 +136,12 @@ service cloud.firestore {
 
       match /weeks/{wid} {
         // 수강생 목록 조회는 반드시 where('published','==',true) 조건을 사용해야 합니다.
-        allow get, list: if admin() || (member(cid) && resource.data.published == true);
+        allow get, list: if admin() || (enrolled(cid) && resource.data.published == true);
         allow create, update, delete: if admin();
 
         match /submissions/{uid} {
           allow get, list: if admin() ||
-            (signedIn() && request.auth.uid == uid && member(cid) && visible(cid,wid));
+            (signedIn() && request.auth.uid == uid && enrolled(cid) && visible(cid,wid));
           allow create: if signedIn() && request.auth.uid == uid && member(cid) &&
             visible(cid,wid) && get(weekDoc(cid,wid)).data.assignment.enabled == true &&
             request.resource.data.keys().hasOnly(['userId','studentName','email','text','audioPath','submittedAt']) &&
@@ -155,7 +160,7 @@ service cloud.firestore {
         }
         match /quizResults/{uid} {
           allow get, list: if admin() ||
-            (signedIn() && request.auth.uid == uid && member(cid) && visible(cid,wid));
+            (signedIn() && request.auth.uid == uid && enrolled(cid) && visible(cid,wid));
           allow create: if signedIn() && request.auth.uid == uid && member(cid) &&
             visible(cid,wid) && get(weekDoc(cid,wid)).data.quiz.enabled == true &&
             request.resource.data.keys().hasOnly(['userId','studentName','email','answers','score','total','submittedAt','firstAttempt','attemptCount']) &&
@@ -185,7 +190,7 @@ service cloud.firestore {
           allow delete: if admin();
 
           match /attempts/{attemptId} {
-            allow get, list: if admin() || (signedIn() && request.auth.uid == uid && member(cid) && visible(cid,wid));
+            allow get, list: if admin() || (signedIn() && request.auth.uid == uid && enrolled(cid) && visible(cid,wid));
             allow create: if signedIn() && request.auth.uid == uid && member(cid) && visible(cid,wid) &&
               get(weekDoc(cid,wid)).data.quiz.enabled == true &&
               request.resource.data.keys().hasOnly(['userId','answers','score','total','attemptNumber','submittedAt']) &&
@@ -199,7 +204,7 @@ service cloud.firestore {
         }
         match /attendance/{uid} {
           allow get, list: if admin() ||
-            (signedIn() && request.auth.uid == uid && member(cid));
+            (signedIn() && request.auth.uid == uid && enrolled(cid));
           allow create, update, delete: if admin();
         }
       }

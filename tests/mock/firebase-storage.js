@@ -1,5 +1,5 @@
 // 테스트 전용 Storage 모의 구현
-import { state, seedOnce } from './mock-store.js';
+import { state, seedOnce, rulesAt } from './mock-store.js';
 
 seedOnce();
 const notFound = path => Object.assign(new Error('Object not found: ' + path), { code: 'storage/object-not-found' });
@@ -46,6 +46,14 @@ export function uploadBytesResumable(r, file, metadata = {}) {
   };
 }
 export async function getDownloadURL(r) {
+  (state.urlRequests ||= []).push(r.fullPath);
+  // v3 규칙: 보관된 반의 강의 영상은 강사만 열 수 있음
+  const video = String(r.fullPath).match(/^classes\/([^/]+)\/previews\/[^/]+\/video\//);
+  if (video && rulesAt('v3')) {
+    const uid = state.user?.uid, admin = state.docs.get('users/' + uid)?.role === 'admin';
+    const e = state.docs.get(`enrollments/${uid}_${video[1]}`), c = state.docs.get('classes/' + video[1]);
+    if (!admin && !(e?.status === 'active' && c?.archived === false)) throw Object.assign(new Error('unauthorized'), { code: 'storage/unauthorized' });
+  }
   const f = state.files.get(r.fullPath);
   if (f) return (f.url ||= URL.createObjectURL(f.blob));
   const seeded = seededFile(r.fullPath);
@@ -61,4 +69,5 @@ export async function deleteObject(r) {
 globalThis.__mock = Object.assign(globalThis.__mock || {}, {
   uploads: () => state.uploads.slice(),
   deletedFiles: () => state.deletedFiles.slice(),
+  urlRequests: () => (state.urlRequests || []).slice(),
 });

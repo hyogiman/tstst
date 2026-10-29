@@ -1,6 +1,7 @@
 // 테스트 전용: Firebase(Auth·Firestore·Storage)를 흉내 내는 메모리 저장소.
 // 운영 코드에서는 절대 불러오지 않습니다. tests/lib/harness.cjs가 gstatic 요청을 가로채 이 파일을 제공합니다.
-// 보안 규칙은 핵심 일부(수강 등록·반 접근)만 흉내 냅니다. window.__MOCK_RULES__ = 'current' | 'proposed'
+// 보안 규칙은 핵심 일부(수강 등록·반 접근)만 흉내 냅니다.
+// window.__MOCK_RULES__ = 'v1'(처음 받은 규칙) | 'v2'(2026-10-29 게시, = 'current') | 'v3'(이번 수정안, = 'proposed')
 
 const SENTINEL = Symbol('mock-sentinel');
 export const state = (globalThis.__mockState ||= {
@@ -112,6 +113,9 @@ export function makeUser(u) {
 export function autoId() { state.seq += 1; return 'auto' + String(state.seq).padStart(4, '0') + Math.random().toString(36).slice(2, 6); }
 
 // ---------- 보안 규칙(일부) 흉내 ----------
+const RULE_VERSIONS = { v1: 1, v2: 2, v3: 3, current: 2, proposed: 3 };
+// 지금 흉내 내는 규칙이 해당 버전 이상인지
+export function rulesAt(v) { return (RULE_VERSIONS[state.rulesMode] ?? 3) >= RULE_VERSIONS[v]; }
 export function permissionError(message) { return Object.assign(new Error('Missing or insufficient permissions. ' + (message || '')), { code: 'permission-denied' }); }
 function me() { return state.user?.uid || null; }
 function isAdmin() { const u = me(); return !!u && state.docs.get('users/' + u)?.role === 'admin'; }
@@ -120,6 +124,12 @@ function memberOf(cid) {
   const e = state.docs.get(`enrollments/${u}_${cid}`);
   const c = state.docs.get('classes/' + cid);
   return !!e && e.status === 'active' && !!c && c.archived === false;
+}
+// v3: 보관된 반도 수강했던 학생은 읽을 수 있음(쓰기는 운영 중인 반만)
+function enrolledIn(cid) {
+  const u = me(); if (!u) return false;
+  const e = state.docs.get(`enrollments/${u}_${cid}`);
+  return !!e && e.status === 'active';
 }
 function finishedAssigned(uid, assigned) {
   if (!assigned) return true;
@@ -137,7 +147,7 @@ export function canReadDoc(path, data) {
   if (s[0] === 'enrollments') return !data || data.uid === u;
   if (s[0] === 'classes') {
     const cid = s[1];
-    if (!memberOf(cid)) return false;
+    if (!(rulesAt('v3') ? enrolledIn(cid) : memberOf(cid))) return false;
     if (s.length <= 2) return true;
     if (s[2] === 'teacherNotes') return false;
     if (s[2] === 'members') return true;
@@ -165,7 +175,7 @@ export function checkWrite(op) {
   if (s[0] === 'enrollments') {
     const creating = !before && op.type !== 'delete';
     if (admin) {
-      if (creating && state.rulesMode !== 'proposed') throw permissionError('admin enrollment create (current rules)');
+      if (creating && !rulesAt('v2')) throw permissionError('admin enrollment create (v1 rules)');
       return;
     }
     if (!creating) throw permissionError('student enrollment update');
@@ -174,7 +184,7 @@ export function checkWrite(op) {
     if (!cls || cls.archived !== false || cls.joinCode !== after.joinCode) throw permissionError('enrollment class');
     const assigned = state.docs.get('users/' + u)?.assignedClassId;
     if (assigned && assigned !== after.classId) {
-      if (state.rulesMode !== 'proposed' || !finishedAssigned(u, assigned)) throw permissionError('already assigned to another class');
+      if (!rulesAt('v2') || !finishedAssigned(u, assigned)) throw permissionError('already assigned to another class');
     }
     return;
   }
@@ -185,7 +195,7 @@ export function checkWrite(op) {
     if (after && newAssigned !== oldAssigned) {
       const e = state.docs.get(`enrollments/${u}_${newAssigned}`);
       if (!e || e.status !== 'active') throw permissionError('assignedClassId without active enrollment');
-      if (oldAssigned !== undefined && (state.rulesMode !== 'proposed' || !finishedAssigned(u, oldAssigned))) throw permissionError('assignedClassId already set');
+      if (oldAssigned !== undefined && (!rulesAt('v2') || !finishedAssigned(u, oldAssigned))) throw permissionError('assignedClassId already set');
     }
     return;
   }
@@ -195,7 +205,7 @@ export function checkWrite(op) {
     if (!memberOf(cid)) throw permissionError('not a member');
     if (s[2] === 'teacherNotes') throw permissionError('teacher notes');
     if (s[2] === 'questions' && s.length === 4 && before) {
-      if (state.rulesMode !== 'proposed') throw permissionError('student question update (current rules)');
+      if (!rulesAt('v3')) throw permissionError('student question update (v2 rules)');
     }
     if (s[2] === 'weeks' && s.length === 4) throw permissionError('week doc');
     if (s[2] === 'weeks' && s[4] === 'attendance') throw permissionError('attendance');
