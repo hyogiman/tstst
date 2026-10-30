@@ -1138,15 +1138,15 @@ test('ST02 새 피드백 배지: 강사 피드백 → 과제 탭 배지 → 과�
   eq(await badge(r.page), ['', '과제'], '다시 열었을 때 배지');
 });
 
-test('ST03 과제: 제출한 학생은 "제출한 답안"이 첫 카드, 편집 폼은 [수정해서 다시 제출]을 눌러야 열림', async b => {
+test('ST03 과제: 과제 안내 → 제출한 답안 → 피드백 순서(2026-10-30), 편집 폼은 [수정해서 다시 제출]을 눌러야 열림', async b => {
   const { page } = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 } });
   await page.selectOption('#student-week-picker', 'w1'); await pause(page, 700);
-  const first = await page.$eval('#assignment-area > .card', el => el.innerText);
-  assert(first.includes('제출한 답안') && first.includes('Me llamo Minji'), '첫 카드: ' + first.slice(0, 80));
+  const answer = await page.$eval('#assignment-area > .submitted-card', el => el.innerText);
+  assert(answer.includes('제출한 답안') && answer.includes('Me llamo Minji'), '제출한 답안 카드: ' + answer.slice(0, 80));
   assert(await page.$eval('#assignment-editor', el => el.classList.contains('hide')), '편집 폼이 처음부터 열려 있음');
-  // 피드백은 답안 바로 아래, 최신이 위
+  // 과제 안내가 먼저, 피드백은 답안 바로 아래(최신이 위)
   const order = await page.$$eval('#assignment-area > *', els => els.map(e => e.matches('.submitted-card') ? 'answer' : e.id === 'student-assignment-feedback' ? 'feedback' : e.matches('.assignment-brief') ? 'brief' : e.id));
-  eq(order, ['answer', 'feedback', 'brief', 'assignment-editor'], '카드 순서');
+  eq(order, ['brief', 'answer', 'feedback', 'assignment-editor'], '카드 순서');
   await page.click('#edit-assignment'); await pause(page, 300);
   assert(!(await page.$eval('#assignment-editor', el => el.classList.contains('hide'))) && await page.$eval('#edit-assignment', el => el.getAttribute('aria-expanded')) === 'true', '편집 폼이 열리지 않음');
   assert((await page.inputValue('#assignment-text')).includes('Me llamo Minji'), '편집 폼에 기존 답안이 없음');
@@ -1614,6 +1614,19 @@ test('CL01 학생 화면 문구: 답안 입력칸은 "여기에 답안을 작성
   assert(src.includes('placeholder="여기에 답안을 작성해 주세요."'), '답안 입력칸 안내');
   const removed = ['스페인어로 답안', '다운로드 메뉴는 숨겨져', '앱 안에서 재생', '유튜브에서 재생됩니다', '펼치면 불러옵니다', '답변은 실시간으로 표시됩니다', '오늘 할 일과 새 소식을 확인해 보세요', '말하기와 쓰기를 차근차근', '반 변경이 필요하시면'];
   eq(removed.filter(t => src.includes(t)), [], '남아 있는 설명 문구');
+});
+
+test('PQ01 질문 목록(390px): 지난 반·운영 중인 반 모두 질문 상자가 화면 폭을 다 씀', async b => {
+  const width = async page => page.evaluate(() => ({ card: document.querySelector('.question-thread').getBoundingClientRect().width, body: document.querySelector('#student-body').getBoundingClientRect().width }));
+  let r = await openAs(b, 'index.html', 's5', { viewport: { width: 390, height: 844 } });
+  await r.page.click('[data-past-class="c3"]'); await pause(r.page, 700);
+  await r.page.click('[data-tab="questions"]'); await pause(r.page, 700);
+  let w = await width(r.page);
+  assert(w.card >= w.body - 2, `지난 반: 질문 상자 폭 ${Math.round(w.card)} / 화면 ${Math.round(w.body)}`);
+  await r.context.close();
+  r = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 }, tab: 'questions' });
+  w = await width(r.page);
+  assert(w.card >= w.body - 2, `운영 중인 반: 질문 상자 폭 ${Math.round(w.card)} / 화면 ${Math.round(w.body)}`);
 });
 
 test('기본: 학생 과제 텍스트 제출, 퀴즈 3/3, 강사 화면 주요 메뉴 오류 없음', async b => {

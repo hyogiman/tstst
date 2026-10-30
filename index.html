@@ -593,9 +593,9 @@ async function renderAssignment(body){
   const revision=Number(data?.revision)||1,newSince=S.past?Number.MAX_SAFE_INTEGER:seenAt(data?.studentSeenFeedbackAt);
   const brief=`<section class="card stack assignment-brief" aria-labelledby="assignment-title"><div class="between"><h2 id="assignment-title">${esc(w.assignment.title||'스페인어 과제')}</h2><span class="pill brand">TAREA</span></div><div class="subtle article" style="white-space:pre-wrap">${esc(w.assignment.instructions||'과제 내용을 확인해 주세요.')}</div>${dueLine(w.assignment)}${!S.past&&w.preview?.enabled?'<button type="button" class="linkbutton assignment-preview-link" data-open-preview>이 차시 예습 자료 보기 →</button>':''}</section>`;
   const feedback=`<div id="student-assignment-feedback">${feedbackMarkup(data,{askable:!S.past,newSince})}</div>`;
-  // 제출 기록이 있으면: 제출한 답안 → 피드백 → 과제 안내 → (닫힌) 수정 폼. 없으면: 과제 안내 → 답안 작성 폼
-  if(S.past)area.innerHTML=data?submittedCard(data)+feedback+brief:brief+'<p class="notice">이 차시에는 제출 기록이 없어요.</p>';
-  else area.innerHTML=data?submittedCard(data)+feedback+brief+editorCard(w,data):brief+editorCard(w,null);
+  // 2026-10-30: 무엇에 대한 답인지 먼저 보이게 과제 안내 → 제출한 답안 → 피드백 → (닫힌) 수정 폼. 제출 전: 과제 안내 → 답안 작성 폼
+  if(S.past)area.innerHTML=data?brief+submittedCard(data)+feedback:brief+'<p class="notice">이 차시에는 제출 기록이 없어요.</p>';
+  else area.innerHTML=data?brief+submittedCard(data)+feedback+editorCard(w,data):brief+editorCard(w,null);
   const fbBox=$('#student-assignment-feedback',area);if(fbBox)fbBox.dataset.rendered=fbBox.innerHTML;
   $('[data-open-preview]',area)?.addEventListener('click',()=>goTab('preview',{weekId:w.id}));
   if(!S.past){
@@ -972,7 +972,7 @@ function questionPath(qid){return ['classes',S.classId,'questions',qid]}
 function renderQuestions(body){
   const newQuestionCard=S.past?'':`<div class="card stack"><h3>새 질문</h3><form id="question-create" class="stack"><div class="field"><label for="question-title">제목</label><input id="question-title" name="title" required maxlength="100" placeholder="예: 오늘 배운 표현이 궁금해요"></div><div class="field"><label for="question-content">질문 내용</label><textarea id="question-content" name="content" required maxlength="8000" rows="6" placeholder="질문을 자세히 작성해 주세요."></textarea></div><div class="field"><label for="question-week">어느 차시에 대한 질문인가요? (선택)</label><select id="question-week" name="weekId"><option value="">차시 선택 안 함</option>${S.weeks.map(w=>`<option value="${esc(w.id)}">${esc(w.label)}</option>`).join('')}</select></div><button class="btn" type="submit">질문 보내기</button></form></div>`;
   // 지난 반: 주고받은 질문과 답변만 읽을 수 있습니다. 새 질문은 현재 반에서 남깁니다.
-  body.innerHTML=(S.past?bodyHeader('질문 기록','새 질문은 현재 반에서 남겨 주세요.'):bodyHeader('질문하기'))+`<div class="${S.past?'stack':'grid2'}" style="align-items:start">${newQuestionCard}<div class="stack"><div class="between"><h3>내 질문</h3><span class="pill brand" id="question-count">0건</span></div><div id="question-list" class="question-list"><div class="loading">질문 확인 중</div></div></div></div><div id="student-thread" style="margin-top:17px"></div>`;
+  body.innerHTML=(S.past?bodyHeader('질문 기록','새 질문은 현재 반에서 남겨 주세요.'):bodyHeader('질문하기'))+`<div class="${S.past?'stack':'grid2'}"${S.past?'':' style="align-items:start"'}>${newQuestionCard}<div class="stack"><div class="between"><h3>내 질문</h3><span class="pill brand" id="question-count">0건</span></div><div id="question-list" class="question-list"><div class="loading">질문 확인 중</div></div></div></div><div id="student-thread" style="margin-top:17px"></div>`;
   if($('#question-create'))$('#question-create').onsubmit=async e=>{e.preventDefault();const form=e.currentTarget,fd=new FormData(form);const title=String(fd.get('title')||'').trim(),content=String(fd.get('content')||'').trim(),weekId=String(fd.get('weekId')||'');if(!title||!content)return;const btn=$('button[type="submit"]',form);btn.disabled=true;try{await createQuestion({title,content,weekId});form.reset();toast('질문이 전송되었습니다.')}catch(err){toast(ex(err),true)}finally{btn.disabled=false}};
   S.live.questions=onSnapshot(query(collection(db,'classes',S.classId,'questions'),where('uid','==',S.user.uid)),snap=>{
     if(S.tab!=='questions')return;const list=$('#question-list');if(!list)return;
