@@ -1183,7 +1183,7 @@ test('ST05 복습: 결과 먼저 → 틀린 문제만 다시 풀기는 attempts(
   await page.click('[data-tab="quiz"]'); await pause(page, 500);
   await page.selectOption('#student-week-picker', 'w1'); await pause(page, 900);
   const summary = await page.innerText('#quiz-content');
-  assert(summary.includes('첫 점수 1/3') && summary.includes('지난번에 틀린 문항 2개') && !(await page.$('.answer-option')), '결과 먼저: ' + summary.slice(0, 120));
+  assert(summary.includes('최근 점수 1/3') && !summary.includes('첫 점수') && summary.includes('지난번에 틀린 문항 2개') && !(await page.$('.answer-option')), '결과 먼저: ' + summary.slice(0, 120));
   const before = await dump(page, 'classes/c1/weeks/w1/quizResults/s2');
   await page.click('#quiz-wrong-only'); await pause(page, 300);
   assert((await page.innerText('.question-count')).includes('틀린 문제 다시 풀기 · QUESTION 1 / 2'), '틀린 문제만 풀기 시작 안 됨');
@@ -1609,6 +1609,67 @@ test('HM01 홈 할 일: 과제를 내고 복습을 풀면 빠지고 "모두 마�
   await page.evaluate(() => window.__mock.remoteWrite('classes/c1/weeks/w4/quizResults/s1', { userId: 's1', score: 2, total: 3, answers: ['1', '0', '1'], submittedAt: new Date().toISOString(), attemptCount: 1, firstAttempt: { score: 2, total: 3, legacy: false } }));
   await pause(page, 600);
   assert(!(await page.$('.todo-row')) && (await page.innerText('.home-todo')).includes('이번 차시 할 일을 모두 마쳤어요'), '다 한 뒤: ' + await page.innerText('.home-todo'));
+});
+
+// 개강 전 반: 모든 차시가 미래 날짜, 1·2차시만 공개, 할 일(과제·복습·수업 영상)은 모두 꺼 둠, 학생 기록 없음
+const preCourseSeed = () => {
+  const seed = makeSeed(), future = n => new Date(Date.now() + n * 86400000 + 9 * 3600000).toISOString().slice(0, 10);
+  seed.docs['classes/c1'].schedule = seed.docs['classes/c1'].schedule.map((x, i) => ({ ...x, date: future(10 + i * 7) }));
+  for (let i = 1; i <= 12; i++) {
+    const w = seed.docs[`classes/c1/weeks/w${i}`];
+    Object.assign(w, { sessionDate: future(10 + (i - 1) * 7), published: i <= 2, assignment: { ...w.assignment, enabled: false }, quiz: { ...w.quiz, enabled: false }, recap: { enabled: false, videos: [] } });
+  }
+  for (const p of Object.keys(seed.docs)) if (/^classes\/c1\/weeks\/w\d+\/(submissions|quizResults|attendance)\//.test(p)) delete seed.docs[p];
+  return seed;
+};
+const todoView = page => page.evaluate(() => ({
+  title: document.querySelector('#home-todo-title')?.textContent || '',
+  chips: [...document.querySelectorAll('.home-todo .home-session-chip')].map(e => e.textContent),
+  kinds: [...document.querySelectorAll('.todo-row .todo-kind')].map(e => e.textContent),
+}));
+
+test('HM02 개강 전(모든 차시가 미래 날짜)에도 선생님이 과제·복습을 공개하면 홈 할 일에 바로 뜸, 여러 차시는 차시별로 묶음', async b => {
+  const { page } = await openApp(b, { file: 'index.html', user: 's1', seed: preCourseSeed(), viewport: { width: 390, height: 844 } });
+  await pause(page, 900);
+  assert(!(await page.$('.home-todo')), '할 일이 없는데 할 일 카드가 보임');
+  await page.evaluate(() => window.__mock.remoteWrite('classes/c1/weeks/w2', { assignment: { enabled: true, title: '국적 소개 문장 쓰기', instructions: '3문장', allowText: true, allowAudio: true, dueAt: '' } }));
+  await pause(page, 700);
+  eq(await todoView(page), { title: '이번 차시 할 일', chips: ['2차시'], kinds: ['과제'] }, '2차시 과제를 공개한 뒤(새로 고침 없이)');
+  const q = [{ id: 'qa', type: 'single', stem: 'Hola는?', options: ['안녕', '잘 가'], correctIndices: [0], explanation: '' }];
+  await page.evaluate(q => window.__mock.remoteWrite('classes/c1/weeks/w1', { quiz: { enabled: true, title: '1차시 복습', questions: q } }), q);
+  await pause(page, 700);
+  eq(await todoView(page), { title: '할 일', chips: ['1차시', '2차시'], kinds: ['복습', '과제'] }, '두 차시에 할 일이 있을 때');
+  // 학생이 과제를 내면 그 차시는 빠지고 남은 차시만
+  await page.click('.todo-row:has-text("과제") [data-home-go="assignment"]'); await pause(page, 700);
+  await page.fill('#assignment-text', 'Soy coreana.'); await page.click('#submit-assignment'); await pause(page, 900);
+  await page.click('[data-tab="home"]'); await pause(page, 600);
+  eq(await todoView(page), { title: '이번 차시 할 일', chips: ['1차시'], kinds: ['복습'] }, '과제를 낸 뒤');
+});
+
+test('HM03 수업 중인 반: 지난 차시 할 일과 미리 공개한 다음 차시 과제를 함께 보여 줌(최근 수업 차시 이전은 보이지 않음)', async b => {
+  const { page } = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 }, tab: 'home' });
+  eq(await todoView(page), { title: '이번 차시 할 일', chips: ['4차시'], kinds: ['과제', '복습'] }, '처음(4차시가 최근 수업 차시)');
+  await page.evaluate(() => window.__mock.remoteWrite('classes/c1/weeks/w6', { published: true, assignment: { enabled: true, title: '하루 일과 쓰기', instructions: '5문장', allowText: true, allowAudio: true, dueAt: '' } }));
+  await pause(page, 900);
+  eq(await todoView(page), { title: '할 일', chips: ['4차시', '6차시'], kinds: ['과제', '복습', '과제'] }, '6차시 과제를 미리 공개한 뒤');
+});
+
+test('AW01 강사 차시 기본값: 처음엔 맨 위 차시, 새로 고침하면 보던 화면·차시 그대로(반을 바꿨다 와도 그 반에서 보던 차시)', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  await page.click('[data-page="weeks"]'); await pause(page, 500);
+  const active = () => page.$eval('.week-pick[aria-current="true"]', el => el.dataset.weekOpen);
+  eq(await active(), 'w1', '처음 연 차시');
+  await page.click('[data-week-open="w3"]'); await pause(page, 400);
+  await page.reload(); await pause(page, 1200);
+  assert(await page.$('#week-editor-host'), '새로 고침 뒤 차시별 학습자료가 아님: ' + await page.innerText('#admin-body').then(t => t.slice(0, 60)));
+  eq(await active(), 'w3', '새로 고침 뒤 차시');
+  await page.click('[data-page="feedback"]'); await pause(page, 600);
+  eq(await page.inputValue('#admin-week-picker'), 'w3', '과제·복습 관리도 같은 차시');
+  await page.click('[data-page="weeks"]'); await pause(page, 500);
+  await page.selectOption('#admin-class-switch', 'c2'); await pause(page, 700);
+  eq(await active(), 'cw1', '다른 반은 맨 위 차시');
+  await page.selectOption('#admin-class-switch', 'c1'); await pause(page, 700);
+  eq(await active(), 'w3', '돌아온 반은 보던 차시');
 });
 
 test('CL01 학생 화면 문구: 답안 입력칸은 "여기에 답안을 작성해 주세요.", 앱 동작을 설명하는 문구는 다시 넣지 않음', async () => {

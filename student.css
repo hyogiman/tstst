@@ -92,6 +92,10 @@
 .home-todo h2,.home-news h2{font-size:18px}
 .home-session-chip{padding:2px 10px;border-radius:999px;border:1px solid var(--wine-100);background:var(--wine-50);color:var(--wine-700);font-size:13px;font-weight:800;white-space:nowrap}
 .todo-done{display:flex;align-items:center;gap:8px;margin-top:10px;color:var(--ink-2);font-size:14px}
+.todo-group{display:flex;flex-direction:column;align-items:flex-start;margin-top:14px}
+.todo-group+.todo-group{padding-top:14px;border-top:1px solid var(--line)}
+.todo-group .todo-list{align-self:stretch}
+.todo-more{margin-top:12px}
 .home-empty{padding:4px 2px}
 .home-news h2 small,.student-feedback h3 small,.classmates-card h3 small{margin-left:4px;font-size:13px;font-weight:700;color:var(--muted)}
 .todo-list{display:flex;flex-direction:column;margin:8px 0 0;padding:0;list-style:none}
@@ -122,10 +126,10 @@
 .feedback-ask>[data-ask-feedback]{justify-self:end}
 .feedback-ask>[data-ask-slot]:not(:empty){margin-top:10px}
 .ask-form{margin-top:10px;padding:14px;border-radius:var(--r-md);background:var(--surface);border:1px solid var(--line)}
-.assignment-preview-link{align-self:flex-start}
 
 /* 복습 결과 먼저 (배치 10) */
-.quiz-scores{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.quiz-scores{display:flex;margin-bottom:16px}
+.quiz-scores .mini-stat{min-width:180px}
 .quiz-summary-title{margin:18px 0 2px;font-size:16px}
 .quiz-actions{margin-top:20px}
 .quiz-actions .btn{flex:1 1 auto}

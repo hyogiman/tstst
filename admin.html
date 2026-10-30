@@ -83,6 +83,12 @@ async function uniqueJoinCode(){
   }
   throw Error('새 수강 코드를 발급하지 못했습니다. 다시 시도해 주세요.');
 }
+// 새로 고침(2026-10-30): 이 탭에서 보던 화면과 차시를 기억했다가 다시 엽니다. 새 탭에서 처음 열면 대시보드, 차시는 맨 위 차시입니다.
+const ADMIN_PAGES=['overview','classes','weeks','feedback','questions','notices','attendance','students'];
+const weekPrefKey=cid=>`senorayu:admin-week:${A.user?.uid||''}:${cid}`;
+function rememberAdminWeek(){if(!A.classId||!A.weekId)return;try{sessionStorage.setItem(weekPrefKey(A.classId),A.weekId)}catch(e){/* 기억하지 못하면 맨 위 차시로 열립니다 */}}
+function rememberedWeek(cid){try{return sessionStorage.getItem(weekPrefKey(cid))||''}catch(e){return ''}}
+window.addEventListener('pagehide',rememberAdminWeek);
 function enterHistory(){if(history.state?.senorayu)return;history.replaceState({senorayu:true,page:'overview'},'');history.pushState({senorayu:true,page:A.page},'','#'+A.page)}
 window.addEventListener('popstate',async e=>{if(!A.user||!document.querySelector('.admin-shell'))return;
   // 브라우저 뒤로 가기도 차시 편집 중이면 먼저 묻습니다(취소하면 제자리).
@@ -147,7 +153,7 @@ function classSchedule(c){
 async function openClassRoster(cid){
   if(!A.classes.some(c=>c.id===cid))return;
   if(A.page==='weeks'&&!(await confirmLeaveWeekEditor()))return;
-  adminClearLive();A.classId=cid;localStorage.setItem(classPrefKey(),cid);A.weekId='';
+  rememberAdminWeek();adminClearLive();A.classId=cid;localStorage.setItem(classPrefKey(),cid);A.weekId='';
   await loadWeeks();frame();navigateAdminPage('students');
 }
 async function classEditor(c=null){
@@ -251,7 +257,7 @@ function frame(){
     drafts.clearUser(A.user.uid);
     resetAdminSession();signOut(auth); // P0-09: 구독을 먼저 끊고 로그아웃
   };
-  $('#admin-class-switch')?.addEventListener('change',async e=>{if(!(await confirmLeaveWeekEditor())){e.target.value=A.classId;return}adminClearLive();A.classId=e.target.value;localStorage.setItem(classPrefKey(),A.classId);A.weekId='';if(A.classId)await loadWeeks();renderPage()});
+  $('#admin-class-switch')?.addEventListener('change',async e=>{if(!(await confirmLeaveWeekEditor())){e.target.value=A.classId;return}rememberAdminWeek();adminClearLive();A.classId=e.target.value;localStorage.setItem(classPrefKey(),A.classId);A.weekId='';if(A.classId)await loadWeeks();renderPage()});
   $$('[data-page]').forEach(el=>el.onclick=()=>navigateAdminPage(el.dataset.page));
   $$('[data-side-class]').forEach(el=>el.onclick=()=>openClassRoster(el.dataset.sideClass));
   paintSideBadges();
@@ -264,7 +270,7 @@ function renderPage(){
   if(A.page==='overview')showOverview(b);if(A.page==='classes')showClasses(b);if(A.page==='weeks')showWeeks(b);if(A.page==='feedback')showFeedback(b);if(A.page==='attendance')showAttendance(b);if(A.page==='students')showStudents(b);if(A.page==='questions')showAdminQuestions(b);if(A.page==='notices')showNotices(b);
 }
 async function loadAdmin(preferred=''){const cs=await getDocs(collection(db,'classes'));A.classes=cs.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.name||'').localeCompare(b.name||'','ko'));await syncJoinCodes(A.classes);const choice=preferred||A.classId||localStorage.getItem(classPrefKey());A.classId=A.classes.some(c=>c.id===choice)?choice:(A.classes.find(c=>!c.archived)?.id||A.classes[0]?.id||'');if(A.classId){localStorage.setItem(classPrefKey(),A.classId);await loadWeeks();await syncMemberDirectory().catch(e=>console.warn('명단 동기화 실패',e))}else{A.weeks=[];A.weekId=''}frame()}
-async function loadWeeks(){const snap=await getDocs(collection(db,'classes',A.classId,'weeks'));A.weeks=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.order||0)-(b.order||0));if(!A.weeks.some(w=>w.id===A.weekId))A.weekId=A.weeks.at(-1)?.id||'';startAdminBadges();}
+async function loadWeeks(){const snap=await getDocs(collection(db,'classes',A.classId,'weeks'));A.weeks=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.order||0)-(b.order||0));if(!A.weeks.some(w=>w.id===A.weekId)){const kept=rememberedWeek(A.classId);A.weekId=A.weeks.some(w=>w.id===kept)?kept:(A.weeks[0]?.id||'')}startAdminBadges();}
 async function roster(){
   const snap=await getDocs(query(collection(db,'enrollments'),where('classId','==',A.classId)));
   const members=snap.docs.map(d=>({id:d.id,...d.data()}));
@@ -1663,7 +1669,7 @@ function noticeEditor(cid,n){
   requestAnimationFrame(()=>title.focus());
 }
 
-if(CONFIGURED){onAuthStateChanged(auth,async user=>{try{if(!user){resetAdminSession();mountAuth(root,{signup:false,variant:'admin'});return}root.innerHTML='<div class="loading" style="min-height:95vh">강사 권한을 확인하고 있습니다</div>';A.user=user;const snap=await getDoc(doc(db,'users',user.uid));if(!snap.exists()||snap.data().role!=='admin'){root.innerHTML=`<div class="card" style="max-width:620px;margin:8vh auto"><div class="eyebrow" lang="es">Acceso</div><h2>강사 권한이 필요합니다</h2><p style="margin-top:12px">관리자 계정은 가입만으로 생성되지 않습니다. Firebase Authentication에 강사 계정을 만든 뒤, Firestore <code>users/${esc(user.uid)}</code> 문서의 <code>role</code> 필드를 <code>admin</code>으로 등록해 주세요.</p><div class="subtle" style="margin-top:18px"><strong>현재 로그인 UID</strong><p style="overflow-wrap:anywhere">${esc(user.uid)}</p></div><div class="row" style="margin-top:18px"><button class="btn secondary" id="admin-signout">다른 계정으로 로그인</button><a class="btn soft" href="index.html">수강생 페이지</a></div></div>`;$('#admin-signout').onclick=()=>{resetAdminSession();signOut(auth)};return}A.profile=snap.data();await loadAdmin()}catch(err){root.innerHTML=`<div class="card" style="max-width:570px;margin:60px auto"><h3>관리자 페이지 불러오기 실패</h3><p class="error">${esc(ex(err))}</p><button class="btn secondary" onclick="location.reload()">새로고침</button></div>`}})}else mountAuth(root,{signup:false});
+if(CONFIGURED){onAuthStateChanged(auth,async user=>{try{if(!user){resetAdminSession();mountAuth(root,{signup:false,variant:'admin'});return}root.innerHTML='<div class="loading" style="min-height:95vh">강사 권한을 확인하고 있습니다</div>';A.user=user;const snap=await getDoc(doc(db,'users',user.uid));if(!snap.exists()||snap.data().role!=='admin'){root.innerHTML=`<div class="card" style="max-width:620px;margin:8vh auto"><div class="eyebrow" lang="es">Acceso</div><h2>강사 권한이 필요합니다</h2><p style="margin-top:12px">관리자 계정은 가입만으로 생성되지 않습니다. Firebase Authentication에 강사 계정을 만든 뒤, Firestore <code>users/${esc(user.uid)}</code> 문서의 <code>role</code> 필드를 <code>admin</code>으로 등록해 주세요.</p><div class="subtle" style="margin-top:18px"><strong>현재 로그인 UID</strong><p style="overflow-wrap:anywhere">${esc(user.uid)}</p></div><div class="row" style="margin-top:18px"><button class="btn secondary" id="admin-signout">다른 계정으로 로그인</button><a class="btn soft" href="index.html">수강생 페이지</a></div></div>`;$('#admin-signout').onclick=()=>{resetAdminSession();signOut(auth)};return}A.profile=snap.data();if(history.state?.senorayu&&ADMIN_PAGES.includes(history.state.page))A.page=history.state.page;await loadAdmin()}catch(err){root.innerHTML=`<div class="card" style="max-width:570px;margin:60px auto"><h3>관리자 페이지 불러오기 실패</h3><p class="error">${esc(ex(err))}</p><button class="btn secondary" onclick="location.reload()">새로고침</button></div>`}})}else mountAuth(root,{signup:false});
 
 
 </script>

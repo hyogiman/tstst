@@ -169,7 +169,7 @@ function startEnrollmentLive(){stopLive('enrollments');
 
 // ---------- 새 소식 · 배지 (배치 10 · P2-08) ----------
 // 새 피드백: 피드백 시각 > 내가 본 시각(studentSeenFeedbackAt). 새 답변: 선생님이 마지막으로 말했고 lastMessageAt > studentSeenAt.
-// 최근 공개 차시 6개는 내 제출·복습 결과를 실시간으로 보고, 그 이전 차시는 한 번 읽습니다.
+// 할 일 기준 차시에서 가까운 공개 차시 6개는 내 제출·복습 결과를 실시간으로 보고, 나머지 차시는 한 번 읽습니다.
 // 새로 여는 구독: 차시당 2개(최대 12개) + 내 질문 목록 1개. 화면을 옮겨도 유지하고, 반이 바뀌거나 로그아웃하면 정리합니다.
 const NEWS_LIVE_SESSIONS=6;
 // notices: 반의 공지(null = 아직 못 읽음) · noticeSeenAt: 내가 공지 화면을 연 시각(undefined = 아직 못 읽음, 0 = 연 적 없음)
@@ -185,7 +185,7 @@ function startNewsLive(){
   stopNewsLive();
   if(!S.classId||S.past||!S.user)return;
   const cid=S.classId,uid=S.user.uid;S.news.classId=cid;
-  const live=new Set(S.weeks.slice(-NEWS_LIVE_SESSIONS).map(w=>w.id));
+  const live=newsLiveIds();
   const keep=(kind,wid,d)=>{if(S.news.classId!==cid)return;S.news[kind][wid]=d;newsChanged()};
   for(const w of S.weeks)for(const kind of ['submissions','quizResults']){
     const ref=doc(db,'classes',cid,'weeks',w.id,kind,uid);
@@ -258,13 +258,22 @@ function classSessions(){
 }
 // 다음 수업: 오늘 수업이 있으면 오늘, 없으면 가장 가까운 다가오는 수업
 const nextSession=()=>classSessions().filter(x=>x.date&&x.state!=='done').sort((a,b)=>a.date.localeCompare(b.date))[0]||null;
-// 이번 차시(과제·복습 기준): 수업한 차시(오늘 포함) 중 과제나 복습이 켜진 가장 최근 차시. 날짜를 정하지 않은 반이면 마지막 공개 차시
 // 복습 수업 영상(2026-10-29): 켜져 있고 영상이 있을 때만 학생에게 보입니다.
 const recapVideos=w=>w?.recap?.enabled?(w.recap.videos||[]):[];
 const hasTasks=w=>!!(w?.assignment?.enabled||(w?.quiz?.enabled&&w.quiz.questions?.length)||recapVideos(w).length);
-function currentTaskWeek(){
-  const held=[...S.weeks].reverse().find(w=>hasTasks(w)&&['done','today'].includes(sessionState({date:sessionDateOf(w)})));
-  return held||(S.weeks.some(w=>sessionDateOf(w))?null:[...S.weeks].reverse().find(hasTasks))||null;
+// 할 일을 볼 차시(2026-10-30): 선생님이 과제·복습·수업 영상을 공개하면 수업 날짜와 관계없이 바로 할 일에 보입니다.
+// 기준은 수업한 차시(오늘 포함) 중 할 일이 있는 가장 최근 차시이고, 그 차시와 뒤 차시들을 봅니다.
+// 아직 수업한 차시가 없으면(개강 전) 할 일이 있는 첫 차시부터, 날짜를 정하지 않은 반이면 마지막 차시를 봅니다.
+function taskWeeks(){
+  const list=S.weeks.filter(hasTasks);
+  const held=list.map(w=>['done','today'].includes(sessionState({date:sessionDateOf(w)}))).lastIndexOf(true);
+  const start=held>=0?held:S.weeks.some(w=>sessionDateOf(w))?0:list.length-1;
+  return list.slice(Math.max(0,start));
+}
+// 새 소식 실시간 구독 차시: 할 일 기준 차시에서 가까운 차시 순(같으면 뒤 차시)
+function newsLiveIds(){
+  const list=taskWeeks(),anchor=list.length?S.weeks.findIndex(w=>w.id===list[0].id):S.weeks.length-1;
+  return new Set(S.weeks.map((w,i)=>({id:w.id,i})).sort((a,b)=>Math.abs(a.i-anchor)-Math.abs(b.i-anchor)||b.i-a.i).slice(0,NEWS_LIVE_SESSIONS).map(x=>x.id));
 }
 // 과제 상태(학생에게 보이는 말): D3에 따라 권장일은 안내만 하고, 지난 뒤 제출도 그대로 인정합니다.
 function assignmentStatus(w,d){
@@ -298,10 +307,21 @@ async function drawHomeGoal(){
 const recapSeenKey=wid=>`senorayu:recap-seen:${S.user?.uid}:${S.classId}:${wid}`;
 function recapSeen(wid){try{return localStorage.getItem(recapSeenKey(wid))==='1'}catch(e){return false}}
 function markRecapSeen(wid){try{localStorage.setItem(recapSeenKey(wid),'1')}catch(e){/* 저장할 수 없으면 할 일에 계속 보입니다 */}}
-// 새 소식이 오면 다시 그리는 부분: 다음 수업 상자 · 공지 · 이번 차시 할 일 · 새 소식 · 학습 목표
+// 차시 하나의 남은 할 일 줄: 과제(미제출) · 수업 영상(이 기기에서 안 봄) · 복습(미응시)
+const TODO_SESSIONS=3;
+function todoRows(w){
+  const rows=[];
+  const row=(kind,pill,note,target,action,view='')=>`<li class="todo-row"><span class="todo-kind">${kind}</span><div class="todo-main"><div class="todo-line">${pill}</div>${note?`<small>${esc(note)}</small>`:''}</div><button type="button" class="btn secondary small" data-home-go="${target}" data-week="${esc(w.id)}"${view?` data-view="${view}"`:''}>${esc(action)}</button></li>`;
+  if(w.assignment?.enabled&&!S.news.submissions[w.id]){const st=assignmentStatus(w,null);rows.push(row('과제',st.pill,st.note,'assignment',st.action))}
+  const rv=recapVideos(w);
+  if(rv.length&&!recapSeen(w.id))rows.push(row('수업 영상',statusPill('brand',`영상 ${rv.length}개`),'','quiz','영상 보기','video'));
+  if(w.quiz?.enabled&&w.quiz.questions?.length&&!S.news.quizResults[w.id])rows.push(row('복습',statusPill('neutral','미응시'),'','quiz','복습하기','quiz'));
+  return rows;
+}
+// 새 소식이 오면 다시 그리는 부분: 다음 수업 상자 · 공지 · 할 일 · 새 소식 · 학습 목표
 function drawHomeLive(){
   const main=$('#home-main'),nextBox=$('#home-next');if(!main||!nextBox)return;
-  const next=nextSession(),tw=currentTaskWeek(),pw=next?.week;
+  const next=nextSession(),pw=next?.week;
   nextBox.innerHTML=next
     ?`<p class="home-next-label">다음 수업 ${statusPill('brand',relativeDay(next.date))}</p><strong class="home-next-title">${esc(next.label)}</strong><p class="hint">${esc(sessionDateText(next.date))}</p>${pw?.preview?.enabled?`<button type="button" class="linkbutton home-next-preview" data-home-go="preview" data-week="${esc(pw.id)}">예습 자료 보기 →</button>`:''}`
     :'<p class="home-next-label">다음 수업</p><p class="hint">수업 날짜가 아직 정해지지 않았어요</p>';
@@ -309,17 +329,20 @@ function drawHomeLive(){
   const noticeList=sortNotices(S.news.notices||[]),since=S.news.noticeSeenAt===undefined?Number.MAX_SAFE_INTEGER:seenAt(S.news.noticeSeenAt);
   const shownNotices=noticeList.filter(n=>n.pinned||noticeTime(n)>since).slice(0,3);
   const noticeCard=shownNotices.length?`<section class="card home-notices" aria-labelledby="home-notices-title"><div class="between"><p class="eyebrow"><span lang="es">Anuncios</span> · 공지</p><button type="button" class="linkbutton" data-home-go="notices">전체 보기 (${noticeList.length})</button></div><h2 id="home-notices-title" class="sr-only">선생님 공지</h2><ul class="announce-list">${shownNotices.map(n=>`<li><button type="button" class="announce-row" data-home-go="notices" data-notice="${esc(n.id)}"><span class="announce-row-main"><span class="announce-row-title">${n.pinned?statusPill('brand','상단 고정'):''}${noticeTime(n)>since?statusPill('brand','새 공지'):''}<strong>${esc(n.title)}</strong></span><small>${esc(formatDateTime(n.createdAt,{time:false}))}${n.body?` · ${esc(noticeExcerpt(n.body))}`:''}</small></span><span aria-hidden="true">→</span></button></li>`).join('')}</ul></section>`:'';
-  // 이번 차시 할 일: 아직 하지 않은 것만. 과제를 내거나 복습을 풀면 빠지고, 피드백 소식은 '새 소식'에 보입니다.
+  // 할 일: 아직 하지 않은 것만. 과제를 내거나 복습을 풀면 빠지고, 피드백 소식은 '새 소식'에 보입니다.
+  // 남은 할 일이 한 차시면 '이번 차시 할 일 [N차시]', 여러 차시면 차시별로 묶어 최대 3개 차시(TODO_SESSIONS)까지 보여 줍니다.
   let todo='';
-  if(tw){
-    const ready=(tw.id in S.news.submissions)&&(tw.id in S.news.quizResults),rows=[];
-    const row=(kind,pill,note,target,action,view='')=>`<li class="todo-row"><span class="todo-kind">${kind}</span><div class="todo-main"><div class="todo-line">${pill}</div>${note?`<small>${esc(note)}</small>`:''}</div><button type="button" class="btn secondary small" data-home-go="${target}" data-week="${esc(tw.id)}"${view?` data-view="${view}"`:''}>${esc(action)}</button></li>`;
-    if(tw.assignment?.enabled&&!S.news.submissions[tw.id]){const st=assignmentStatus(tw,null);rows.push(row('과제',st.pill,st.note,'assignment',st.action))}
-    const rv=recapVideos(tw);
-    if(rv.length&&!recapSeen(tw.id))rows.push(row('수업 영상',statusPill('brand',`영상 ${rv.length}개`),'','quiz','영상 보기','video'));
-    if(tw.quiz?.enabled&&tw.quiz.questions?.length&&!S.news.quizResults[tw.id])rows.push(row('복습',statusPill('neutral','미응시'),'','quiz','복습하기','quiz'));
-    const list=!ready?'<div class="loading">할 일 확인 중</div>':rows.length?`<ul class="todo-list">${rows.join('')}</ul>`:`<p class="todo-done">${statusPill('success','완료')}<span>이번 차시 할 일을 모두 마쳤어요</span></p>`;
-    todo=`<section class="card home-todo" aria-labelledby="home-todo-title"><div class="home-section-head"><h2 id="home-todo-title">이번 차시 할 일</h2><span class="home-session-chip">${esc(shortLabel(tw.label))}</span></div>${list}</section>`;
+  const win=taskWeeks();
+  if(win.length){
+    const ready=win.every(w=>(w.id in S.news.submissions)&&(w.id in S.news.quizResults));
+    const groups=ready?win.map(w=>({w,rows:todoRows(w)})).filter(g=>g.rows.length):[];
+    const shown=groups.slice(0,TODO_SESSIONS),more=groups.length-shown.length;
+    const head=(title,w)=>`<div class="home-section-head"><h2 id="home-todo-title">${title}</h2>${w?`<span class="home-session-chip">${esc(shortLabel(w.label))}</span>`:''}</div>`;
+    const inner=!ready?head('이번 차시 할 일',win[0])+'<div class="loading">할 일 확인 중</div>'
+      :!shown.length?head('이번 차시 할 일',win[0])+`<p class="todo-done">${statusPill('success','완료')}<span>이번 차시 할 일을 모두 마쳤어요</span></p>`
+      :shown.length===1?head('이번 차시 할 일',shown[0].w)+`<ul class="todo-list">${shown[0].rows.join('')}</ul>`
+      :head('할 일')+shown.map(g=>`<div class="todo-group"><span class="home-session-chip">${esc(shortLabel(g.w.label))}</span><ul class="todo-list">${g.rows.join('')}</ul></div>`).join('');
+    todo=`<section class="card home-todo" aria-labelledby="home-todo-title">${inner}${more?`<p class="hint todo-more">이후 차시에도 할 일이 있어요 (${more}개 차시)</p>`:''}</section>`;
   }
   const items=newsItems();
   const news=items.length?`<section class="card home-news" aria-labelledby="home-news-title"><h2 id="home-news-title">새 소식 <small>${items.length}</small></h2><ul class="news-list">${items.map(i=>`<li><button type="button" class="news-item" data-home-go="${i.kind}" data-week="${esc(i.weekId||'')}" data-question="${esc(i.questionId||'')}"><span>${esc(i.text)}</span><span aria-hidden="true">→</span></button></li>`).join('')}</ul></section>`:'';
@@ -591,13 +614,12 @@ async function renderAssignment(body){
   const area=$('#assignment-area');if(!area)return;
   // 지난 반(보관된 반)은 확인 시각을 남길 수 없어 '새 피드백' 표시를 하지 않습니다.
   const revision=Number(data?.revision)||1,newSince=S.past?Number.MAX_SAFE_INTEGER:seenAt(data?.studentSeenFeedbackAt);
-  const brief=`<section class="card stack assignment-brief" aria-labelledby="assignment-title"><div class="between"><h2 id="assignment-title">${esc(w.assignment.title||'스페인어 과제')}</h2><span class="pill brand">TAREA</span></div><div class="subtle article" style="white-space:pre-wrap">${esc(w.assignment.instructions||'과제 내용을 확인해 주세요.')}</div>${dueLine(w.assignment)}${!S.past&&w.preview?.enabled?'<button type="button" class="linkbutton assignment-preview-link" data-open-preview>이 차시 예습 자료 보기 →</button>':''}</section>`;
+  const brief=`<section class="card stack assignment-brief" aria-labelledby="assignment-title"><div class="between"><h2 id="assignment-title">${esc(w.assignment.title||'스페인어 과제')}</h2><span class="pill brand">TAREA</span></div><div class="subtle article" style="white-space:pre-wrap">${esc(w.assignment.instructions||'과제 내용을 확인해 주세요.')}</div>${dueLine(w.assignment)}</section>`;
   const feedback=`<div id="student-assignment-feedback">${feedbackMarkup(data,{askable:!S.past,newSince})}</div>`;
   // 2026-10-30: 무엇에 대한 답인지 먼저 보이게 과제 안내 → 제출한 답안 → 피드백 → (닫힌) 수정 폼. 제출 전: 과제 안내 → 답안 작성 폼
   if(S.past)area.innerHTML=data?brief+submittedCard(data)+feedback:brief+'<p class="notice">이 차시에는 제출 기록이 없어요.</p>';
   else area.innerHTML=data?brief+submittedCard(data)+feedback+editorCard(w,data):brief+editorCard(w,null);
   const fbBox=$('#student-assignment-feedback',area);if(fbBox)fbBox.dataset.rendered=fbBox.innerHTML;
-  $('[data-open-preview]',area)?.addEventListener('click',()=>goTab('preview',{weekId:w.id}));
   if(!S.past){
     // P0-02: 음성 초안은 이 차시에만 붙습니다(반·차시·학생 키).
     if(w.assignment.allowAudio!==false)wireMediaUi($('#student-audio-ui'),f=>{if(f)S.audioDrafts[draftKey]=f;else delete S.audioDrafts[draftKey]},{label:`${w.label} 과제`,initialFile:S.audioDrafts[draftKey]});
@@ -612,6 +634,7 @@ async function renderAssignment(body){
   }
   useMediaPaths(area);wireRevisionHistory(area,w.id,revision);markFeedbackSeen('submissions',w.id,data);
   S.live.assignment=onSnapshot(doc(db,'classes',S.classId,'weeks',w.id,'submissions',S.user.uid),snapshot=>{
+    if(!S.past&&S.news.classId===S.classId)S.news.submissions[w.id]=snapshot.exists()?snapshot.data():null; // 홈 할 일·배지도 최신으로
     if(S.tab!=='assignment'||S.weekId!==w.id)return;
     const el=$('#student-assignment-feedback');if(!el)return;
     const latest=snapshot.exists()?snapshot.data():null;
@@ -715,8 +738,9 @@ async function renderQuiz(body){const w=week(),token=++quizRenderSeq;
   }else if(last)showQuizSummary(ctx);
   else startQuiz(ctx);
   S.live.quiz=onSnapshot(doc(db,'classes',S.classId,'weeks',w.id,'quizResults',S.user.uid),snapshot=>{
-    if(S.tab!=='quiz'||S.weekId!==w.id)return;
     const d=snapshot.exists()?snapshot.data():null;
+    if(!S.past&&S.news.classId===S.classId)S.news.quizResults[w.id]=d; // 홈 할 일·배지도 최신으로
+    if(S.tab!=='quiz'||S.weekId!==w.id)return;
     if(d)ctx.last=d;
     markFeedbackSeen('quizResults',w.id,d);
     const html=feedbackMarkup(d,{askable:!S.past,newSince});
@@ -753,9 +777,10 @@ async function showQuizSummary(ctx){
   S.quiz=null;
   const r=lastReview(ctx);
   const draw=()=>{
-    const {qs,last}=ctx,first=last.firstAttempt||last;
+    // 학생에게는 최근 점수만 보여 줍니다(2026-10-30). 첫 응시 점수는 강사 화면(대시보드·학생 상세)에서만 씁니다.
+    const {qs,last}=ctx;
     const still=r.practice?qs.filter(q=>r.practice.wrongIds.includes(q.id)):r.wrong;
-    node.innerHTML=`<div class="quiz-summary"><div class="quiz-scores"><div class="mini-stat"><strong>${scorePct(first.score,first.total)}%</strong><span>첫 점수 ${Number(first.score)||0}/${Number(first.total)||0}</span></div><div class="mini-stat"><strong>${scorePct(last.score,last.total)}%</strong><span>최근 점수 ${Number(last.score)||0}/${Number(last.total)||0}</span></div></div>
+    node.innerHTML=`<div class="quiz-summary"><div class="quiz-scores"><div class="mini-stat"><strong>${scorePct(last.score,last.total)}%</strong><span>최근 점수 ${Number(last.score)||0}/${Number(last.total)||0}</span></div></div>
       ${r.practice?`<p class="notice">틀린 문제 연습 · ${r.practice.total}문항 중 ${r.practice.score}문항 정답 · ${esc(formatDateTime(r.practice.at,{time:false}))}</p>`:''}
       ${!r.sameVersion?'<p class="hint">선생님이 문제를 바꿔서 지난 결과의 문항별 정답은 보여 드릴 수 없어요. 전체 다시 풀기로 새 문제를 풀어 보세요.</p>':r.wrong.length?`<h3 class="quiz-summary-title">지난번에 틀린 문항 ${r.wrong.length}개</h3>${r.wrong.map(q=>reviewLine(q,r.answers[qs.indexOf(q)])).join('')}`:'<p class="notice">지난번에 모두 맞혔어요 ✓</p>'}
       <div class="row quiz-actions">${r.sameVersion&&still.length?`<button type="button" class="btn" id="quiz-wrong-only">틀린 문제만 다시 풀기 (${still.length})</button>`:''}<button type="button" class="btn${r.sameVersion&&still.length?' secondary':''}" id="quiz-full-retry">전체 다시 풀기</button></div></div>`;
