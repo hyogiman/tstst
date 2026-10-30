@@ -55,6 +55,11 @@ service firebase.storage {
       allow create, update: if admin() && request.resource.size < 15 * 1024 * 1024 && request.resource.contentType.matches('audio/.*');
       allow delete: if admin();
     }
+    // 반 폴더 목록(2026-10-30): 반·차시를 영구 삭제할 때 문서에 연결되지 않은 파일(저장하지 않고 닫은 업로드 등)까지
+    // 찾아 지우려고 강사만 폴더 목록을 봅니다. 파일 읽기·쓰기 권한은 위의 규칙 그대로입니다.
+    match /classes/{cid}/{allPaths=**} {
+      allow list: if admin();
+    }
     match /{allPaths=**} { allow read, write: if false; }
   }
 }

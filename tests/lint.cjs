@@ -1,5 +1,5 @@
 // 정적 검사: node tests/lint.cjs
-// 두 HTML의 <script type="module">과 common.js · dashboard.js에서 정의되지 않은 이름(import 누락 등)과 쓰지 않는 import를 찾습니다.
+// 두 HTML의 <script type="module">과 common.js · dashboard.js · classexport.js에서 정의되지 않은 이름(import 누락 등)과 쓰지 않는 import를 찾습니다.
 // ESLint가 필요합니다: npm i -g eslint 또는 ESLINT_PATH=/경로/node_modules/eslint
 'use strict';
 const fs = require('fs');
@@ -18,7 +18,7 @@ const browserGlobals = ['window', 'document', 'navigator', 'location', 'history'
   'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'requestAnimationFrame', 'cancelAnimationFrame', 'matchMedia',
   'URL', 'File', 'Blob', 'FormData', 'DOMParser', 'Node', 'CSS', 'MediaRecorder', 'crypto', 'Audio', 'Event', 'CustomEvent',
   'HTMLElement', 'KeyboardEvent', 'addEventListener', 'removeEventListener', 'getComputedStyle', 'performance', 'structuredClone',
-  'alert', 'confirm', 'innerWidth', 'scrollTo', 'IntersectionObserver', 'ResizeObserver', 'AbortController', 'queueMicrotask', 'TextEncoder'];
+  'alert', 'confirm', 'innerWidth', 'scrollTo', 'IntersectionObserver', 'ResizeObserver', 'AbortController', 'queueMicrotask', 'TextEncoder', 'CompressionStream', 'Response'];
 
 const sources = [];
 for (const file of ['index.html', 'admin.html']) {
@@ -31,7 +31,7 @@ for (const file of ['index.html', 'admin.html']) {
     n++;
   }
 }
-for (const file of ['common.js', 'dashboard.js']) sources.push({ name: file, code: fs.readFileSync(path.join(ROOT, file), 'utf8') });
+for (const file of ['common.js', 'dashboard.js', 'classexport.js']) sources.push({ name: file, code: fs.readFileSync(path.join(ROOT, file), 'utf8') });
 
 (async () => {
   const eslint = new ESLint({

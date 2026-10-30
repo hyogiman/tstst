@@ -113,7 +113,8 @@ export function makeUser(u) {
 export function autoId() { state.seq += 1; return 'auto' + String(state.seq).padStart(4, '0') + Math.random().toString(36).slice(2, 6); }
 
 // ---------- 보안 규칙(일부) 흉내 ----------
-const RULE_VERSIONS = { v1: 1, v2: 2, v3: 3, v4: 4, current: 3, proposed: 4 };
+// v5(2026-10-30): Storage에서 강사가 반 폴더 목록을 볼 수 있음(Firestore 규칙은 v4와 같음)
+const RULE_VERSIONS = { v1: 1, v2: 2, v3: 3, v4: 4, v5: 5, current: 4, proposed: 5 };
 // 지금 흉내 내는 규칙이 해당 버전 이상인지
 export function rulesAt(v) { return (RULE_VERSIONS[state.rulesMode] ?? 4) >= RULE_VERSIONS[v]; }
 export function permissionError(message) { return Object.assign(new Error('Missing or insufficient permissions. ' + (message || '')), { code: 'permission-denied' }); }

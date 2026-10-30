@@ -15,8 +15,8 @@
 <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;1,9..144,500&display=swap">
 <!-- 배포할 때 CSS를 바꾸면 ?v= 값을 함께 올려 브라우저 캐시를 갱신하세요 -->
-<link rel="stylesheet" href="common.css?v=20261030c">
-<link rel="stylesheet" href="admin.css?v=20261030c">
+<link rel="stylesheet" href="common.css?v=20261030d">
+<link rel="stylesheet" href="admin.css?v=20261030d">
 </head>
 <body>
 <div id="root"></div>
@@ -35,9 +35,10 @@ window.__appStarted=true; // 모듈(외부 SDK 포함)을 모두 불러와 앱�
 
 import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import { doc, getDoc, getDocs, collection, query, where, setDoc, updateDoc, deleteDoc, serverTimestamp, arrayUnion, onSnapshot, writeBatch, runTransaction, deleteField } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
-import { ref as storageRef, deleteObject } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-storage.js';
-import { CONFIGURED, auth, db, storage, $, $$, esc, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, mountAuth, formatDuration, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalDialog, modalConfirm, modalInput, formatDateTime, todayKey, statusPill, paintPill, needsReply, linkifyText, sortNotices, IS_MAC, byLastActivity, feedbackItems, reviewState, REVIEW_LABEL, openModalLayer, toDate, quizContentKey, answersFor, audioMarkup, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded, modalChoice, sessionState, sessionDateText, parseYouTube, SIZE_LABEL, uploadsInProgress, filePicker, wireFilePickers, wasActiveAt, daysBetween, partsInZone, attendanceValue, normalizeQuizQuestion, isCorrectAnswer, questionSessionTag, shortLabel, isComposingKey } from './common.js?v=20261030c';
-import { computeDashboard, analyzeQuiz, feedbackQueue, firstAttemptOf, WATCH_RULES, TREND_SESSIONS } from './dashboard.js?v=20261030c';
+import { ref as storageRef, deleteObject, listAll, getBlob } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-storage.js';
+import { CONFIGURED, auth, db, storage, $, $$, esc, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, mountAuth, formatDuration, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalDialog, modalConfirm, modalInput, formatDateTime, todayKey, statusPill, paintPill, needsReply, linkifyText, sortNotices, IS_MAC, byLastActivity, feedbackItems, reviewState, REVIEW_LABEL, openModalLayer, toDate, quizContentKey, answersFor, audioMarkup, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded, modalChoice, sessionState, sessionDateText, parseYouTube, SIZE_LABEL, uploadsInProgress, filePicker, wireFilePickers, wasActiveAt, daysBetween, partsInZone, attendanceValue, normalizeQuizQuestion, isCorrectAnswer, questionSessionTag, shortLabel, isComposingKey } from './common.js?v=20261030d';
+import { computeDashboard, analyzeQuiz, feedbackQueue, firstAttemptOf, WATCH_RULES, TREND_SESSIONS } from './dashboard.js?v=20261030d';
+import { exportPlan, exportFiles, makeZip, exportFileName } from './classexport.js?v=20261030d';
 
 
 // ===== ADMIN PAGE =====
@@ -271,8 +272,8 @@ function renderPage(){
 }
 async function loadAdmin(preferred=''){const cs=await getDocs(collection(db,'classes'));A.classes=cs.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.name||'').localeCompare(b.name||'','ko'));await syncJoinCodes(A.classes);const choice=preferred||A.classId||localStorage.getItem(classPrefKey());A.classId=A.classes.some(c=>c.id===choice)?choice:(A.classes.find(c=>!c.archived)?.id||A.classes[0]?.id||'');if(A.classId){localStorage.setItem(classPrefKey(),A.classId);await loadWeeks();await syncMemberDirectory().catch(e=>console.warn('명단 동기화 실패',e))}else{A.weeks=[];A.weekId=''}frame()}
 async function loadWeeks(){const snap=await getDocs(collection(db,'classes',A.classId,'weeks'));A.weeks=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.order||0)-(b.order||0));if(!A.weeks.some(w=>w.id===A.weekId)){const kept=rememberedWeek(A.classId);A.weekId=A.weeks.some(w=>w.id===kept)?kept:(A.weeks[0]?.id||'')}startAdminBadges();}
-async function roster(){
-  const snap=await getDocs(query(collection(db,'enrollments'),where('classId','==',A.classId)));
+async function roster(cid=A.classId){
+  const snap=await getDocs(query(collection(db,'enrollments'),where('classId','==',cid)));
   const members=snap.docs.map(d=>({id:d.id,...d.data()}));
   // 학생 등록 시점의 복사본 대신 최신 users 프로필을 사용합니다.
   // 과거 가입 오류로 studentName="수강생"이 저장된 경우도 이름을 복구합니다.
@@ -509,6 +510,63 @@ async function showOverview(b){
  // 진행표·챙겨 볼 학생에 쓰는 이름은 최신 프로필 기준(수강생 관리와 같은 이름)으로 한 번 읽습니다.
  roster().then(list=>{if(!isCurrent())return;data.names=Object.fromEntries(list.map(m=>[m.uid,m.studentName]));schedule()}).catch(err=>console.warn('대시보드 이름 조회 실패',err));
 }
+// ---------- 반 내보내기 (2026-10-30) ----------
+// 출석·과제(답안·음성·피드백)·복습 결과를 ZIP 하나로 내려받습니다. 강의 영상과 예습 자료는 강사 원본이 있어 넣지 않습니다.
+const EXPORT_DEPS={formatDateTime,toDate,todayKey,attendanceValue,wasActiveAt,reviewState,feedbackItems,normalizeQuizQuestion};
+async function readClassExport(c,progress){
+  const cid=c.id,base=['classes',cid];
+  progress('명단 읽는 중');
+  // 강사 메모·학습 목표는 규칙 게시 전이면 읽지 못할 수 있어 없이 진행합니다.
+  const optional=async path=>{try{return await getDocs(collection(db,...path))}catch(e){if(e?.code!=='permission-denied')throw e;return null}};
+  const [weeksSnap,members,notes,goals]=await Promise.all([getDocs(collection(db,...base,'weeks')),roster(cid),optional([...base,'teacherNotes']),optional([...base,'studentGoals'])]);
+  const sched=new Map((c.schedule||[]).map(x=>[x.weekId,x.date]));
+  const weeks=weeksSnap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.order||0)-(b.order||0)).map(w=>({...w,sessionDate:w.sessionDate||sched.get(w.id)||''}));
+  const textOf=snap=>new Map((snap?.docs||[]).map(d=>[d.id,String(d.data().text||'')]));
+  const noteOf=textOf(notes),goalOf=textOf(goals);
+  const events=await Promise.all(members.map(m=>getDocs(collection(db,'enrollments',m.id,'events')).then(s=>s.docs.map(d=>d.data())).catch(()=>[])));
+  const students=members.map((m,i)=>({uid:m.uid,name:m.studentName,email:m.email,status:m.status,joinedAt:m.joinedAt,events:events[i],note:noteOf.get(m.uid)||'',goal:goalOf.get(m.uid)||''}));
+  const out={submissions:{},quizResults:{},attendance:{}};
+  for(const [i,w] of weeks.entries()){
+    progress(`차시 기록 읽는 중 ${i+1}/${weeks.length}`);
+    const [subs,quiz,att]=await Promise.all(['submissions','quizResults','attendance'].map(k=>getDocs(collection(db,...base,'weeks',w.id,k))));
+    out.submissions[w.id]=Object.fromEntries(await Promise.all(subs.docs.map(async d=>[d.id,{...d.data(),revisions:(await getDocs(collection(db,...base,'weeks',w.id,'submissions',d.id,'revisions'))).docs.map(r=>r.data())}])));
+    out.quizResults[w.id]=Object.fromEntries(quiz.docs.map(d=>[d.id,d.data()]));
+    out.attendance[w.id]=Object.fromEntries(att.docs.map(d=>[d.id,d.data()]));
+  }
+  return {cls:c,exportedAt:new Date(),weeks,students,...out};
+}
+// 음성 파일을 4개씩 내려받습니다. 처음 3개가 모두 실패하면(대개 Storage CORS 설정이 없을 때) 나머지는 시도하지 않고 README에 적습니다.
+async function downloadExportAudio(list,progress){
+  const files=[],missing=new Set();let next=0,done=0,ok=0,failed=0;
+  const worker=async()=>{
+    while(next<list.length){
+      const a=list[next++];
+      if(!ok&&failed>=3){missing.add(a.storagePath);continue}
+      try{const blob=await getBlob(storageRef(storage,a.storagePath));files.push({name:a.zipPath,data:new Uint8Array(await blob.arrayBuffer())});ok++}
+      catch(e){missing.add(a.storagePath);if(e?.code!=='storage/object-not-found'){failed++;console.warn('음성 내려받기 실패',a.storagePath,e)}}
+      progress(`음성 내려받는 중 ${++done}/${list.length}`);
+    }
+  };
+  await Promise.all(Array.from({length:Math.min(4,list.length)},worker));
+  return {files:files.sort((a,b)=>a.name.localeCompare(b.name)),missing};
+}
+function saveBlob(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000)}
+async function exportClass(c,btn){
+  if(!c||btn.disabled)return;
+  const choice=await modalChoice({title:'반 기록 내보내기',message:`${c.name} 반의 출석·과제(답안·피드백)·복습 결과를 압축 파일(ZIP) 하나로 내려받습니다. 강의 영상과 예습 자료는 넣지 않습니다.\n학생 과제 음성과 피드백 음성까지 넣으면 시간이 더 걸려요.`,
+    choices:[{value:'audio',label:'음성까지 내려받기'},{value:'text',label:'기록만 내려받기',kind:'secondary'},{value:'',label:'취소',kind:'secondary'}]});
+  if(!choice)return;
+  const label=btn.textContent,progress=text=>{if(btn.isConnected)btn.textContent=text};btn.disabled=true;
+  try{
+    const input=await readClassExport(c,progress),plan=exportPlan(input),withAudio=choice==='audio';
+    const audio=withAudio?await downloadExportAudio(plan.audio,progress):{files:[],missing:new Set()};
+    progress('압축 파일 만드는 중');
+    const files=exportFiles(input,plan,EXPORT_DEPS,{missing:audio.missing,audioIncluded:withAudio});
+    saveBlob(await makeZip([...files.map(f=>({...f,compress:true})),...audio.files],input.exportedAt),exportFileName(c.name,todayKey(input.exportedAt)));
+    toast(audio.missing.size?`내려받았어요. 음성 ${audio.missing.size}개는 받지 못해 README.txt에 적어 두었어요.`:'반 기록을 내려받았어요.',audio.missing.size>0);
+  }catch(e){toast('내보내지 못했어요: '+ex(e),true)}
+  finally{if(btn.isConnected){btn.disabled=false;btn.textContent=label}}
+}
 function showClasses(b){
   // 2026-10-30: 기본 목록은 운영 중인 반만. 보관된 반은 '보관된 반 보기'에서만 봅니다.
   const archivedView=A.classFilter==='archived',archivedCount=A.classes.filter(c=>c.archived).length;
@@ -516,7 +574,7 @@ function showClasses(b){
   b.innerHTML=`<div class="section-title"><div><div class="eyebrow" lang="es">Clases</div><h1>클래스 관리</h1><p>클래스별 차시·수업 날짜와 수강생을 관리합니다. 반 이름을 누르면 해당 수강생 목록으로 이동합니다.</p></div></div><section class="db-panel class-page-panel"><header class="db-panel-head"><div class="db-heading"><span class="db-heading-icon">${sideIcon('classes')}</span><h2>${archivedView?'보관된 반':'운영 중인 반'} <span class="db-subcount">${classes.length}개</span></h2></div><div class="db-heading-actions"><button type="button" class="btn" id="create-class">＋ 새 반 만들기</button><button type="button" class="btn btn-outline-red" id="toggle-class-filter">${archivedView?'← 운영 중인 반 보기':`▣ 보관된 반 보기 (${archivedCount})`}</button></div></header><div id="class-list" class="class-manager-list db-table-scroller"></div></section><p class="hint" style="margin-top:15px">※ 보관한 반은 복원할 수 있습니다. 영구 삭제하면 학생의 학습 기록과 연결 데이터가 함께 삭제되므로 주의해 주세요.</p>`;
   $('#toggle-class-filter').onclick=()=>{A.classFilter=archivedView?'active':'archived';showClasses(b);$('#toggle-class-filter')?.focus()};
   const list=$('#class-list');
-  list.innerHTML=`<table class="db-table db-class-table"><thead><tr><th>반 이름</th><th>소개</th><th>수강 코드</th><th>상태</th><th>생성일</th><th>관리</th></tr></thead><tbody>${classes.map(c=>`<tr class="class-manager-item ${c.archived?'is-archived':''}"><td><button type="button" class="db-class-name" data-open-roster="${esc(c.id)}">${esc(c.name)}</button></td><td class="db-muted db-ellipsis">${esc(c.description||'—')}</td><td><button class="db-code-copy" data-copy-class="${esc(c.id)}" aria-label="수강 코드 ${esc(c.joinCode||'')} 복사" title="수강 코드만 복사">${esc(c.joinCode||'—')} <span class="copy-svg"><svg aria-hidden="true" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></span></button></td><td><span class="db-status ${c.archived?'archived':'active'}"><span aria-hidden="true">${c.archived?'–':'✓'}</span> ${c.archived?'보관됨':'운영 중'}</span></td><td class="db-muted">${shortDate(c.createdAt)}</td><td><div class="db-action-row"><button class="db-light-button" data-edit-class="${esc(c.id)}">수정</button><button class="db-light-button" data-rotate-class="${esc(c.id)}">코드 변경</button><button class="db-light-button ${c.archived?'db-border-red':''}" data-archive-class="${esc(c.id)}">${c.archived?'복원':'보관'}</button><button class="db-light-button db-danger-button" data-delete-class="${esc(c.id)}">삭제</button></div></td></tr>`).join('')||`<tr><td colspan="6" class="db-no-data">${archivedView?'보관된 반이 없습니다.':archivedCount?'운영 중인 반이 없습니다. 새 반을 만들거나 보관된 반을 복원해 보세요.':'아직 반이 없습니다. 새 반을 만들어 보세요.'}</td></tr>`}</tbody></table>`;
+  list.innerHTML=`<table class="db-table db-class-table"><thead><tr><th>반 이름</th><th>소개</th><th>수강 코드</th><th>상태</th><th>생성일</th><th>관리</th></tr></thead><tbody>${classes.map(c=>`<tr class="class-manager-item ${c.archived?'is-archived':''}"><td><button type="button" class="db-class-name" data-open-roster="${esc(c.id)}">${esc(c.name)}</button></td><td class="db-muted db-ellipsis">${esc(c.description||'—')}</td><td><button class="db-code-copy" data-copy-class="${esc(c.id)}" aria-label="수강 코드 ${esc(c.joinCode||'')} 복사" title="수강 코드만 복사">${esc(c.joinCode||'—')} <span class="copy-svg"><svg aria-hidden="true" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></span></button></td><td><span class="db-status ${c.archived?'archived':'active'}"><span aria-hidden="true">${c.archived?'–':'✓'}</span> ${c.archived?'보관됨':'운영 중'}</span></td><td class="db-muted">${shortDate(c.createdAt)}</td><td><div class="db-action-row"><button class="db-light-button" data-edit-class="${esc(c.id)}">수정</button><button class="db-light-button" data-rotate-class="${esc(c.id)}">코드 변경</button><button class="db-light-button ${c.archived?'db-border-red':''}" data-archive-class="${esc(c.id)}">${c.archived?'복원':'보관'}</button><button class="db-light-button" data-export-class="${esc(c.id)}" aria-label="${esc(c.name)} 기록 내보내기">내보내기</button><button class="db-light-button db-danger-button" data-delete-class="${esc(c.id)}">삭제</button></div></td></tr>`).join('')||`<tr><td colspan="6" class="db-no-data">${archivedView?'보관된 반이 없습니다.':archivedCount?'운영 중인 반이 없습니다. 새 반을 만들거나 보관된 반을 복원해 보세요.':'아직 반이 없습니다. 새 반을 만들어 보세요.'}</td></tr>`}</tbody></table>`;
   $('#create-class').onclick=()=>classEditor();
   $$('[data-open-roster]',list).forEach(el=>el.onclick=()=>openClassRoster(el.dataset.openRoster));
   // 수강 코드만 복사합니다. 안내 문구는 강사가 직접 씁니다(2026-10-29 요청).
@@ -524,7 +582,8 @@ function showClasses(b){
   $$('[data-edit-class]',list).forEach(el=>el.onclick=()=>classEditor(A.classes.find(x=>x.id===el.dataset.editClass)));
   $$('[data-rotate-class]',list).forEach(el=>el.onclick=async()=>{const c=A.classes.find(x=>x.id===el.dataset.rotateClass);if(!await modalConfirm(`${c.name} 반의 수강 코드를 새로 발급할까요? 기존 코드는 사용할 수 없지만 등록된 수강생은 유지됩니다.`,{title:'수강 코드 재발급',confirmText:'새 코드 발급'}))return;try{const code=await uniqueJoinCode(),batch=writeBatch(db);batch.update(doc(db,'classes',c.id),{joinCode:code,updatedAt:serverTimestamp()});batch.set(doc(db,'joinCodes',code),{classId:c.id,createdBy:A.user.uid,updatedAt:serverTimestamp()});if(c.joinCode)batch.delete(doc(db,'joinCodes',c.joinCode));await batch.commit();toast('수강 코드를 변경했습니다.');await loadAdmin(c.id)}catch(e){toast(ex(e),true)}});
   $$('[data-archive-class]',list).forEach(el=>el.onclick=async()=>{const c=A.classes.find(x=>x.id===el.dataset.archiveClass);if(!await modalConfirm(c.archived?`${c.name} 반을 다시 운영할까요?\n학생들이 이 반에서 다시 과제를 제출하고 질문할 수 있게 됩니다.`:`${c.name} 반을 보관할까요?\n학습 기록은 그대로 남고, 학생은 지난 자료(과제·피드백·복습·질문·출석·수업 자료)를 읽기 전용으로 볼 수 있어요. 강의 영상은 볼 수 없어요.\n학생은 다음 반의 수강 코드로 새 반에 입장할 수 있어요.`,{title:c.archived?'반 다시 운영':'반 보관',confirmText:c.archived?'다시 운영하기':'보관하기'}))return;try{await updateDoc(doc(db,'classes',c.id),{archived:!c.archived,updatedAt:serverTimestamp()});toast(c.archived?'반을 복원했어요. 운영 중인 반 목록에 다시 보여요.':'반을 보관했어요. \'보관된 반 보기\'에서 볼 수 있어요.');await loadAdmin(c.id)}catch(e){toast(ex(e),true)}});
-  $$('[data-delete-class]',list).forEach(el=>el.onclick=async()=>{const c=A.classes.find(x=>x.id===el.dataset.deleteClass);const answer=await modalDialog({title:'반 영구 삭제',message:`${c.name} 반에 속한 출석·과제·퀴즈·질문·학생 메모·수강 등록 및 연결된 파일이 삭제 대상입니다. 이 작업은 복원할 수 없습니다. 보관을 원하시면 취소 후 '보관'을 선택하세요.`,value:'',verify:c.name,verifyLabel:'삭제할 반 이름',danger:true,confirmText:'반과 관련 기록 영구 삭제'});if(answer===null)return;el.disabled=true;try{await deleteClassDeep(c);toast(`${c.name} 반 삭제가 완료되었습니다.`);await loadAdmin()}catch(e){toast('삭제 중 오류가 발생했습니다: '+ex(e)+' · 남은 기록을 확인하고 다시 시도해 주세요.',true)}finally{if(el.isConnected)el.disabled=false}});
+  $$('[data-export-class]',list).forEach(el=>el.onclick=()=>exportClass(A.classes.find(x=>x.id===el.dataset.exportClass),el));
+  $$('[data-delete-class]',list).forEach(el=>el.onclick=async()=>{const c=A.classes.find(x=>x.id===el.dataset.deleteClass);const answer=await modalDialog({title:'반 영구 삭제',message:`${c.name} 반의 출석·과제·퀴즈·질문·공지·학생 메모·수강 등록 기록과, Storage에 있는 이 반의 파일(강의·수업 영상, 예습 자료, 학생·피드백 음성)이 모두 지워집니다. 되돌릴 수 없습니다.\n기록이 필요하면 먼저 '내보내기'로 받아 두세요. 보관만 하려면 취소 후 '보관'을 고르세요.`,value:'',verify:c.name,verifyLabel:'삭제할 반 이름',danger:true,confirmText:'반과 관련 기록 영구 삭제'});if(answer===null)return;el.disabled=true;try{await deleteClassDeep(c);toast(`${c.name} 반 삭제가 완료되었습니다.`);await loadAdmin()}catch(e){toast('삭제 중 오류가 발생했습니다: '+ex(e)+' · 남은 기록을 확인하고 다시 시도해 주세요.',true)}finally{if(el.isConnected)el.disabled=false}});
 }
 // Firestore는 상위 문서만 삭제해도 하위 컬렉션이 지워지지 않습니다. 알려진 하위 경로를 아래부터 먼저 지웁니다.
 async function purgeDocs(ref){const snap=await getDocs(ref);for(let i=0;i<snap.docs.length;i+=350){const batch=writeBatch(db);snap.docs.slice(i,i+350).forEach(x=>batch.delete(x.ref));await batch.commit()}return snap.docs}
@@ -552,10 +611,23 @@ async function purgeWeekRecords(cid,wid,weekData,paths){
   await purgeDocs(collection(db,...base,'attendance'));
   await purgeDocs(collection(db,...base,'quizVersions')); // P1-02
 }
+// Storage 폴더 아래 파일을 모두 찾습니다(2026-10-30). 강사의 폴더 목록 권한(storage.rules 2026-10-30 추가분)을 게시하기 전에는
+// 폴더 전체를 볼 수 없어서, 대신 차시별 영상 폴더(예습·복습)만 찾습니다. 문서에 연결된 파일은 따로 모아 함께 지웁니다.
+const videoFolders=(cid,wid)=>[`classes/${cid}/previews/${wid}/video`,`classes/${cid}/recaps/${wid}/video`];
+async function listStorageFiles(folders,fallback){
+  const found=new Set(),walk=async path=>{const res=await listAll(storageRef(storage,path));for(const it of res.items)found.add(it.fullPath);for(const p of res.prefixes)await walk(p.fullPath)};
+  try{for(const f of folders)await walk(f);return {paths:found,complete:true}}
+  catch(e){if(e?.code!=='storage/unauthorized')console.warn('Storage 목록을 읽지 못했습니다',e)}
+  for(const f of fallback){try{await walk(f)}catch(e){console.warn('영상 폴더 목록을 읽지 못했습니다',f,e)}}
+  return {paths:found,complete:false};
+}
 async function deleteClassDeep(c){
   const cid=c.id,paths=new Set();
   await updateDoc(doc(db,'classes',cid),{archived:true,updatedAt:serverTimestamp()});
   const weeks=await getDocs(collection(db,'classes',cid,'weeks'));
+  // 2026-10-30: 문서에 연결되지 않은 파일(저장하지 않고 닫은 업로드 등)까지 반 폴더에서 찾아 지웁니다(Storage 저장 용량 과금 방지).
+  const listed=await listStorageFiles([`classes/${cid}`],weeks.docs.flatMap(w=>videoFolders(cid,w.id)));
+  for(const p of listed.paths)paths.add(p);
   for(const w of weeks.docs)await purgeWeekRecords(cid,w.id,w.data(),paths);
   await purgeDocs(collection(db,'classes',cid,'weeks'));
   const questions=await getDocs(collection(db,'classes',cid,'questions'));
@@ -572,7 +644,7 @@ async function deleteClassDeep(c){
   }
   for(let i=0;i<enrollments.docs.length;i+=350){const batch=writeBatch(db);enrollments.docs.slice(i,i+350).forEach(e=>batch.delete(e.ref));await batch.commit()}
   if(c.joinCode)await deleteDoc(doc(db,'joinCodes',String(c.joinCode).toUpperCase()));
-  // 직접 관리 중인 등록 파일을 정리합니다. 오래된 미참조 파일은 Storage에 잔존할 수 있습니다.
+  // 반 폴더에서 찾은 파일과 문서에 연결된 파일을 지웁니다. 강사 목록 권한을 게시하기 전이면 영상 폴더 밖의 미연결 파일은 남을 수 있습니다.
   let fileFailures=0;for(const path of paths){try{await deleteObject(storageRef(storage,path))}catch(e){if(e.code!=='storage/object-not-found'){fileFailures++;console.warn('파일 정리 필요',path,e)}}}
   await deleteDoc(doc(db,'classes',cid));
   if(A.classId===cid){A.classId='';localStorage.removeItem(classPrefKey())}
@@ -620,6 +692,8 @@ function showCreateWeek(){
 async function deleteWeekDeep(cid,wid){
   const rootRef=doc(db,'classes',cid,'weeks',wid),ws=await getDoc(rootRef);if(!ws.exists())throw Error('이미 삭제된 차시입니다.');
   const paths=new Set();
+  const listed=await listStorageFiles(['previews','recaps','submissions','feedback'].map(area=>`classes/${cid}/${area}/${wid}`),videoFolders(cid,wid));
+  for(const p of listed.paths)paths.add(p);
   await purgeWeekRecords(cid,wid,ws.data(),paths);
   const batch=writeBatch(db);batch.delete(rootRef);syncClassSchedule(batch,cid,A.weeks.filter(x=>x.id!==wid));await batch.commit();
   let failed=0;for(const path of paths){try{await deleteObject(storageRef(storage,path))}catch(e){if(e.code!=='storage/object-not-found'){failed++;console.warn('미디어 삭제 실패',path,e)}}}

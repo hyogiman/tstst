@@ -1672,6 +1672,108 @@ test('AW01 강사 차시 기본값: 처음엔 맨 위 차시, 새로 고침하�
   eq(await active(), 'w3', '돌아온 반은 보던 차시');
 });
 
+// 반 내보내기(2026-10-30): 내려받은 ZIP을 Python zipfile로 열어 CRC·압축·이름 인코딩까지 확인합니다.
+const ZIP_READER = `
+import json, sys, zipfile
+z = zipfile.ZipFile(sys.argv[1])
+out = {'bad': z.testzip(), 'names': z.namelist(), 'texts': {}, 'heads': {}, 'methods': {}, 'utf8': {}}
+for i in z.infolist():
+    out['methods'][i.filename] = i.compress_type
+    out['utf8'][i.filename] = bool(i.flag_bits & 0x800)
+    data = z.read(i.filename)
+    if i.filename.endswith(('.csv', '.txt')):
+        out['texts'][i.filename] = data.decode('utf-8')
+    else:
+        out['heads'][i.filename] = data[:4].decode('latin-1')
+print(json.dumps(out, ensure_ascii=False))
+`;
+const readZip = file => JSON.parse(require('node:child_process').execFileSync('python3', ['-I', '-c', ZIP_READER, file], { encoding: 'utf8' }));
+const parseCsv = text => {
+  const rows = [], src = text.replace(/^\uFEFF/, ''); let row = [], cell = '', q = false;
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i];
+    if (q) { if (c === '"' && src[i + 1] === '"') { cell += '"'; i++; } else if (c === '"') q = false; else cell += c; }
+    else if (c === '"') q = true; else if (c === ',') { row.push(cell); cell = ''; }
+    else if (c === '\r') continue; else if (c === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; } else cell += c;
+  }
+  return rows;
+};
+const exportZip = async (page, cid, choice) => {
+  await page.click('[data-page="classes"]'); await pause(page, 500);
+  await page.click(`[data-export-class="${cid}"]`); await pause(page, 200);
+  const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 20000 }), page.click(`.app-modal [data-choice="${choice}"]`)]);
+  const file = require('node:path').join(require('node:os').tmpdir(), `export-${Date.now()}.zip`);
+  await dl.saveAs(file);
+  return { name: dl.suggestedFilename(), zip: readZip(file) };
+};
+
+test('EX01 반 내보내기: 출석·과제(답안·음성·피드백)·복습 결과를 ZIP 하나로, 영상·예습 자료는 넣지 않음', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  const { name, zip } = await exportZip(page, 'c1', 0);
+  eq(name, `스페인어 기초반 2기 기록 ${kstDate(Date.now())}.zip`, '파일 이름');
+  assert(zip.bad === null, 'CRC가 맞지 않는 파일: ' + zip.bad);
+  const csvs = ['README.txt', 'students.csv', 'sessions.csv', 'attendance.csv', 'assignments.csv', 'assignment-history.csv', 'quiz-results.csv', 'quiz-questions.csv'];
+  eq(zip.names.slice(0, csvs.length), csvs, '기록 파일');
+  assert(zip.names.every(n => !/previews|recaps|\.mp4|\.pdf|\.png/.test(n)), '영상·예습 자료가 들어감: ' + zip.names.join(', '));
+  assert(Object.values(zip.utf8).every(Boolean) && csvs.every(n => zip.methods[n] === 8), '이름 인코딩·압축: ' + JSON.stringify(zip.methods));
+  assert(csvs.every(n => zip.texts[n].startsWith('\uFEFF')), '엑셀용 BOM 없음');
+  const students = parseCsv(zip.texts['students.csv']), num = Object.fromEntries(students.slice(1).map(r => [r[1], r[0]]));
+  eq(students[0], ['번호', '이름', '이메일', '수강 상태', '등록일', '수강 기간 기록', '강사 메모', '다음 학습 목표'], '학생 명단 머리글');
+  assert(num['김민지'] && num['박서연'] && students.find(r => r[1] === '김민지')[3] === '수강 중', '학생 명단: ' + JSON.stringify(students.slice(0, 4)));
+  // 음성: 1차시 박서연 과제 음성 + 선생님 피드백 음성(모의 저장소의 무음 WAV)
+  const voice = `audio/assignment/w01_${num['박서연']}_r1.webm`, fbVoice = `audio/feedback/w01_${num['박서연']}_assignment_1.webm`;
+  assert(zip.heads[voice] === 'RIFF' && zip.heads[fbVoice] === 'RIFF', '음성 파일: ' + JSON.stringify(zip.heads));
+  const att = parseCsv(zip.texts['attendance.csv']);
+  assert(att[0].includes('1차시 · 인사와 자기소개') && att[0].slice(-3).join() === '출석,불참,미입력', '출석표 머리글: ' + att[0].join(','));
+  const asg = parseCsv(zip.texts['assignments.csv']);
+  const minji = asg.find(r => r[0] === 'w01' && r[4] === '김민지'), seoyeon = asg.find(r => r[0] === 'w01' && r[4] === '박서연');
+  assert(minji[9].includes('¡Hola! Me llamo Minji.') && minji[12].includes('아주 자연스러워요!') && minji[5] === '피드백 완료', '과제(김민지): ' + JSON.stringify(minji));
+  eq([seoyeon[10], seoyeon[13]], [voice, fbVoice], '과제 음성 칸(박서연)');
+  const quiz = parseCsv(zip.texts['quiz-results.csv']), junho = quiz.find(r => r[0] === 'w01' && r[4] === '이준호');
+  eq([junho[5], junho[6], junho[7]], ['응시', '1/3', '33%'], '복습 첫 응시(이준호)');
+  assert(parseCsv(zip.texts['quiz-questions.csv']).length > 3, '복습 문항이 없음');
+  assert(zip.texts['README.txt'].includes('반: 스페인어 기초반 2기') && !zip.texts['README.txt'].includes('내려받지 못한'), 'README: ' + zip.texts['README.txt'].slice(0, 200));
+  assert((await lastToast(page)).includes('반 기록을 내려받았어요'), '완료 알림: ' + await lastToast(page));
+});
+
+test('EX02 반 내보내기: 음성을 못 받아도(CORS 미설정 등) 기록은 내려받고 README에 못 받은 파일을 적음 · 기록만 받기', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  await page.evaluate(() => window.__mock.failDownloads(true));
+  let r = await exportZip(page, 'c1', 0);
+  assert(r.zip.bad === null && !r.zip.names.some(n => n.startsWith('audio/')), '음성 없이 만들어져야 함: ' + r.zip.names.join(', '));
+  assert(r.zip.texts['README.txt'].includes('[내려받지 못한 음성 파일]') && r.zip.texts['README.txt'].includes('classes/c1/submissions/w1/s3/intro.webm'), 'README: ' + r.zip.texts['README.txt'].slice(-400));
+  assert(r.zip.texts['assignments.csv'].includes('(내려받지 못함)'), '과제 음성 칸에 표시 없음');
+  assert((await lastToast(page)).includes('음성 2개는 받지 못해'), '알림: ' + await lastToast(page));
+  await page.evaluate(() => window.__mock.failDownloads(false));
+  const before = (await page.evaluate(() => window.__mock.blobRequests())).length;
+  r = await exportZip(page, 'c1', 1);
+  eq((await page.evaluate(() => window.__mock.blobRequests())).length, before, '기록만 받기인데 음성을 내려받음');
+  assert(r.zip.texts['assignments.csv'].includes('(음성 제외하고 내보냄)') && r.zip.texts['README.txt'].includes('음성 파일 넣지 않음'), '기록만 받기 표시');
+});
+
+// 반 삭제 뒤 Storage: 문서에 연결된 영상 + 연결이 끊긴 파일(저장 안 한 복습 영상, 지난 차시 영상, 저장 안 한 첨부)
+const orphanSeed = () => {
+  const seed = makeSeed(), linked = 'classes/c2/previews/cw1/video/linked.mp4';
+  seed.docs['classes/c2/weeks/cw1'].preview = { ...seed.docs['classes/c2/weeks/cw1'].preview, videos: [{ kind: 'upload', path: linked, name: '1차시.mp4', size: 10 }] };
+  for (const p of [linked, 'classes/c2/recaps/cw2/video/unsaved.mp4', 'classes/c2/previews/cw9/video/old-week.mp4', 'classes/c2/previews/cw1/file/unsaved.pdf']) seed.files[p] = p.endsWith('.pdf') ? 'file' : 'video';
+  return seed;
+};
+const deleteClass = async (page, cid, name) => {
+  await page.click('[data-page="classes"]'); await pause(page, 500);
+  await page.click(`[data-delete-class="${cid}"]`); await pause(page, 200);
+  assert((await page.innerText('.app-modal')).includes('강의·수업 영상') && (await page.innerText('.app-modal')).includes("'내보내기'"), '삭제 안내: ' + await page.innerText('.app-modal'));
+  await page.fill('.app-modal-input', name); await ok(page); await pause(page, 1500);
+};
+test('DL01 반 영구 삭제: 새 규칙(v5)이면 반 폴더의 파일을 모두 지움(연결이 끊긴 영상·첨부까지), 이전 규칙이면 차시 영상 폴더까지', async b => {
+  let r = await openApp(b, { file: 'admin.html', user: 'admin1', rules: 'v5', seed: orphanSeed() });
+  await deleteClass(r.page, 'c2', '스페인어 회화반');
+  eq((await r.page.evaluate(() => window.__mock.files())).filter(p => p.startsWith('classes/c2/')), [], '남은 파일(v5)');
+  await r.context.close();
+  r = await openApp(b, { file: 'admin.html', user: 'admin1', rules: 'v4', seed: orphanSeed() });
+  await deleteClass(r.page, 'c2', '스페인어 회화반');
+  eq((await r.page.evaluate(() => window.__mock.files())).filter(p => p.startsWith('classes/c2/')), ['classes/c2/previews/cw1/file/unsaved.pdf', 'classes/c2/previews/cw9/video/old-week.mp4'], '남은 파일(v4: 차시 영상 폴더만 찾음)');
+});
+
 test('CL01 학생 화면 문구: 답안 입력칸은 "여기에 답안을 작성해 주세요.", 앱 동작을 설명하는 문구는 다시 넣지 않음', async () => {
   const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'index.html'), 'utf8');
   assert(src.includes('placeholder="여기에 답안을 작성해 주세요."'), '답안 입력칸 안내');

@@ -17,7 +17,8 @@ function serveFile(route, file) {
 }
 
 async function launch() {
-  return chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required'] });
+  // 리눅스 언어 설정(LANG)이 비어 있으면 Chromium이 한글 내려받기 파일 이름을 'download'로 바꾸므로 UTF-8로 띄웁니다(반 내보내기 테스트).
+  return chromium.launch({ env: { ...process.env, LANG: process.env.LANG || 'C.UTF-8' }, args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required'] });
 }
 
 async function openApp(browser, { file = 'index.html', user = null, viewport = { width: 1280, height: 860 }, rules = 'v4', seed = makeSeed(), timezoneId = 'Asia/Seoul', blockCdn = false, bootTimeoutMs = null, context: existing = null } = {}) {

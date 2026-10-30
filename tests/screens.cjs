@@ -33,6 +33,12 @@ const withPreviewMedia = () => {
   p.videosEnabled = false; p.filesEnabled = true;
   return s;
 };
+// 2026-10-30 홈 할 일: 지난 차시(4차시) 할 일 + 미리 공개한 6차시 과제
+const withEarlyAssignment = () => {
+  const s = makeSeed(), w = s.docs['classes/c1/weeks/w6'];
+  w.published = true; w.assignment = { ...w.assignment, enabled: true, title: '하루 일과 쓰기', instructions: '5문장', allowText: true, allowAudio: true, dueAt: '' };
+  return s;
+};
 const scenes = [
   ['student-login', 'index.html', null, async () => {}],
   ['student-join', 'index.html', 's6', async () => {}],
@@ -68,6 +74,8 @@ const scenes = [
   ['admin-weeks-recap', 'admin.html', 'admin1', async p => { await click(p, '[data-page="weeks"]'); await click(p, '[data-week-open="w4"]'); await click(p, '[data-week-tab="quiz"]'); }, withRecap(true)],
   ['admin-weeks-preview-media', 'admin.html', 'admin1', async p => { await click(p, '[data-page="weeks"]'); await click(p, '[data-week-open="w5"]'); }, withPreviewMedia],
   ['student-preview-media', 'index.html', 's1', async p => { await pause(p, 600); await click(p, '#home-next [data-home-go="preview"]'); }, withPreviewMedia],
+  ['admin-class-export', 'admin.html', 'admin1', async p => { await click(p, '[data-page="classes"]'); await click(p, '[data-export-class="c1"]'); }],
+  ['student-home-multi-todo', 'index.html', 's1', async p => pause(p, 600), withEarlyAssignment],
   ['admin-attendance', 'admin.html', 'admin1', async p => { await click(p, '[data-page="attendance"]'); await p.selectOption('#quick-session', 'w2').catch(() => {}); await pause(p, 500); }],
 ];
 

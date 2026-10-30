@@ -86,6 +86,9 @@ Storage
   classes/{cid}/submissions/{wid}/{uid}/…            학생 과제 음성
   classes/{cid}/feedback/{wid}/{uid}/…               강사 피드백 음성
   classes/{cid}/previews/{wid}/{image|video|file}/…  예습 자료
+  classes/{cid}/recaps/{wid}/video/…                 복습 수업 영상(2026-10-29)
+  ※ 2026-10-30: 강사는 classes/{cid}/ 아래 폴더 목록을 볼 수 있음(반·차시 영구 삭제 때 문서에 연결되지 않은 파일까지 정리).
+    반 내보내기(classexport.js)는 학생 과제 음성·피드백 음성만 내려받고 영상·예습 자료는 넣지 않음
 ```
 
 이 구조가 배치 06·08 등에서 바뀌면, 해당 배치의 결과 보고에 바뀐 구조를 적고 이 표도 갱신하세요.
