@@ -56,7 +56,9 @@ classes/{cid}             name, description, joinCode, archived,
                           quiz{enabled, title, version(배치 06), questions[{id, type('single'|'multiple'|'ox'),
                                stem, options[], correctIndices[], explanation}]},   ← correctIndex는 배치 12부터 쓰지 않음(읽기만 호환)
                           preview{enabled, title, mode('rich'|'image'), richHtml, imagePath,
-                                  videos[{path,name,size}], files[{path,name,size}]}
+                                  videos[{path,name,size}], files[{path,name,size}],
+                                  videosEnabled, filesEnabled}   ← 2026-10-30 강의 영상·첨부 묶음별 공개. 값이 없으면 켜짐,
+                                  끄면 학생 화면에서만 숨기고 목록·파일은 그대로 둠
                           recap{enabled, videos[]}   ← 2026-10-29 복습 수업 영상. 영상 형식은 preview.videos와 같음
                                   ({kind:'upload',path,name,size} 또는 {kind:'youtube',videoId,url,name}),
                                   직접 올린 파일은 Storage classes/{cid}/recaps/{wid}/video/ (보관된 반은 학생 재생 차단)

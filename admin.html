@@ -15,8 +15,8 @@
 <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;1,9..144,500&display=swap">
 <!-- 배포할 때 CSS를 바꾸면 ?v= 값을 함께 올려 브라우저 캐시를 갱신하세요 -->
-<link rel="stylesheet" href="common.css?v=20261030b">
-<link rel="stylesheet" href="admin.css?v=20261030b">
+<link rel="stylesheet" href="common.css?v=20261030c">
+<link rel="stylesheet" href="admin.css?v=20261030c">
 </head>
 <body>
 <div id="root"></div>
@@ -36,8 +36,8 @@ window.__appStarted=true; // 모듈(외부 SDK 포함)을 모두 불러와 앱�
 import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import { doc, getDoc, getDocs, collection, query, where, setDoc, updateDoc, deleteDoc, serverTimestamp, arrayUnion, onSnapshot, writeBatch, runTransaction, deleteField } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
 import { ref as storageRef, deleteObject } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-storage.js';
-import { CONFIGURED, auth, db, storage, $, $$, esc, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, mountAuth, formatDuration, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalDialog, modalConfirm, modalInput, formatDateTime, todayKey, statusPill, paintPill, needsReply, linkifyText, sortNotices, IS_MAC, byLastActivity, feedbackItems, reviewState, REVIEW_LABEL, openModalLayer, toDate, quizContentKey, answersFor, audioMarkup, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded, modalChoice, sessionState, sessionDateText, parseYouTube, SIZE_LABEL, uploadsInProgress, filePicker, wireFilePickers, wasActiveAt, daysBetween, partsInZone, attendanceValue, normalizeQuizQuestion, isCorrectAnswer, questionSessionTag, shortLabel, isComposingKey } from './common.js?v=20261030b';
-import { computeDashboard, analyzeQuiz, feedbackQueue, firstAttemptOf, WATCH_RULES, TREND_SESSIONS } from './dashboard.js?v=20261030b';
+import { CONFIGURED, auth, db, storage, $, $$, esc, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, mountAuth, formatDuration, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalDialog, modalConfirm, modalInput, formatDateTime, todayKey, statusPill, paintPill, needsReply, linkifyText, sortNotices, IS_MAC, byLastActivity, feedbackItems, reviewState, REVIEW_LABEL, openModalLayer, toDate, quizContentKey, answersFor, audioMarkup, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded, modalChoice, sessionState, sessionDateText, parseYouTube, SIZE_LABEL, uploadsInProgress, filePicker, wireFilePickers, wasActiveAt, daysBetween, partsInZone, attendanceValue, normalizeQuizQuestion, isCorrectAnswer, questionSessionTag, shortLabel, isComposingKey } from './common.js?v=20261030c';
+import { computeDashboard, analyzeQuiz, feedbackQueue, firstAttemptOf, WATCH_RULES, TREND_SESSIONS } from './dashboard.js?v=20261030c';
 
 
 // ===== ADMIN PAGE =====
@@ -135,7 +135,7 @@ function newWeekDoc({label,order,date=''}){
   return {label,order,sessionDate:date,published:false,
     assignment:{enabled:false,title:'',instructions:'',allowText:true,allowAudio:true,dueAt:'',dueAtTs:null},
     quiz:{enabled:false,title:'단어 복습',questions:[]},
-    preview:{enabled:false,title:'',mode:'rich',richHtml:'',imagePath:'',videos:[],files:[]},
+    preview:{enabled:false,title:'',mode:'rich',richHtml:'',imagePath:'',videos:[],files:[],videosEnabled:true,filesEnabled:true},
     recap:{enabled:false,videos:[]},
     createdAt:serverTimestamp()};
 }
@@ -689,10 +689,11 @@ function drawWeekEditor(){const host=$('#week-editor-host');if(!host)return;cons
    <div id="preview-rich" class="stack ${A.preview.mode==='image'?'hide':''}"><div class="editor-toolbar" role="toolbar" aria-label="서식"><button type="button" data-format="bold" title="굵게" aria-label="굵게"><b>B</b></button><button type="button" data-format="insertUnorderedList" title="글머리표" aria-label="글머리표 목록">• 목록</button><label class="sr-only" for="format-size">글자 크기</label><select id="format-size" title="글자 크기"><option value="3">보통</option><option value="4">크게</option><option value="5">더 크게</option><option value="6">제목</option></select><details class="toolbar-more"><summary>더 보기</summary><div class="toolbar-more-items"><button type="button" data-format="italic" title="기울임" aria-label="기울임"><i>I</i></button><button type="button" data-format="underline" title="밑줄" aria-label="밑줄"><u>U</u></button><button type="button" data-format="justifyCenter" title="가운데 정렬">☷ 가운데</button><label class="sr-only" for="format-color">글자 색</label><input id="format-color" type="color" title="글자 색" value="#8e1a30"></div></details></div><div id="preview-editor" class="rich-editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="예습 내용">${sanitizeRich(A.preview.richHtml||'')}</div></div>
    <div id="preview-image" class="stack ${A.preview.mode==='image'?'':'hide'}"><p class="notice">권장 이미지 너비는 <strong>1200px</strong>입니다. 세로 길이는 자유롭고, 모바일에서는 자동으로 축소됩니다. JPG/PNG/WEBP, 최대 8MB.</p><div class="field"><span class="field-label">직접 만든 안내 이미지</span>${filePicker({id:'preview-image-file',accept:'image/*',label:'안내 이미지 선택'})}</div><div id="preview-image-display"></div></div>
    <div class="separator" style="margin:0"></div><h3>🎬 강의 영상</h3>
+   <div class="toggle-row"><label class="switch"><input id="preview-videos-enabled" type="checkbox" ${A.preview.videosEnabled!==false?'checked':''} aria-label="강의 영상 공개"><span></span></label><div><strong>강의 영상 공개 ON / OFF</strong><small>끄면 올린 영상은 그대로 두고 학생 화면에서만 숨깁니다.</small></div></div>
    ${videoHintHtml()}
    <div class="grid2"><div class="field"><span class="field-label">영상 파일 올리기</span>${filePicker({id:'preview-video-file',accept:'video/*',label:'영상 파일 선택'})}</div><div class="field"><label for="preview-video-link">또는 유튜브 링크</label><div class="row link-row"><input id="preview-video-link" inputmode="url" placeholder="https://youtu.be/…"><button type="button" class="btn secondary small" id="add-video-link">링크 추가</button></div></div></div>
    <div id="preview-videos-list" class="media-list"></div>
-   <div class="separator" style="margin:0"></div><h3>📎 파일 첨부</h3><div class="field"><span class="field-label">PDF, 수업자료 등 최대 20MB/개</span>${filePicker({id:'preview-extra-file',label:'첨부 파일 선택'})}</div><div id="preview-files-list" class="media-list"></div><p id="media-upload-status" class="hint" role="status"></p>
+   <div class="separator" style="margin:0"></div><h3>📎 파일 첨부</h3><div class="toggle-row"><label class="switch"><input id="preview-files-enabled" type="checkbox" ${A.preview.filesEnabled!==false?'checked':''} aria-label="파일 첨부 공개"><span></span></label><div><strong>파일 첨부 공개 ON / OFF</strong><small>끄면 올린 파일은 그대로 두고 학생 화면에서만 숨깁니다.</small></div></div><div class="field"><span class="field-label">PDF, 수업자료 등 최대 20MB/개</span>${filePicker({id:'preview-extra-file',label:'첨부 파일 선택'})}</div><div id="preview-files-list" class="media-list"></div><p id="media-upload-status" class="hint" role="status"></p>
   </section>
   <section data-week-panel="assignment" class="stack ${A.weekTab==='assignment'?'':'hide'}"><div class="toggle-row"><label class="switch"><input id="assignment-enabled" type="checkbox" ${w.assignment?.enabled?'checked':''} aria-label="과제 공개"><span></span></label><div><strong>과제 공개 ON / OFF</strong><small>학생은 공개된 차시에서 켜진 과제만 제출할 수 있습니다.</small></div></div><div class="field"><label for="assignment-title">과제 제목</label><input id="assignment-title" maxlength="1000" value="${esc(w.assignment?.title||'')}" placeholder="예: 자기소개 문장 만들기"></div><div class="field"><label for="assignment-instructions">과제 지시문</label><textarea id="assignment-instructions" rows="8" maxlength="30000" placeholder="학생이 무엇을 준비할지 구체적으로 적어 주세요.">${esc(w.assignment?.instructions||'')}</textarea></div><div class="grid2"><div class="field"><label for="assignment-due">제출 권장일 (선택)</label><input id="assignment-due" type="datetime-local" value="${esc(w.assignment?.dueAt||'')}"><small class="hint">한국 시간 기준 · 통계 마감이 아니라 학생 안내용이고, 지난 뒤 제출도 그대로 인정합니다.</small></div><div class="stack" style="justify-content:end;gap:10px"><label class="checkline"><input id="allow-text" type="checkbox" ${w.assignment?.allowText!==false?'checked':''}> 텍스트 제출 허용</label><label class="checkline"><input id="allow-audio" type="checkbox" ${w.assignment?.allowAudio!==false?'checked':''}> 음성 제출 허용</label></div></div></section>
   <section data-week-panel="quiz" class="stack ${A.weekTab==='quiz'?'':'hide'}">${recapEditorHtml()}<div class="separator" style="margin:0"></div><h3>📝 복습 퀴즈</h3><div class="toggle-row"><label class="switch"><input id="quiz-enabled" type="checkbox" ${w.quiz?.enabled?'checked':''} aria-label="복습 퀴즈 공개"><span></span></label><div><strong>복습 퀴즈 공개 ON / OFF</strong><small>문제 순서는 유지하고 선택지 순서만 매번 섞습니다.</small></div></div><div class="field"><label for="quiz-title">퀴즈 제목</label><input id="quiz-title" maxlength="1000" value="${esc(w.quiz?.title||'단어 복습')}"></div><div id="questions-list">${(w.quiz?.questions||[]).map(questionCard).join('')}</div><button class="btn secondary" id="add-question" type="button">+ 문제 추가</button><p class="hint">2~12개 선택지의 객관식, 복수정답, O/X형을 섞어서 출제할 수 있습니다. 점수는 퀴즈 종료 후 공개됩니다.${w.quiz?.version?` · 현재 문제 버전 ${Number(w.quiz.version)}`:''}</p></section>
@@ -754,7 +755,7 @@ function serializeWeekForm(){
     label:$('#week-label').value.trim(),order:$('#week-order').value,date:$('#week-date').value,published:$('#week-published').checked,
     assignment:['#assignment-enabled','#allow-text','#allow-audio'].map(sel=>$(sel).checked).concat(['#assignment-title','#assignment-instructions','#assignment-due'].map(sel=>$(sel).value.trim())),
     quiz:{enabled:$('#quiz-enabled').checked,title:$('#quiz-title').value.trim(),questions:collectQs()},
-    preview:{enabled:$('#preview-enabled').checked,title:$('#preview-title').value.trim(),mode:$('#preview-mode').value,html:sanitizeRich($('#preview-editor').innerHTML),imagePath:A.preview.imagePath||'',videos:A.preview.videos||[],files:A.preview.files||[]},
+    preview:{enabled:$('#preview-enabled').checked,title:$('#preview-title').value.trim(),mode:$('#preview-mode').value,html:sanitizeRich($('#preview-editor').innerHTML),imagePath:A.preview.imagePath||'',videos:A.preview.videos||[],files:A.preview.files||[],videosEnabled:$('#preview-videos-enabled').checked,filesEnabled:$('#preview-files-enabled').checked},
     recap:{enabled:$('#recap-enabled').checked,videos:A.recap.videos||[]},
   });
 }
@@ -827,7 +828,8 @@ async function saveWeek({rerender=true}={}){const w=activeWeek();if(!w)return fa
   const videos=storedVideos(A.preview.videos);
   const recap={enabled:$('#recap-enabled').checked,videos:storedVideos(A.recap.videos)};
   if(recap.enabled&&!recap.videos.length)throw Error('수업 영상을 공개하려면 영상을 올리거나 유튜브 링크를 하나 이상 추가해 주세요.');
-  const preview={enabled:$('#preview-enabled').checked,title:$('#preview-title').value.trim(),mode:$('#preview-mode').value,richHtml:sanitizeRich($('#preview-editor').innerHTML),imagePath:A.preview.imagePath||'',videos,files:A.preview.files||[]};
+  const preview={enabled:$('#preview-enabled').checked,title:$('#preview-title').value.trim(),mode:$('#preview-mode').value,richHtml:sanitizeRich($('#preview-editor').innerHTML),imagePath:A.preview.imagePath||'',videos,files:A.preview.files||[],
+    videosEnabled:$('#preview-videos-enabled').checked,filesEnabled:$('#preview-files-enabled').checked}; // 영상·첨부 묶음별 공개(2026-10-30). 없으면 켜짐으로 봅니다.
   if(preview.enabled&&preview.mode==='image'&&!preview.imagePath)throw Error('이미지 모드를 켰다면 안내 이미지를 업로드해 주세요.');
   if($('#week-published').checked&&!assignment.enabled&&!quiz.enabled&&!preview.enabled&&!recap.enabled)throw Error('차시를 공개하려면 예습·과제·복습 퀴즈·수업 영상 중 하나 이상을 켜 주세요.');
   const label=$('#week-label').value.trim(),order=Number($('#week-order').value),sessionDate=$('#week-date').value;if(!label||!Number.isInteger(order)||order<=0)throw Error('차시 이름과 정렬 번호를 확인해 주세요.');

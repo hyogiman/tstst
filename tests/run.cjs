@@ -1051,7 +1051,7 @@ test('DB05 대시보드: 0건이면 "처리할 일이 없어요", 문항 분석�
   assert((await page.innerText('#dash-item-body')).includes('첫 응시를 알 수 없는 이전 기록 1명'), '이전 기록 분리 안내 없음');
 });
 
-test('DB06 공개 누락: 만들어 둔 예습이 안 보이는 차시만 셈(예습을 쓰지 않는 차시·빈 편집기·이미지 없는 이미지 모드는 제외)', async b => {
+test('DB06 공개 누락: 만들어 둔 예습이 안 보이는 차시만 셈(예습을 쓰지 않는 차시·빈 편집기·이미지 없는 이미지 모드·꺼 둔 영상·첨부는 제외)', async b => {
   const { page } = await openAs(b, 'admin.html', 'admin1');
   const r = await page.evaluate(async () => {
     const { computeDashboard, previewPrepared } = await import('/dashboard.js');
@@ -1069,14 +1069,16 @@ test('DB06 공개 누락: 만들어 둔 예습이 안 보이는 차시만 셈(�
       s('7', day(3), false, { enabled: false, mode: 'rich', richHtml: '' }),                                     // 빈 차시가 비공개(아직 준비 전)
       s('8', day(3), true, { enabled: true, mode: 'rich', richHtml: '<p>공개됨</p>' }),                          // 이미 보임
       s('9', day(5), true, text('<p>멀리 있는 차시</p>')),                                                        // 3일 밖
+      s('10', day(1), true, { enabled: false, mode: 'rich', richHtml: '', videos: [{ kind: 'youtube', videoId: 'x' }], videosEnabled: false, files: [{ path: 'p' }], filesEnabled: false }), // 영상·첨부를 모두 꺼 둠 → 공개해도 보일 것이 없음
+      s('11', day(2), true, { enabled: false, mode: 'rich', richHtml: '', videos: [{ kind: 'youtube', videoId: 'x' }], files: [{ path: 'p' }], filesEnabled: false }), // 첨부만 꺼 둠, 영상은 켜짐(값 없음) → 셈
     ];
     const deps = { sessionState: c.sessionState, wasActiveAt: c.wasActiveAt, reviewState: c.reviewState, needsReply: c.needsReply, attendanceValue: c.attendanceValue, daysBetween: c.daysBetween };
     const d = computeDashboard({ sessions, enrollments: [], events: {}, names: {}, attendance: {}, submissions: {}, quizResults: {}, questions: [] }, today, deps);
-    return { publish: d.actions.publish.sessions.map(x => x.id + ':' + x.reason), total: d.actions.total, none: [previewPrepared(null), previewPrepared(undefined), previewPrepared({ title: '제목만' })] };
+    return { publish: d.actions.publish.sessions.map(x => x.id + ':' + x.reason), total: d.actions.total, none: [previewPrepared(null), previewPrepared(undefined), previewPrepared({ title: '제목만' }), previewPrepared({ mode: 'rich', richHtml: '', videos: [{ kind: 'youtube', videoId: 'x' }], videosEnabled: false })] };
   });
-  eq(r.publish, ['2:예습 꺼짐', '5:예습 꺼짐', '6:비공개'], '공개 누락 차시');
-  eq(r.total, 3, '처리할 일 합계');
-  eq(r.none, [false, false, false], '예습 없음·제목만');
+  eq(r.publish, ['2:예습 꺼짐', '5:예습 꺼짐', '6:비공개', '11:예습 꺼짐'], '공개 누락 차시');
+  eq(r.total, 4, '처리할 일 합계');
+  eq(r.none, [false, false, false, false], '예습 없음·제목만·꺼 둔 영상만');
 });
 
 test('DB07 대시보드 탭: 처리할 일이 처음, 탭마다 그 묶음만, 다시 그려도·다른 화면에 다녀와도 고른 탭 유지', async b => {
@@ -1651,6 +1653,54 @@ test('CL03 빈 화면 그림: 올리브 가지 대신 빈 상자 모양 선 그�
   await page.click('[data-page="notices"]'); await pause(page, 600);
   const icon = await page.$eval('.empty .symbol svg', el => ({ paths: el.querySelectorAll('path').length, ellipses: el.querySelectorAll('ellipse').length, stroke: el.getAttribute('stroke') }));
   eq(icon, { paths: 2, ellipses: 0, stroke: 'currentColor' }, '빈 화면 그림');
+});
+
+test('PV01 예습의 강의 영상·파일 첨부 공개 토글(강사): 값이 없던 차시는 켜짐, 끄고 저장해도 올린 파일은 그대로', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  await page.click('[data-page="weeks"]'); await pause(page, 500);
+  await page.click('[data-week-open="w5"]'); await pause(page, 400);
+  eq(await page.$$eval('[data-week-panel="preview"] h3', els => els.map(e => e.textContent.trim())), ['🎬 강의 영상', '📎 파일 첨부'], '예습 탭 묶음');
+  const toggles = () => Promise.all(['#preview-videos-enabled', '#preview-files-enabled'].map(sel => page.isChecked(sel)));
+  eq(await toggles(), [true, true], '값이 없는 차시(이전에 만든 차시)의 토글');
+  await page.click('label.switch:has(#preview-files-enabled)');
+  assert((await page.innerText('#week-save-status')).includes('저장하지 않은 변경'), '토글만 바꿨는데 저장 전 표시 없음');
+  await page.fill('#preview-video-link', 'https://youtu.be/dQw4w9WgXcQ'); await page.click('#add-video-link'); await pause(page, 200);
+  await page.click('label.switch:has(#preview-videos-enabled)');
+  await page.click('#save-week'); await pause(page, 900);
+  const p = (await dump(page, 'classes/c1/weeks/w5')).preview;
+  eq([p.videosEnabled, p.filesEnabled, p.videos.length, p.files.length], [false, false, 1, 1], '저장 형식(꺼도 영상·파일 목록은 남음)');
+  assert(!(await page.evaluate(() => window.__mock.deletedFiles())).includes('classes/c1/previews/w5/file/menu.pdf'), '꺼 둔 첨부 파일이 지워짐');
+  eq(await toggles(), [false, false], '저장 뒤 다시 그린 편집 화면');
+  await page.click('label.switch:has(#preview-files-enabled)');
+  await page.click('#save-week'); await pause(page, 900);
+  const p2 = (await dump(page, 'classes/c1/weeks/w5')).preview;
+  eq([p2.videosEnabled, p2.filesEnabled], [false, true], '첨부만 다시 켬');
+});
+
+test('PV02 예습의 강의 영상·파일 첨부 공개 토글(학생): 꺼 둔 묶음만 숨기고 글은 그대로, 켜면 바로 나타남, 지난 반 안내도 숨김', async b => {
+  let r = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 }, tab: 'home' });
+  const yt = [{ kind: 'youtube', videoId: 'dQw4w9WgXcQ', url: 'https://youtu.be/dQw4w9WgXcQ', name: '유튜브 영상' }];
+  await r.page.evaluate(v => window.__mock.remoteWrite('classes/c1/weeks/w5', { preview: { videos: v, videosEnabled: false, filesEnabled: false } }), yt);
+  await pause(r.page, 400);
+  await r.page.click('#home-next [data-home-go="preview"]'); await pause(r.page, 600);
+  const heads = () => r.page.$$eval('#student-body .card > h3', els => els.map(e => e.textContent.trim()));
+  eq(await heads(), [], '둘 다 껐을 때');
+  assert(!(await r.page.$('#student-body iframe')) && !(await r.page.$('#student-body a[data-media-path]')), '꺼 둔 영상·첨부가 보임');
+  assert((await r.page.innerText('#student-body .article')).includes('Quisiera un café'), '예습 글이 사라짐');
+  await r.page.evaluate(() => window.__mock.remoteWrite('classes/c1/weeks/w5', { preview: { filesEnabled: true } })); await pause(r.page, 600);
+  eq(await heads(), ['📎 첨부 자료'], '첨부만 켰을 때');
+  assert((await r.page.innerText('#student-body .media-list')).includes('카페 메뉴판 단어장.pdf'), '첨부 파일 이름');
+  await r.page.evaluate(() => window.__mock.remoteWrite('classes/c1/weeks/w5', { preview: { videosEnabled: true } })); await pause(r.page, 600);
+  eq(await heads(), ['🎬 수업 영상', '📎 첨부 자료'], '둘 다 켰을 때');
+  assert(await r.page.$('#student-body .video-embed iframe'), '유튜브 영상이 보이지 않음');
+  await r.context.close();
+  // 지난 반: 꺼 둔 영상은 '수강 기간에만 볼 수 있어요' 안내도 띄우지 않음
+  r = await openAs(b, 'index.html', 's5', { viewport: { width: 390, height: 844 } });
+  await r.page.evaluate(v => window.__mock.remoteWrite('classes/c3/weeks/ow1', { preview: { videos: v, videosEnabled: false } }), yt);
+  await r.page.click('[data-past-class="c3"]'); await pause(r.page, 700);
+  await r.page.selectOption('#student-week-picker', 'ow1'); await pause(r.page, 400);
+  await r.page.click('[data-tab="preview"]'); await pause(r.page, 600);
+  assert(!(await r.page.innerText('#student-body')).includes('수강 기간에만'), '꺼 둔 영상의 지난 반 안내가 보임');
 });
 
 test('기본: 학생 과제 텍스트 제출, 퀴즈 3/3, 강사 화면 주요 메뉴 오류 없음', async b => {

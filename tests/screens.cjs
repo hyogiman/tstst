@@ -26,6 +26,13 @@ const withRecap = upload => () => {
   s.docs['classes/c1/weeks/w4'].recap = { enabled: true, videos };
   return s;
 };
+// 2026-10-30 예습의 강의 영상·파일 첨부 공개 토글: 영상은 꺼 두고 첨부는 켠 상태
+const withPreviewMedia = () => {
+  const s = makeSeed(), p = s.docs['classes/c1/weeks/w5'].preview;
+  p.videos = [{ kind: 'youtube', videoId: 'dQw4w9WgXcQ', url: 'https://youtu.be/dQw4w9WgXcQ', name: '유튜브 영상 (dQw4w9WgXcQ)' }];
+  p.videosEnabled = false; p.filesEnabled = true;
+  return s;
+};
 const scenes = [
   ['student-login', 'index.html', null, async () => {}],
   ['student-join', 'index.html', 's6', async () => {}],
@@ -59,6 +66,8 @@ const scenes = [
   ['admin-notices', 'admin.html', 'admin1', async p => { await click(p, '[data-page="notices"]'); await pause(p, 500); }, withNotices],
   ['admin-notice-editor', 'admin.html', 'admin1', async p => { await click(p, '[data-page="notices"]'); await click(p, '#notice-new'); }, withNotices],
   ['admin-weeks-recap', 'admin.html', 'admin1', async p => { await click(p, '[data-page="weeks"]'); await click(p, '[data-week-open="w4"]'); await click(p, '[data-week-tab="quiz"]'); }, withRecap(true)],
+  ['admin-weeks-preview-media', 'admin.html', 'admin1', async p => { await click(p, '[data-page="weeks"]'); await click(p, '[data-week-open="w5"]'); }, withPreviewMedia],
+  ['student-preview-media', 'index.html', 's1', async p => { await pause(p, 600); await click(p, '#home-next [data-home-go="preview"]'); }, withPreviewMedia],
   ['admin-attendance', 'admin.html', 'admin1', async p => { await click(p, '[data-page="attendance"]'); await p.selectOption('#quick-session', 'w2').catch(() => {}); await pause(p, 500); }],
 ];
 

@@ -48,9 +48,11 @@ export function feedbackQueue(submissions, activeUids, reviewState) {
 
 // 예습을 실제로 만들어 두었는지: 글(텍스트 모드)·안내 이미지(이미지 모드)·영상·첨부 중 하나라도 있으면 true.
 // 제목만 있거나 편집기에 빈 줄만 남은 예습은 만든 것으로 보지 않습니다.
+// 강사가 꺼 둔 영상·첨부 묶음(videosEnabled·filesEnabled가 false)은 예습을 공개해도 보이지 않으므로 세지 않습니다.
 export function previewPrepared(preview) {
   if (!preview) return false;
-  if ((preview.videos || []).length || (preview.files || []).length) return true;
+  const shown = (on, list) => on !== false && (list || []).length > 0;
+  if (shown(preview.videosEnabled, preview.videos) || shown(preview.filesEnabled, preview.files)) return true;
   if (preview.mode === 'image') return !!preview.imagePath;
   return String(preview.richHtml || '').replace(/<[^>]*>/g, '').replace(/&nbsp;|&#160;/gi, ' ').trim() !== '';
 }
@@ -66,7 +68,7 @@ export function firstAttemptOf(result) {
 
 /**
  * input = {
- *   sessions: 정렬 번호 순 차시 [{id, label, order, date('YYYY-MM-DD'|''), published, assignment:{enabled}, quiz:{enabled, questions}, preview:{enabled, mode, richHtml, imagePath, videos, files}}]
+ *   sessions: 정렬 번호 순 차시 [{id, label, order, date('YYYY-MM-DD'|''), published, assignment:{enabled}, quiz:{enabled, questions}, preview:{enabled, mode, richHtml, imagePath, videos, files, videosEnabled, filesEnabled}}]
  *   enrollments: 이 반의 수강 등록 [{id, uid, status, joinedAt, studentName}]
  *   events: {등록ID: [수강 기간 기록]} · 읽지 못했으면 null(등록일 기준 추정)
  *   names: {uid: 표시 이름}
