@@ -155,8 +155,8 @@ select.input,.field select{appearance:none;-webkit-appearance:none;padding-right
 .setup-warning{background:var(--warning-bg);color:var(--warning);padding:12px 14px;border-radius:12px;font-size:13px;margin:12px 0}
 .quiet-note{background:var(--surface-2);padding:12px 15px;border-radius:12px;color:var(--ink-2);font-size:13px}
 .empty{padding:44px 24px;text-align:center;border:1.5px dashed var(--line-strong);border-radius:var(--r-lg);background:var(--surface)}
-.empty .symbol{display:grid;place-items:center;margin:0 auto 12px;width:56px;height:56px;border-radius:18px;background:var(--olive-50)}
-.empty .symbol svg{width:36px;height:36px}
+.empty .symbol{display:grid;place-items:center;margin:0 auto 12px;width:56px;height:56px;border-radius:18px;background:var(--surface-2);color:var(--subtle)} /* 빈 상자(받은 편지함) 모양, 2026-10-30 */
+.empty .symbol svg{width:30px;height:30px}
 .empty strong{display:block;font-size:16px;font-weight:750;color:var(--ink);margin-bottom:6px}
 .empty p{font-size:14px;color:var(--muted)}
 .loading{display:flex;align-items:center;gap:12px;min-height:88px;padding:16px 0;color:var(--muted);font-size:14px}

@@ -1629,6 +1629,30 @@ test('PQ01 질문 목록(390px): 지난 반·운영 중인 반 모두 질문 상
   assert(w.card >= w.body - 2, `운영 중인 반: 질문 상자 폭 ${Math.round(w.card)} / 화면 ${Math.round(w.body)}`);
 });
 
+test('CL02 클래스 관리: 기본 목록은 운영 중인 반만, 보관된 반은 "보관된 반 보기"에서만 · 보관하면 목록에서 빠짐', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  await page.click('[data-page="classes"]'); await pause(page, 500);
+  const names = () => page.$$eval('.db-class-name', els => els.map(e => e.textContent));
+  eq(await names(), ['스페인어 기초반 2기', '스페인어 회화반'], '운영 중인 반 목록');
+  assert((await page.innerText('.class-page-panel h2')).includes('운영 중인 반'), '목록 제목');
+  eq(await page.innerText('#toggle-class-filter'), '▣ 보관된 반 보기 (1)', '보관된 반 보기 버튼');
+  await page.click('#toggle-class-filter'); await pause(page, 300);
+  eq(await names(), ['왕초보반 1기'], '보관된 반 목록');
+  eq(await page.innerText('#toggle-class-filter'), '← 운영 중인 반 보기', '돌아가기 버튼');
+  await page.click('#toggle-class-filter'); await pause(page, 300);
+  await page.click('[data-archive-class="c2"]'); await pause(page, 200); await ok(page); await pause(page, 600);
+  eq(await names(), ['스페인어 기초반 2기'], '보관한 반이 운영 중인 목록에서 빠짐');
+  assert((await lastToast(page)).includes('보관된 반 보기'), '보관 안내: ' + await lastToast(page));
+  eq(await page.innerText('#toggle-class-filter'), '▣ 보관된 반 보기 (2)', '보관된 반 수');
+});
+
+test('CL03 빈 화면 그림: 올리브 가지 대신 빈 상자 모양 선 그림', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1', { rules: 'v4' });
+  await page.click('[data-page="notices"]'); await pause(page, 600);
+  const icon = await page.$eval('.empty .symbol svg', el => ({ paths: el.querySelectorAll('path').length, ellipses: el.querySelectorAll('ellipse').length, stroke: el.getAttribute('stroke') }));
+  eq(icon, { paths: 2, ellipses: 0, stroke: 'currentColor' }, '빈 화면 그림');
+});
+
 test('기본: 학생 과제 텍스트 제출, 퀴즈 3/3, 강사 화면 주요 메뉴 오류 없음', async b => {
   const r = await openAs(b, 'index.html', 's2', { viewport: { width: 390, height: 844 } });
   await r.page.selectOption('#student-week-picker', 'w4'); await pause(r.page, 700);

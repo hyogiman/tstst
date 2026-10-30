@@ -327,7 +327,7 @@ export function sortNotices(list) {
   const at = n => toDate(n.createdAt)?.getTime() || 0;
   return [...(list || [])].sort((a, b) => (b.pinned === true) - (a.pinned === true) || at(b) - at(a));
 }
-export function empty(title,detail=''){return `<div class="empty"><span class="symbol" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M9 41C17 31 26 21 39 9" stroke="#56781f" stroke-width="2.2" stroke-linecap="round"/><ellipse cx="19" cy="28" rx="7.5" ry="3.1" transform="rotate(-52 19 28)" fill="#8ba65a"/><ellipse cx="27" cy="20" rx="7.5" ry="3.1" transform="rotate(-38 27 20)" fill="#a7c072"/><ellipse cx="16" cy="34.5" rx="6.2" ry="2.7" transform="rotate(18 16 34.5)" fill="#a7c072"/><ellipse cx="31" cy="25.5" rx="6.2" ry="2.7" transform="rotate(24 31 25.5)" fill="#8ba65a"/><circle cx="35" cy="13.5" r="3.6" fill="#3f5f14"/></svg></span><strong>${esc(title)}</strong><p>${esc(detail)}</p></div>`;}
+export function empty(title,detail=''){return `<div class="empty"><span class="symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 13l2.6-7.2a1.6 1.6 0 0 1 1.5-1.1h9.8a1.6 1.6 0 0 1 1.5 1.1L21 13v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 13h5l1.5 2.5h5L16 13h5"/></svg></span><strong>${esc(title)}</strong><p>${esc(detail)}</p></div>`;}
 export function makeId(){return (globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2));}
 export const enId = (uid,cid)=>`${uid}_${cid}`;
 export const isMedia = (file,kind) => kind==='audio'?file.type.startsWith('audio/'):kind==='image'?file.type.startsWith('image/'):kind==='video'?file.type.startsWith('video/'):true;
