@@ -15,8 +15,8 @@
 <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;1,9..144,500&display=swap">
 <!-- 배포할 때 CSS를 바꾸면 ?v= 값을 함께 올려 브라우저 캐시를 갱신하세요 -->
-<link rel="stylesheet" href="common.css?v=20261029m">
-<link rel="stylesheet" href="student.css?v=20261029m">
+<link rel="stylesheet" href="common.css?v=20261030a">
+<link rel="stylesheet" href="student.css?v=20261030a">
 </head>
 <body>
 <div id="root"></div>
@@ -35,7 +35,7 @@ window.__appStarted=true; // 모듈(외부 SDK 포함)을 모두 불러와 앱�
 
 import { onAuthStateChanged, updateProfile, signOut } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import { doc, getDoc, getDocs, collection, query, where, addDoc, setDoc, updateDoc, serverTimestamp, onSnapshot, runTransaction, writeBatch } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
-import { CONFIGURED, auth, db, $, $$, esc, fmt, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, ensureProfile, mountAuth, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalConfirm, formatDateTime, statusPill, paintPill, needsReply, byLastActivity, feedbackItems, reviewState, toDate, todayKey, daysBetween, audioMarkup, parseAnswer, encodeAnswer, normalizeQuizQuestion, isCorrectAnswer, answersFor, attendanceValue, dateKeyOf, shortLabel, questionSessionTag, setErrorAudience, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded, sessionState, sessionDateText, youtubeEmbedUrl, linkifyText, sortNotices } from './common.js?v=20261029m';
+import { CONFIGURED, auth, db, $, $$, esc, fmt, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, ensureProfile, mountAuth, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalConfirm, formatDateTime, statusPill, paintPill, needsReply, byLastActivity, feedbackItems, reviewState, toDate, todayKey, daysBetween, audioMarkup, parseAnswer, encodeAnswer, normalizeQuizQuestion, isCorrectAnswer, answersFor, shortLabel, questionSessionTag, setErrorAudience, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded, sessionState, sessionDateText, youtubeEmbedUrl, linkifyText, sortNotices } from './common.js?v=20261030a';
 
 
 // ===== INDEX PAGE =====
@@ -245,8 +245,9 @@ function goTab(tab,{weekId='',questionId='',noticeId='',view=''}={}){
   renderBody();window.scrollTo(0,0);
 }
 
-// ---------- 홈 (배치 10 · D6 B안) ----------
-// 다음 수업 · 이번 차시 할 일 · 새 소식 · 예습 미리보기 · 출석 요약. 수업 시각 필드는 없어 날짜만 씁니다(D10 한국 시간).
+// ---------- 홈 (배치 10 · D6 B안, 2026-10-30 다시 설계) ----------
+// 인사 옆 '다음 수업' 상자 → 공지(고정·새 공지) → 이번 차시 할 일(남은 것만) → 새 소식(있을 때만) → 다음 학습 목표.
+// 출석은 내 정보에, 예습은 '다음 수업' 상자의 링크 하나로만 둡니다. 수업 시각 필드는 없어 날짜만 씁니다(D10 한국 시간).
 const relativeDay=date=>{const n=daysBetween(todayKey(),date);return n===0?'오늘':n===1?'내일':n===2?'모레':n>0?`${n}일 뒤`:`${-n}일 전`};
 // 반 일정 사본(비공개 차시 포함, 이름·날짜)에 공개된 차시 문서를 붙입니다. 사본이 없으면 공개 차시만 씁니다.
 function classSessions(){
@@ -295,8 +296,8 @@ function previewExcerpt(p){
 }
 function renderHome(body){
   const name=((S.profile?.displayName==='수강생'&&S.user?.displayName)?S.user.displayName:S.profile?.displayName)||'';
-  body.innerHTML=`${bodyHeader(`¡Hola${name?', '+esc(name):''}!`,'오늘 할 일과 새 소식을 확인해 보세요.')}<div class="home-grid"><div class="stack home-main" id="home-main"></div><div class="stack home-side"><section class="card home-news" id="home-news" aria-labelledby="home-news-title"></section><section class="card home-attendance" id="home-attendance" aria-labelledby="home-attendance-title"><h3 id="home-attendance-title">출석</h3><div class="loading">출석 기록 확인 중</div></section></div></div>`;
-  drawHomeLive();drawHomeAttendance();drawHomeGoal();
+  body.innerHTML=`<div class="home-head"><div class="page-head"><div class="eyebrow" lang="es">Mi aprendizaje</div><h1>¡Hola${name?', '+esc(name):''}!</h1></div><aside class="home-next-box" id="home-next" aria-label="다음 수업"></aside></div><div class="stack home-main" id="home-main"></div>`;
+  drawHomeLive();drawHomeGoal();
 }
 // 다음 학습 목표(배치 11): 선생님이 학생 상세에서 남긴 한 줄 목표. 없으면 카드를 그리지 않습니다.
 async function drawHomeGoal(){
@@ -307,47 +308,39 @@ async function drawHomeGoal(){
   }catch(e){S.homeGoal=null;if(e?.code!=='permission-denied')console.warn('학습 목표 조회 실패',e)} // 목표 규칙을 게시하기 전에는 조용히 건너뜁니다
   if(S.tab==='home'&&S.classId===cid)drawHomeLive();
 }
-// 새 소식이 오면 다시 그리는 부분(다음 수업·할 일·예습·새 소식)
+// 복습 수업 영상을 이 기기에서 열어 봤는지. 홈 '할 일'에서 빼는 데만 씁니다(기기마다 따로 기억).
+const recapSeenKey=wid=>`senorayu:recap-seen:${S.user?.uid}:${S.classId}:${wid}`;
+function recapSeen(wid){try{return localStorage.getItem(recapSeenKey(wid))==='1'}catch(e){return false}}
+function markRecapSeen(wid){try{localStorage.setItem(recapSeenKey(wid),'1')}catch(e){/* 저장할 수 없으면 할 일에 계속 보입니다 */}}
+// 새 소식이 오면 다시 그리는 부분: 다음 수업 상자 · 공지 · 이번 차시 할 일 · 새 소식 · 학습 목표
 function drawHomeLive(){
-  const main=$('#home-main'),newsBox=$('#home-news');if(!main||!newsBox)return;
-  const next=nextSession(),tw=currentTaskWeek();
-  const nextCard=next?`<section class="card home-next" aria-labelledby="home-next-title"><p class="eyebrow"><span lang="es">Próxima clase</span> · 다음 수업</p><h2 id="home-next-title">${esc(next.label)}</h2><p class="home-next-date"><strong>${esc(sessionDateText(next.date))}</strong><span class="pill brand">${esc(relativeDay(next.date))}</span></p></section>`
-    :`<section class="card home-next"><p class="eyebrow"><span lang="es">Próxima clase</span> · 다음 수업</p><h2>다음 수업 날짜가 아직 없어요</h2><p class="hint">선생님이 수업 일정을 정하면 여기에 보여요.</p></section>`;
-  const row=(kind,week,status,target,view='')=>`<li class="todo-row"><span class="todo-kind">${kind}</span><div class="todo-main"><div class="todo-line">${status.pill}<span class="todo-week">${esc(shortLabel(week.label))}</span></div>${status.note?`<small>${esc(status.note)}</small>`:''}</div><button type="button" class="btn secondary small" data-home-go="${target}" data-week="${esc(week.id)}"${view?` data-view="${view}"`:''}>${esc(status.action)}</button></li>`;
-  const rows=[];
-  const pw=next?.week;
-  if(pw?.preview?.enabled)rows.push(`<li class="todo-row"><span class="todo-kind">예습</span><div class="todo-main"><div class="todo-line">${statusPill('brand','자료 있음')}<span class="todo-week">${esc(shortLabel(pw.label))}</span></div><small>${esc(relativeDay(next.date))} 수업 전에 보면 좋아요</small></div><button type="button" class="btn secondary small" data-home-go="preview" data-week="${esc(pw.id)}">자료 보기</button></li>`);
-  if(tw?.assignment?.enabled)rows.push(row('과제',tw,assignmentStatus(tw,S.news.submissions[tw.id]),'assignment'));
-  const rv=recapVideos(tw);
-  if(rv.length)rows.push(row('수업 영상',tw,{pill:statusPill('brand',`영상 ${rv.length}개`),note:'수업 내용을 다시 볼 수 있어요',action:'영상 보기'},'quiz','video'));
-  if(tw?.quiz?.enabled&&tw.quiz.questions?.length)rows.push(row('복습',tw,quizStatus(S.news.quizResults[tw.id]),'quiz','quiz'));
-  const todo=`<section class="card home-todo" aria-labelledby="home-todo-title"><h3 id="home-todo-title">이번 차시 할 일</h3>${rows.length?`<ul class="todo-list">${rows.join('')}</ul>`:'<p class="hint">지금은 할 일이 없어요. 선생님이 과제나 복습을 열면 여기에 보여요.</p>'}</section>`;
-  const preview=pw?.preview?.enabled?`<section class="card home-preview" aria-labelledby="home-preview-title"><p class="eyebrow"><span lang="es">Preparación</span> · 예습</p><h3 id="home-preview-title">${esc(pw.preview.title&&pw.preview.title!=='다음 차시'?pw.preview.title:`${shortLabel(pw.label)} 예습`)}</h3>${previewExcerpt(pw.preview)?`<p class="home-preview-text">${esc(previewExcerpt(pw.preview))}</p>`:''}<p class="hint">${[(pw.preview.videos||[]).length?`영상 ${(pw.preview.videos||[]).length}개`:'',(pw.preview.files||[]).length?`첨부 자료 ${(pw.preview.files||[]).length}개`:''].filter(Boolean).join(' · ')||`${esc(shortLabel(pw.label))} 수업 전에 볼 자료`}</p><button type="button" class="btn small" data-home-go="preview" data-week="${esc(pw.id)}">예습 자료 보기 →</button></section>`:'';
-  const goal=S.homeGoal?.classId===S.classId?`<section class="card home-goal" aria-labelledby="home-goal-title"><p class="eyebrow"><span lang="es">Mi próximo paso</span> · 다음 학습 목표</p><h3 id="home-goal-title">${esc(S.homeGoal.text)}</h3><p class="hint">선생님이 정해 준 다음 목표예요${S.homeGoal.updatedAt?` · ${esc(formatDateTime(S.homeGoal.updatedAt,{time:false}))}`:''}</p></section>`:'';
-  // 공지(2026-10-29): 상단 고정과 새 공지만 홈 맨 위에(최대 3개). 다 읽은 공지는 '새 소식' 아래 링크로 봅니다.
+  const main=$('#home-main'),nextBox=$('#home-next');if(!main||!nextBox)return;
+  const next=nextSession(),tw=currentTaskWeek(),pw=next?.week;
+  nextBox.innerHTML=next
+    ?`<p class="home-next-label">다음 수업 ${statusPill('brand',relativeDay(next.date))}</p><strong class="home-next-title">${esc(next.label)}</strong><p class="hint">${esc(sessionDateText(next.date))}</p>${pw?.preview?.enabled?`<button type="button" class="linkbutton home-next-preview" data-home-go="preview" data-week="${esc(pw.id)}">예습 자료 보기 →</button>`:''}`
+    :'<p class="home-next-label">다음 수업</p><p class="hint">수업 날짜가 아직 정해지지 않았어요</p>';
+  // 공지: 상단 고정과 새 공지만(최대 3개). 다 읽은 공지는 맨 아래 링크로 봅니다.
   const noticeList=sortNotices(S.news.notices||[]),since=S.news.noticeSeenAt===undefined?Number.MAX_SAFE_INTEGER:seenAt(S.news.noticeSeenAt);
   const shownNotices=noticeList.filter(n=>n.pinned||noticeTime(n)>since).slice(0,3);
   const noticeCard=shownNotices.length?`<section class="card home-notices" aria-labelledby="home-notices-title"><div class="between"><p class="eyebrow"><span lang="es">Anuncios</span> · 공지</p><button type="button" class="linkbutton" data-home-go="notices">전체 보기 (${noticeList.length})</button></div><h2 id="home-notices-title" class="sr-only">선생님 공지</h2><ul class="announce-list">${shownNotices.map(n=>`<li><button type="button" class="announce-row" data-home-go="notices" data-notice="${esc(n.id)}"><span class="announce-row-main"><span class="announce-row-title">${n.pinned?statusPill('brand','상단 고정'):''}${noticeTime(n)>since?statusPill('brand','새 공지'):''}<strong>${esc(n.title)}</strong></span><small>${esc(formatDateTime(n.createdAt,{time:false}))}${n.body?` · ${esc(noticeExcerpt(n.body))}`:''}</small></span><span aria-hidden="true">→</span></button></li>`).join('')}</ul></section>`:'';
-  main.innerHTML=noticeCard+nextCard+goal+todo+preview;
+  // 이번 차시 할 일: 아직 하지 않은 것만. 과제를 내거나 복습을 풀면 빠지고, 피드백 소식은 '새 소식'에 보입니다.
+  let todo='';
+  if(tw){
+    const ready=(tw.id in S.news.submissions)&&(tw.id in S.news.quizResults),rows=[];
+    const row=(kind,pill,note,target,action,view='')=>`<li class="todo-row"><span class="todo-kind">${kind}</span><div class="todo-main"><div class="todo-line">${pill}</div>${note?`<small>${esc(note)}</small>`:''}</div><button type="button" class="btn secondary small" data-home-go="${target}" data-week="${esc(tw.id)}"${view?` data-view="${view}"`:''}>${esc(action)}</button></li>`;
+    if(tw.assignment?.enabled&&!S.news.submissions[tw.id]){const st=assignmentStatus(tw,null);rows.push(row('과제',st.pill,st.note,'assignment',st.action))}
+    const rv=recapVideos(tw);
+    if(rv.length&&!recapSeen(tw.id))rows.push(row('수업 영상',statusPill('brand',`영상 ${rv.length}개`),'','quiz','영상 보기','video'));
+    if(tw.quiz?.enabled&&tw.quiz.questions?.length&&!S.news.quizResults[tw.id])rows.push(row('복습',statusPill('neutral','미응시'),'','quiz','복습하기','quiz'));
+    const list=!ready?'<div class="loading">할 일 확인 중</div>':rows.length?`<ul class="todo-list">${rows.join('')}</ul>`:`<p class="todo-done">${statusPill('success','완료')}<span>이번 차시 할 일을 모두 마쳤어요</span></p>`;
+    todo=`<section class="card home-todo" aria-labelledby="home-todo-title"><div class="home-section-head"><h2 id="home-todo-title">이번 차시 할 일</h2><span class="home-session-chip">${esc(shortLabel(tw.label))}</span></div>${list}</section>`;
+  }
   const items=newsItems();
-  newsBox.innerHTML=`<h3 id="home-news-title">새 소식${items.length?` <small>${items.length}</small>`:''}</h3>${items.length?`<ul class="news-list">${items.map(i=>`<li><button type="button" class="news-item" data-home-go="${i.kind}" data-week="${esc(i.weekId||'')}" data-question="${esc(i.questionId||'')}"><span>${esc(i.text)}</span><span aria-hidden="true">→</span></button></li>`).join('')}</ul>`:'<p class="hint">새 소식이 없어요. 피드백이나 답변이 오면 여기에 보여요.</p>'}${noticeList.length&&!shownNotices.length?`<button type="button" class="linkbutton home-notices-link" data-home-go="notices">선생님 공지 ${noticeList.length}개 보기 →</button>`:''}`;
+  const news=items.length?`<section class="card home-news" aria-labelledby="home-news-title"><h2 id="home-news-title">새 소식 <small>${items.length}</small></h2><ul class="news-list">${items.map(i=>`<li><button type="button" class="news-item" data-home-go="${i.kind}" data-week="${esc(i.weekId||'')}" data-question="${esc(i.questionId||'')}"><span>${esc(i.text)}</span><span aria-hidden="true">→</span></button></li>`).join('')}</ul></section>`:'';
+  const goal=S.homeGoal?.classId===S.classId?`<section class="card home-goal" aria-labelledby="home-goal-title"><p class="eyebrow"><span lang="es">Mi próximo paso</span> · 다음 학습 목표</p><h3 id="home-goal-title">${esc(S.homeGoal.text)}</h3>${S.homeGoal.updatedAt?`<p class="hint">${esc(formatDateTime(S.homeGoal.updatedAt,{time:false}))}</p>`:''}</section>`:'';
+  const allNotices=noticeList.length&&!shownNotices.length?`<button type="button" class="linkbutton home-notices-link" data-home-go="notices">선생님 공지 ${noticeList.length}개 보기 →</button>`:'';
+  main.innerHTML=(noticeCard+todo+news+goal+allNotices)||'<p class="hint home-empty">지금은 새로 할 일이 없어요.</p>';
   for(const el of $$('[data-home-go]',$('#student-body')))el.onclick=()=>goTab(el.dataset.homeGo,{weekId:el.dataset.week,questionId:el.dataset.question,noticeId:el.dataset.notice,view:el.dataset.view});
-}
-// 출석 요약: 등록한 날 이후 지난 수업 중 출석 수. 자세한 기록은 내 정보에서 봅니다.
-async function drawHomeAttendance(){
-  const box=$('#home-attendance');if(!box)return;
-  const cid=S.classId,mine=S.enrollments.find(e=>e.classId===cid&&e.status==='active');
-  const joined=dateKeyOf(mine?.joinedAt);
-  const held=classSessions().filter(x=>x.state==='done'&&(!joined||!x.date||x.date>=joined));
-  const title='<h3 id="home-attendance-title">출석</h3>';
-  if(!held.length){box.innerHTML=title+'<p class="hint">아직 지난 수업이 없어요.</p>';return}
-  try{
-    const values=await Promise.all(held.map(x=>getDoc(doc(db,'classes',cid,'weeks',x.id,'attendance',S.user.uid)).then(d=>attendanceValue(d.exists()?d.data().status:''))));
-    if(S.tab!=='home'||S.classId!==cid||!box.isConnected)return;
-    const present=values.filter(v=>v==='present').length,absent=values.filter(v=>v==='absent').length,blank=values.length-present-absent;
-    box.innerHTML=`${title}<p class="home-attendance-count"><strong>${present}</strong> / ${values.length}차시 출석</p><p class="hint">${[absent?`불참 ${absent}`:'',blank?`미입력 ${blank}`:''].filter(Boolean).join(' · ')||'지난 수업에 모두 출석했어요'}</p><button type="button" class="linkbutton" data-home-go="mypage">내 정보에서 자세히 보기 →</button>`;
-    $('[data-home-go]',box).onclick=()=>goTab('mypage');
-  }catch(e){if(box.isConnected)showLoadFailed(box,()=>drawHomeAttendance(),e)}
 }
 
 const wselect=()=>`<select id="student-week-picker" class="input week-chooser" aria-label="차시 선택">${S.weeks.map(w=>`<option value="${esc(w.id)}" ${w.id===S.weekId?'selected':''}>${esc(w.label)}</option>`).join('')}</select>`;
@@ -368,7 +361,7 @@ function frame(){
   $$('[data-tab]').forEach(b=>b.addEventListener('click',()=>goTab(b.dataset.tab)));
   renderBody();paintNavBadges();
 }
-function bodyHeader(title,description){return `<div class="page-head"><div class="eyebrow" lang="es">Mi aprendizaje</div><h1>${title}</h1><p>${description}</p></div>`}
+function bodyHeader(title,description=''){return `<div class="page-head"><div class="eyebrow" lang="es">Mi aprendizaje</div><h1>${title}</h1>${description?`<p>${description}</p>`:''}</div>`}
 function weekHeader(title,description){return `<div class="section-title"><div>${bodyHeader(title,description)}</div>${S.weeks.length?wselect():''}</div>`}
 // 차시를 바꾸면 화면을 다시 그리므로, 키보드로 고르던 사람이 처음부터 Tab을 다시 누르지 않게 선택기로 포커스를 돌려 둡니다(배치 12).
 function weeklyPicker(){ $('#student-week-picker')?.addEventListener('change',e=>{S.weekId=e.target.value;S.quiz=null;renderBody();$('#student-week-picker')?.focus()}) }
@@ -473,7 +466,7 @@ async function closePastClass(){
 }
 function pastClassesCard(){
   if(!S.pastClasses.length)return '';
-  return `<div class="card past-classes"><h3>지난 반 자료</h3><p class="hint">수업이 끝난 반의 과제·피드백·복습·질문·출석 기록을 다시 볼 수 있어요. 강의 영상은 볼 수 없어요.</p><div class="past-class-list">${S.pastClasses.map(c=>`<button type="button" class="past-class" data-past-class="${esc(c.id)}"><strong>${esc(c.name)}</strong><span>지난 자료 보기 →</span></button>`).join('')}</div></div>`;
+  return `<div class="card past-classes"><h3>지난 반 자료</h3><div class="past-class-list">${S.pastClasses.map(c=>`<button type="button" class="past-class" data-past-class="${esc(c.id)}"><strong>${esc(c.name)}</strong><span>지난 자료 보기 →</span></button>`).join('')}</div></div>`;
 }
 function wirePastClasses(container){$$('[data-past-class]',container).forEach(b=>b.onclick=()=>openPastClass(b.dataset.pastClass))}
 async function loadWeeks(){const snap=await getDocs(query(collection(db,'classes',S.classId,'weeks'),where('published','==',true)));
@@ -494,7 +487,7 @@ function dueLine(assignment){
 function revisionHistoryMarkup(data){
   const latest=Number(data?.revision)||1;
   if(latest<2)return '';
-  return `<details class="revision-history" data-revision-history><summary>이전 제출 보기 (${latest-1}개)</summary><div class="stack" data-revision-list><p class="hint">펼치면 불러옵니다.</p></div></details>`;
+  return `<details class="revision-history" data-revision-history><summary>이전 제출 보기 (${latest-1}개)</summary><div class="stack" data-revision-list><div class="loading">이전 제출을 불러오는 중</div></div></details>`;
 }
 function wireRevisionHistory(container,wid,latest){
   const box=$('[data-revision-history]',container);if(!box)return;
@@ -548,7 +541,11 @@ function feedbackMarkup(obj,{askable=false,newSince=Number.MAX_SAFE_INTEGER}={})
   if(!comments.length)return '';
   const revised=(Number(obj?.revision)||1)>1;
   const items=[...comments].sort((a,b)=>(toDate(b.createdAt)?.getTime()||0)-(toDate(a.createdAt)?.getTime()||0));
-  return `<section class="card stack student-feedback" aria-label="선생님의 피드백"><h3>선생님의 피드백 <small>${items.length}</small></h3>${items.map(f=>`<article class="feedback"><p class="feedback-meta"><strong>선생님</strong> · ${esc(formatDateTime(f.createdAt))}${revised?` · ${Number(f.forRevision)||1}차 제출에 대한 피드백`:''}${(toDate(f.createdAt)?.getTime()||0)>newSince?' '+statusPill('brand','새 피드백'):''}</p>${f.text?`<div class="feedback-text">${esc(f.text)}</div>`:''}${f.audioPath?`<div class="feedback-audio">${audioMarkup(f.audioPath,f.audioDuration)}</div>`:''}${askable?'<div class="feedback-ask"><button type="button" class="btn ghost small" data-ask-feedback aria-expanded="false">이 피드백에 질문하기</button><div data-ask-slot></div></div>':''}</article>`).join('')}</section>`;
+  return `<section class="card stack student-feedback" aria-label="선생님의 피드백"><h3>선생님의 피드백 <small>${items.length}</small></h3>${items.map(f=>{
+    // 2026-10-30: 작성자('선생님')와 보낸 시각은 빼고 내용만 보여 줍니다. 다시 제출한 과제면 어느 회차에 대한 피드백인지만 작게 붙입니다.
+    const tags=[revised?`<span class="feedback-tag">${Number(f.forRevision)||1}차 제출</span>`:'',(toDate(f.createdAt)?.getTime()||0)>newSince?statusPill('brand','새 피드백'):''].join('');
+    return `<article class="feedback">${tags?`<div class="feedback-tags">${tags}</div>`:''}${f.text?`<div class="feedback-text">${esc(f.text)}</div>`:''}${f.audioPath?`<div class="feedback-audio">${audioMarkup(f.audioPath,f.audioDuration)}</div>`:''}${askable?'<div class="feedback-ask"><button type="button" class="btn secondary small" data-ask-feedback aria-expanded="false">이 피드백에 질문하기</button><div data-ask-slot></div></div>':''}</article>`;
+  }).join('')}</section>`;
 }
 // 질문 보내기(질문 탭·피드백 질문 공용). weekId·context는 배치 10 규칙에서 허용합니다.
 // 게시된 규칙이 아직 이 필드를 막으면 제목의 [N차시 과제] 표시만 남기고 연결 없이 보냅니다.
@@ -587,17 +584,17 @@ function wireFeedbackQuestions(container,w,context){
   });
 }
 // 제출한 답안 카드(배치 10): 제출 기록이 있으면 과제 화면의 첫 카드입니다. 편집 폼은 [수정해서 다시 제출]을 눌러야 열립니다.
+const submittedPill=d=>reviewState(d)==='done'?statusPill('success','피드백 받음'):statusPill('neutral',(Number(d.revision)||1)>1?'수정본 확인 전':'선생님 확인 전');
 function submittedCard(d){
-  const revision=Number(d.revision)||1,state=reviewState(d);
-  const pill=state==='done'?statusPill('success','피드백 받음'):statusPill('neutral',revision>1?'수정본 확인 전':'선생님 확인 전');
+  const revision=Number(d.revision)||1,pill=`<span id="submitted-state">${submittedPill(d)}</span>`;
   return `<section class="card stack submitted-card" aria-labelledby="submitted-title"><div class="between"><div><p class="eyebrow" lang="es">Mi respuesta</p><h2 id="submitted-title">제출한 답안</h2></div>${pill}</div><p class="hint">${revision>1?`${revision}차 제출 · `:''}${esc(formatDateTime(d.latestSubmittedAt||d.submittedAt))}</p>${d.text?`<div class="submitted-text">${esc(d.text)}</div>`:''}${d.audioPath?audioMarkup(d.audioPath,d.audioDuration):''}${!d.text&&!d.audioPath?'<p class="hint">제출한 내용이 비어 있어요.</p>':''}${revisionHistoryMarkup(d)}${S.past?'':'<div class="row" data-edit-row><button type="button" class="btn secondary" id="edit-assignment" aria-expanded="false" aria-controls="assignment-editor">수정해서 다시 제출</button></div>'}</section>`;
 }
 function editorCard(w,d){
-  return `<section class="card stack${d?' hide':''}" id="assignment-editor" aria-labelledby="editor-title"><div><h3 id="editor-title">${d?'수정해서 다시 제출':'답안 작성'}</h3>${d?'<p class="hint">다시 제출하면 수정본으로 기록되고, 이전 답안도 그대로 남아요.</p>':''}</div>${w.assignment.allowText!==false?`<div class="field"><label for="assignment-text">작성 과제</label><textarea id="assignment-text" rows="8" maxlength="20000" placeholder="여기에 스페인어로 답안을 작성해 주세요." data-saved="${esc(d?.text||'')}">${esc(d?.text||'')}</textarea></div>`:''}${w.assignment.allowAudio!==false?`<div class="field"><span class="field-label">말하기 과제</span><div id="student-audio-ui">${makeMediaUi('audio')}</div>${d?.audioPath?'<p class="hint">새 녹음을 올리지 않으면 지금 제출된 녹음을 그대로 써요.</p>':''}</div>`:''}<div class="between"><p id="assignment-progress" class="hint">답안은 본인과 강사만 열람할 수 있습니다.</p><div class="row">${d?'<button type="button" class="btn ghost" id="cancel-edit">닫기</button>':''}<button class="btn" id="submit-assignment">${d?'수정본 제출하기 →':'과제 제출하기 →'}</button></div></div></section>`;
+  return `<section class="card stack${d?' hide':''}" id="assignment-editor" aria-labelledby="editor-title"><div><h3 id="editor-title">${d?'수정해서 다시 제출':'답안 작성'}</h3></div>${w.assignment.allowText!==false?`<div class="field"><label for="assignment-text">작성 과제</label><textarea id="assignment-text" rows="8" maxlength="20000" placeholder="여기에 답안을 작성해 주세요." data-saved="${esc(d?.text||'')}">${esc(d?.text||'')}</textarea></div>`:''}${w.assignment.allowAudio!==false?`<div class="field"><span class="field-label">말하기 과제</span><div id="student-audio-ui">${makeMediaUi('audio')}</div>${d?.audioPath?'<p class="hint">새 녹음을 올리지 않으면 지금 제출된 녹음을 그대로 써요.</p>':''}</div>`:''}<div class="between"><p id="assignment-progress" class="hint"></p><div class="row">${d?'<button type="button" class="btn ghost" id="cancel-edit">닫기</button>':''}<button class="btn" id="submit-assignment">${d?'수정본 제출하기 →':'과제 제출하기 →'}</button></div></div></section>`;
 }
 async function renderAssignment(body){
   const w=week();
-  body.innerHTML=weekHeader('과제',S.past?'제출한 답안과 선생님의 피드백을 다시 볼 수 있어요.':'말하기와 쓰기를 차근차근 연습해 보세요.');weeklyPicker();
+  body.innerHTML=weekHeader('과제');weeklyPicker();
   if(!w.assignment?.enabled){body.insertAdjacentHTML('beforeend',empty('이 차시의 과제는 아직 열리지 않았습니다','선생님이 과제를 공개하면 여기서 제출할 수 있어요.'));return}
   body.insertAdjacentHTML('beforeend','<div id="assignment-area" class="stack"><div class="card"><div class="loading">제출 기록 확인 중</div></div></div>');
   let snap;
@@ -633,6 +630,8 @@ async function renderAssignment(body){
     const el=$('#student-assignment-feedback');if(!el)return;
     const latest=snapshot.exists()?snapshot.data():null;
     markFeedbackSeen('submissions',w.id,latest);
+    // 2026-10-30: 피드백 칸만이 아니라 '제출한 답안' 카드의 상태 표시('선생님 확인 전' → '피드백 받음')도 바로 바꿉니다.
+    const state=$('#submitted-state');if(state&&latest){const pill=submittedPill(latest);if(state.innerHTML!==pill)state.innerHTML=pill}
     const html=feedbackMarkup(latest,{askable:!S.past,newSince});
     if(el.dataset.rendered===html)return;
     // 피드백에 질문을 쓰는 중이면 덮어쓰지 않고 알려 줍니다(P0-10).
@@ -697,13 +696,13 @@ let quizRenderSeq=0;
 const reviewTabsHtml=(view,n)=>`<div class="tabset review-tabs" role="group" aria-label="복습 화면 고르기"><button type="button" class="tab ${view==='video'?'active':''}" data-review-view="video" aria-pressed="${view==='video'}" aria-label="수업 영상 ${n}개">수업 영상 <span class="review-tab-count">${n}</span></button><button type="button" class="tab ${view==='quiz'?'active':''}" data-review-view="quiz" aria-pressed="${view==='quiz'}">복습 퀴즈</button></div>`;
 function wireReviewTabs(container){$$('[data-review-view]',container).forEach(b=>b.onclick=()=>{const v=b.dataset.reviewView;S.reviewView=v;S.quiz=null;renderBody();$(`.review-tabs [data-review-view="${v}"]`)?.focus()})}
 function renderRecap(body,w,videos,quizOn){
-  body.insertAdjacentHTML('beforeend',`<div class="card stack recap-card"><div class="between"><h2>${esc(shortLabel(w.label))} 수업 영상</h2><span class="pill brand">${videos.length}개</span></div><p class="hint">수업 내용을 다시 보며 복습해 보세요. 앱 안에서 재생되고, 다운로드 메뉴는 숨겨져 있어요.</p>${videos.map(videoMarkup).join('')}${quizOn?'<div class="separator"></div><button type="button" class="btn secondary" data-review-view="quiz">복습 퀴즈 풀러 가기 →</button>':''}</div>`);
-  useMediaPaths(body);wireReviewTabs(body);
+  body.insertAdjacentHTML('beforeend',`<div class="card stack recap-card"><div class="between"><h2>${esc(shortLabel(w.label))} 수업 영상</h2><span class="pill brand">${videos.length}개</span></div>${videos.map(videoMarkup).join('')}${quizOn?'<div class="separator"></div><button type="button" class="btn secondary" data-review-view="quiz">복습 퀴즈 풀러 가기 →</button>':''}</div>`);
+  useMediaPaths(body);wireReviewTabs(body);markRecapSeen(w.id);
 }
 async function renderQuiz(body){const w=week(),token=++quizRenderSeq;
   const videos=recapVideos(w),quizOn=!!(w.quiz?.enabled&&w.quiz.questions?.length);
   const view=S.past||!videos.length?'quiz':!quizOn?'video':(S.reviewView||'video');
-  body.innerHTML=weekHeader('복습',S.past?'연습 모드예요. 다시 풀어 볼 수 있지만 결과는 저장되지 않아요.':view==='video'?'수업 영상을 다시 보고, 복습 퀴즈로 확인해 보세요.':'지난 결과를 먼저 확인하고, 틀린 문제를 다시 풀어 보세요.');weeklyPicker();
+  body.innerHTML=weekHeader('복습',S.past?'연습 모드예요. 결과는 저장되지 않아요.':'');weeklyPicker();
   if(videos.length&&quizOn&&!S.past){body.insertAdjacentHTML('beforeend',reviewTabsHtml(view,videos.length));wireReviewTabs(body)}
   if(S.past&&videos.length)body.insertAdjacentHTML('beforeend',`<p class="notice warn review-past-note">🎬 이 차시의 수업 영상 ${videos.length}개는 수강 기간에만 볼 수 있어요.</p>`);
   if(view==='video'){renderRecap(body,w,videos,quizOn);return}
@@ -886,16 +885,16 @@ function upcomingWeekId(){
 }
 function videoMarkup(v,i){
   // D9: 유튜브 '일부 공개' 링크는 개인정보 보호 강화 모드(youtube-nocookie.com)로 끼워 넣습니다.
-  if(v.kind==='youtube')return `<div class="stack lesson-video-block"><div class="lesson-video-label"><span class="lesson-play-icon" aria-hidden="true">▶</span><strong>수업 영상 ${i+1}</strong><span class="hint">유튜브에서 재생됩니다</span></div><div class="video-embed"><iframe src="${esc(youtubeEmbedUrl(v.videoId))}" title="수업 영상 ${i+1}" loading="lazy" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div></div>`;
+  if(v.kind==='youtube')return `<div class="stack lesson-video-block"><div class="lesson-video-label"><span class="lesson-play-icon" aria-hidden="true">▶</span><strong>수업 영상 ${i+1}</strong></div><div class="video-embed"><iframe src="${esc(youtubeEmbedUrl(v.videoId))}" title="수업 영상 ${i+1}" loading="lazy" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div></div>`;
   return `<div class="stack lesson-video-block"><div class="lesson-video-label"><span class="lesson-play-icon" aria-hidden="true">▶</span><strong>수업 영상 ${i+1}</strong></div><video controls controlslist="nodownload noremoteplayback" disablepictureinpicture disableremoteplayback playsinline preload="metadata" class="media-preview" data-media-path="${esc(v.path)}"></video></div>`;
 }
 async function renderPreview(body){
   const w=week(),date=sessionDateOf(w);
-  body.innerHTML=weekHeader('예습',`${w.label} 수업 준비 · ${sessionDateText(date)}`);weeklyPicker();const p=w.preview;
+  body.innerHTML=weekHeader('예습',date?`${sessionDateText(date)} 수업`:'');weeklyPicker();const p=w.preview;
   if(!p?.enabled){body.insertAdjacentHTML('beforeend',empty('예습 자료를 준비하고 있어요','선생님이 수업 전에 볼 자료를 올리면 여기에 나타나요.'));return}
   const mode=p.mode||'rich',videos=p.videos||[];
   // 보관된 반(지난 반)에서는 강의 영상을 보여 주지 않습니다(직접 업로드·유튜브 모두).
-  const videoPart=!videos.length?'':S.past?`<div class="separator"></div><p class="notice warn">🎬 이 차시의 강의 영상 ${videos.length}개는 수강 기간에만 볼 수 있어요.</p>`:`<div class="separator"></div><h3>🎬 수업 영상</h3><p class="hint">앱 안에서 재생됩니다. 다운로드 메뉴는 숨겨져 있습니다.</p>${videos.map(videoMarkup).join('')}`;
+  const videoPart=!videos.length?'':S.past?`<div class="separator"></div><p class="notice warn">🎬 이 차시의 강의 영상 ${videos.length}개는 수강 기간에만 볼 수 있어요.</p>`:`<div class="separator"></div><h3>🎬 수업 영상</h3>${videos.map(videoMarkup).join('')}`;
   body.insertAdjacentHTML('beforeend',`<div class="card stack"><div class="between"><div><h2>${esc(p.title&&p.title!=='다음 차시'?p.title:`${w.label} 예습`)}</h2></div><span class="pill brand">PREPARACIÓN</span></div>${mode==='image'?(p.imagePath?`<img class="article-image" alt="${esc(w.label)} 예습 자료" data-media-path="${esc(p.imagePath)}">`:empty('안내 이미지가 없습니다')):`<div class="article">${sanitizeRich(p.richHtml||'<p>학습 내용을 곧 안내할 예정입니다.</p>')}</div>`}${videoPart}${(p.files||[]).length?`<div class="separator"></div><h3>📎 첨부 자료</h3><div class="media-list">${p.files.map(f=>`<a href="#" data-media-path="${esc(f.path)}" class="media-item">${esc(f.name||'첨부 파일')} ↗</a>`).join('')}</div>`:''}</div>`);useMediaPaths(body);
 }
 // ---------- 공지사항 (2026-10-29) ----------
@@ -903,7 +902,7 @@ async function renderPreview(body){
 const noticeExcerpt=t=>{const line=String(t||'').split('\n').map(x=>x.trim()).find(Boolean)||'';return line.length>60?line.slice(0,60)+'…':line};
 async function renderNotices(body){
   const cid=S.classId;
-  body.innerHTML=`${bodyHeader('공지사항',S.past?'지난 반에 올라온 선생님 공지예요.':'선생님이 반 전체에 알린 내용이에요.')}<button type="button" class="linkbutton announce-back" id="notices-back">← ${S.past?'지난 반 과제로':'홈으로'}</button><div id="announce-feed" class="stack" aria-busy="true"><div class="loading">공지를 불러오는 중</div></div>`;
+  body.innerHTML=`${bodyHeader('공지사항')}<button type="button" class="linkbutton announce-back" id="notices-back">← ${S.past?'지난 반 과제로':'홈으로'}</button><div id="announce-feed" class="stack" aria-busy="true"><div class="loading">공지를 불러오는 중</div></div>`;
   $('#notices-back').onclick=()=>goTab(S.past?'assignment':'home');
   // 이 화면에서는 연 순간의 확인 시각으로 '새 공지'를 표시합니다(확인 시각을 저장해도 보는 동안은 표시가 남음).
   S.noticeSince=S.past?Number.MAX_SAFE_INTEGER:S.news.noticeSeenAt===undefined?undefined:seenAt(S.news.noticeSeenAt);
@@ -945,13 +944,13 @@ async function markNoticesSeen(list){
 async function renderMyPage(body){
   if(S.past){
     // 지난 반: 그 반의 출석 기록만 보여 줍니다(프로필 수정은 현재 반 화면에서).
-    body.innerHTML=bodyHeader('출석 기록','지난 반의 차시별 출결 기록이에요.')+`<div class="card"><h3>📋 출석 현황</h3><div id="attendance-overview" class="loading">불러오는 중</div></div>`;
+    body.innerHTML=bodyHeader('출석 기록')+`<div class="card"><h3>📋 출석 현황</h3><div id="attendance-overview" class="loading">불러오는 중</div></div>`;
     await drawAttendanceOverview();return;
   }
   const realName=String(S.profile.realName||S.enrollmentRealName||S.profile.displayName||'').trim();
   const preferred=String(S.profile.nickname||(S.profile.displayName!==realName?S.profile.displayName:'')||'').trim();
-  body.innerHTML=bodyHeader('내 정보','내 프로필, 출석 기록, 우리 반 친구들을 확인하세요.');
-  body.insertAdjacentHTML('beforeend',`<div class="grid2"><div class="card"><h3>👋 프로필</h3><div class="separator"></div><dl class="info-grid"><dt>내 이름</dt><dd>${esc(realName)}</dd><dt>사용하는 별명</dt><dd>${esc(preferred||'미설정')}</dd><dt>로그인 ID</dt><dd>${esc(S.user.email)}</dd><dt>현재 반</dt><dd>${esc(currentClass()?.name||'미등록')}</dd><dt>수강 시작</dt><dd>${esc((currentClass()?.schedule||[]).map(x=>x.date).filter(Boolean).sort()[0]||'수업 날짜 미설정')}</dd></dl><div class="separator"></div><form id="student-name-form" class="row" style="align-items:end"><div class="field" style="flex:1;min-width:160px"><label for="student-nickname">우리 반에 표시할 별명</label><input id="student-nickname" name="displayName" maxlength="35" value="${esc(preferred)}" placeholder="비우면 실제 이름으로 표시"></div><button class="btn secondary small" type="submit">별명 저장</button></form><p class="hint">우리 반 명단에는 별명만 표시됩니다. 강사에게는 별명과 실명이 함께 표시됩니다.</p><div class="quiet-note">반 변경이 필요하시면 강사에게 요청해 주세요.</div></div><div class="card"><h3>📋 출석 현황</h3><p class="hint" style="margin:6px 0 12px">등록된 차시별 수업 날짜와 출결을 표시합니다.</p><div id="attendance-overview" class="loading">불러오는 중</div></div></div>${classmatesCard()}${pastClassesCard()}`);
+  body.innerHTML=bodyHeader('내 정보');
+  body.insertAdjacentHTML('beforeend',`<div class="grid2"><div class="card"><h3>👋 프로필</h3><div class="separator"></div><dl class="info-grid"><dt>내 이름</dt><dd>${esc(realName)}</dd><dt>사용하는 별명</dt><dd>${esc(preferred||'미설정')}</dd><dt>로그인 ID</dt><dd>${esc(S.user.email)}</dd><dt>현재 반</dt><dd>${esc(currentClass()?.name||'미등록')}</dd><dt>수강 시작</dt><dd>${esc((currentClass()?.schedule||[]).map(x=>x.date).filter(Boolean).sort()[0]||'수업 날짜 미설정')}</dd></dl><div class="separator"></div><form id="student-name-form" class="row" style="align-items:end"><div class="field" style="flex:1;min-width:160px"><label for="student-nickname">우리 반에 표시할 별명</label><input id="student-nickname" name="displayName" maxlength="35" value="${esc(preferred)}" placeholder="비우면 실제 이름으로 표시"></div><button class="btn secondary small" type="submit">별명 저장</button></form><p class="hint">우리 반 명단에는 별명만 표시됩니다. 강사에게는 별명과 실명이 함께 표시됩니다.</p></div><div class="card"><h3>📋 출석 현황</h3><div id="attendance-overview" class="loading">불러오는 중</div></div></div>${classmatesCard()}${pastClassesCard()}`);
   wirePastClasses(body);startClassmatesLive();
   $('#student-name-form')?.addEventListener('submit',async e=>{
     e.preventDefault();const form=e.currentTarget,name=String(new FormData(form).get('displayName')||'').trim();
@@ -987,7 +986,7 @@ function questionPath(qid){return ['classes',S.classId,'questions',qid]}
 function renderQuestions(body){
   const newQuestionCard=S.past?'':`<div class="card stack"><h3>새 질문</h3><form id="question-create" class="stack"><div class="field"><label for="question-title">제목</label><input id="question-title" name="title" required maxlength="100" placeholder="예: 오늘 배운 표현이 궁금해요"></div><div class="field"><label for="question-content">질문 내용</label><textarea id="question-content" name="content" required maxlength="8000" rows="6" placeholder="질문을 자세히 작성해 주세요."></textarea></div><div class="field"><label for="question-week">어느 차시에 대한 질문인가요? (선택)</label><select id="question-week" name="weekId"><option value="">차시 선택 안 함</option>${S.weeks.map(w=>`<option value="${esc(w.id)}">${esc(w.label)}</option>`).join('')}</select></div><button class="btn" type="submit">질문 보내기</button></form></div>`;
   // 지난 반: 주고받은 질문과 답변만 읽을 수 있습니다. 새 질문은 현재 반에서 남깁니다.
-  body.innerHTML=(S.past?bodyHeader('질문 기록','지난 반에서 주고받은 질문과 답변이에요. 새 질문은 현재 반에서 남겨 주세요.'):bodyHeader('질문하기','궁금한 점을 선생님께 남겨보세요. 답변은 실시간으로 표시됩니다.'))+`<div class="${S.past?'stack':'grid2'}" style="align-items:start">${newQuestionCard}<div class="stack"><div class="between"><h3>내 질문</h3><span class="pill brand" id="question-count">0건</span></div><div id="question-list" class="question-list"><div class="loading">질문 확인 중</div></div></div></div><div id="student-thread" style="margin-top:17px"></div>`;
+  body.innerHTML=(S.past?bodyHeader('질문 기록','새 질문은 현재 반에서 남겨 주세요.'):bodyHeader('질문하기'))+`<div class="${S.past?'stack':'grid2'}" style="align-items:start">${newQuestionCard}<div class="stack"><div class="between"><h3>내 질문</h3><span class="pill brand" id="question-count">0건</span></div><div id="question-list" class="question-list"><div class="loading">질문 확인 중</div></div></div></div><div id="student-thread" style="margin-top:17px"></div>`;
   if($('#question-create'))$('#question-create').onsubmit=async e=>{e.preventDefault();const form=e.currentTarget,fd=new FormData(form);const title=String(fd.get('title')||'').trim(),content=String(fd.get('content')||'').trim(),weekId=String(fd.get('weekId')||'');if(!title||!content)return;const btn=$('button[type="submit"]',form);btn.disabled=true;try{await createQuestion({title,content,weekId});form.reset();toast('질문이 전송되었습니다.')}catch(err){toast(ex(err),true)}finally{btn.disabled=false}};
   S.live.questions=onSnapshot(query(collection(db,'classes',S.classId,'questions'),where('uid','==',S.user.uid)),snap=>{
     if(S.tab!=='questions')return;const list=$('#question-list');if(!list)return;
@@ -1028,7 +1027,7 @@ function showStudentThread(q){if(!q)return;stopLive('replies');const holder=$('#
   S.live.replies=onSnapshot(collection(db,...questionPath(q.id),'replies'),snap=>{if(S.activeQuestionId!==q.id)return;const list=$('#student-replies');if(!list)return;const replies=snap.docs.map(d=>d.data()).sort((a,b)=>(a.createdAt?.seconds||0)-(b.createdAt?.seconds||0));loaded(list,replies.map(r=>`<div class="reply-bubble ${r.role==='admin'?'teacher':'student'}"><p class="hint">${r.role==='admin'?'선생님':'나'} · ${fmt(r.createdAt)}</p><p style="white-space:pre-wrap">${esc(r.text)}</p></div>`).join('')||'<p class="hint">아직 댓글이 없습니다.</p>')},onLiveError);
 }
 // 우리 반 친구들(배치 10: 하단 메뉴에서 내 정보 안으로 옮김). 반 명단에는 이름(별명)만 공개합니다.
-const classmatesCard=()=>`<div class="card classmates-card"><div class="between" style="margin-bottom:18px"><h3>우리 반 친구들 <small>${esc(currentClass()?.name||'')}</small></h3><span class="pill brand" id="classmate-count">—</span></div><div id="classmates-list" class="grid3"><div class="loading">수강생 확인 중</div></div><p class="hint" style="margin-top:17px">개인정보 보호를 위해 이름만 공개되며, 이메일이나 개별 학습 성적은 보이지 않습니다.</p></div>`;
+const classmatesCard=()=>`<div class="card classmates-card"><div class="between" style="margin-bottom:18px"><h3>우리 반 친구들 <small>${esc(currentClass()?.name||'')}</small></h3><span class="pill brand" id="classmate-count">—</span></div><div id="classmates-list" class="grid3"><div class="loading">수강생 확인 중</div></div></div>`;
 function startClassmatesLive(){
   S.live.classmates=onSnapshot(collection(db,'classes',S.classId,'members'),snap=>{
     if(S.tab!=='mypage')return;const list=$('#classmates-list');if(!list)return;const members=snap.docs.map(d=>d.data()).filter(m=>m.status==='active').sort((a,b)=>(a.name||'').localeCompare(b.name||'','ko'));$('#classmate-count').textContent=members.length+'명';loaded(list,members.map(m=>`<div class="classmate-card"><span class="classmate-avatar">${esc((m.name||'?')[0])}</span><div><strong>${esc(m.name||'이름 미등록')}</strong>${m.uid===S.user.uid?'<p class="hint">나</p>':''}</div></div>`).join('')||empty('아직 반 명단이 없습니다','강사가 수강생 관리를 열면 기존 명단도 동기화됩니다.'));

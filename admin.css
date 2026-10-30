@@ -515,8 +515,11 @@ button.dash-action:hover{border-color:var(--wine-200);box-shadow:var(--shadow-md
 .announce-card.is-pinned{border-color:var(--wine-200)}
 .announce-card h3{overflow-wrap:anywhere}
 .announce-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
-.announce-reads{display:grid;gap:4px;min-width:0}
-.announce-unread summary{cursor:pointer;color:var(--wine-600);font-size:13px;font-weight:700}
-.announce-unread p{margin-top:6px;font-size:13px;color:var(--ink-2);overflow-wrap:anywhere}
+.announce-reads{display:grid;gap:8px;min-width:0}
+.announce-names{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.announce-names-label{min-width:64px;font-size:12px;font-weight:800;color:var(--muted)}
 .announce-modal{width:min(640px,100%)}
 .week-visibility-line span{white-space:nowrap} /* '복습 퀴즈 ✓'처럼 항목 중간에서 줄이 바뀌지 않게 */
+/* 대시보드 탭(2026-10-30) */
+.dash-tabs{margin:0 0 18px}
+.dash-tab-count{display:inline-block;min-width:20px;margin-left:6px;padding:0 6px;border-radius:999px;background:var(--wine-600);color:#fff;font-size:12px;line-height:20px;text-align:center}

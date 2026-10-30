@@ -395,14 +395,15 @@ test('B10 피드백 받은 학생이 재제출 → 2차 제출 기록, 강사 �
   assert((await r.page.innerText('[data-feedback-uid="s1"]')).includes('피드백 완료'), '피드백 후 상태가 피드백 완료가 아님');
 });
 
-test('B11 피드백·마감 시각은 브라우저 시간대와 상관없이 한국 시간으로 표시', async b => {
+test('B11 제출·마감 시각은 브라우저 시간대와 상관없이 한국 시간으로 표시 (피드백에는 작성자·시각을 쓰지 않음)', async b => {
   for (const timezoneId of ['Asia/Seoul', 'Europe/Madrid', 'America/Los_Angeles']) {
     const { page, context } = await openApp(b, { file: 'index.html', user: 's1', timezoneId, viewport: { width: 390, height: 844 } });
     await pause(page, 600);
     await page.click('[data-tab="assignment"]'); await pause(page, 500);
     await page.selectOption('#student-week-picker', 'w1'); await pause(page, 700);
     const text = await page.innerText('#student-body');
-    assert(/선생님 · \d+월 \d+일 \(.\) 오전 10:00/.test(text), `${timezoneId}: 피드백 시각이 한국 시간 오전 10:00이 아님`);
+    assert(/\d+월 \d+일 \(.\) 오후 9:00/.test(await page.innerText('.submitted-card')), `${timezoneId}: 제출 시각이 한국 시간 오후 9:00이 아님`);
+    assert(!/선생님 ·|오전 10:00/.test(await page.innerText('.student-feedback')), `${timezoneId}: 피드백에 작성자·시각이 보임`);
     assert(/제출 권장일 \d+월 \d+일 \(.\) 오후 11:59/.test(text), `${timezoneId}: 마감 표시가 한국 시간이 아님`);
     await context.close();
   }
@@ -805,10 +806,10 @@ test('S03 sessionState: 어제·오늘·내일·날짜 없음(출결 있음/없�
 test('S04 학생 예습(D8): 홈에서 다음 수업 예습을 열면 그 차시가 선택되고, 하단 메뉴는 홈·과제·복습·질문·내 정보(D6)', async b => {
   const { page } = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 }, tab: 'home' });
   eq(await page.$$eval('.nav-item .nav-label', els => els.map(e => e.textContent)), ['홈', '과제', '복습', '질문', '내 정보'], '하단 메뉴');
-  await page.click('.home-preview [data-home-go="preview"]'); await pause(page, 600);
+  await page.click('#home-next [data-home-go="preview"]'); await pause(page, 600);
   assert((await page.inputValue('#student-week-picker')) === 'w5', '기본 선택: ' + await page.inputValue('#student-week-picker'));
   const head = await page.innerText('.page-head');
-  assert(head.includes('예습') && /5차시 · 카페에서 주문하기 수업 준비 · \d+월 \d+일 \(.\)/.test(head), '머리말: ' + head);
+  assert(head.includes('예습') && /\d+월 \d+일 \(.\) 수업/.test(head), '머리말: ' + head);
   assert(await page.$eval('.nav-item[data-tab="home"]', el => el.classList.contains('active') && el.getAttribute('aria-current') === 'page'), '예습 화면에서 홈 메뉴가 켜지지 않음');
 });
 
@@ -827,7 +828,7 @@ test('S05 유튜브 링크: 허용 주소만 추가, 학생 화면은 youtube-no
   r = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 }, tab: 'home' });
   await r.page.evaluate(v => window.__mock.remoteWrite('classes/c1/weeks/w5', { preview: { videos: v } }), v);
   await pause(r.page, 400);
-  await r.page.click('.home-preview [data-home-go="preview"]'); await pause(r.page, 600);
+  await r.page.click('#home-next [data-home-go="preview"]'); await pause(r.page, 600);
   const src = await r.page.getAttribute('.video-embed iframe', 'src');
   assert(src === 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?rel=0', 'iframe 주소: ' + src);
   await r.context.close();
@@ -858,6 +859,7 @@ const firstLine = els => els.map(e => e.firstChild.textContent.trim());
 test('B14 대시보드: 차시별 추이·진행표에 오늘·미래 차시(5~12차시)가 없음', async b => {
   const { page } = await openAs(b, 'admin.html', 'admin1');
   await pause(page, 600);
+  await page.click('[data-dash-tab="progress"]'); await pause(page, 250); // 2026-10-30: 대시보드 탭
   for (const panel of [1, 2, 3]) {
     const labels = await page.$$eval(`.dash-panels .dash-panel:nth-child(${panel}) .dash-bar-label`, firstLine);
     eq(labels, ['1차시', '2차시', '3차시', '4차시'], `추이 ${panel}번째 차트`);
@@ -870,6 +872,7 @@ test('B14 대시보드: 차시별 추이·진행표에 오늘·미래 차시(5~1
 test('B14b 대시보드: 중도 등록 학생은 등록 전 차시 분모에서 빠지고, 기록은 수강 기간 밖으로 표시', async b => {
   const { page } = await openAs(b, 'admin.html', 'admin1');
   await pause(page, 600);
+  await page.click('[data-dash-tab="progress"]'); await pause(page, 250); // 2026-10-30: 대시보드 탭
   // 박서연(s3)은 20일 전에 반을 옮겨 와 1·2차시(28·21일 전) 대상이 아님. 1차시 인정결석 기록은 출석률에 넣지 않음
   const first = await page.$eval('.dash-panels .dash-panel:nth-child(1) .dash-bar-row:first-child .dash-bar-value', e => e.innerText.replace(/\s+/g, ' '));
   eq(first, '100% 3/3', '1차시 출석률');
@@ -887,6 +890,7 @@ test('B14c 대시보드: 수강 기간 기록을 읽지 못하면(이전 규칙)
   await page.evaluate(() => window.__mock.failReads('^enrollments/[^/]+/events'));
   await page.click('[data-page="classes"]'); await pause(page, 400);
   await page.click('[data-page="overview"]'); await pause(page, 900);
+  await page.click('[data-dash-tab="progress"]'); await pause(page, 250); // 2026-10-30: 대시보드 탭
   assert((await page.innerText('#insight-content')).includes('수강 기간 기록을 읽지 못해'), '안내 없음');
   // 수강 중지 학생은 중지 시점을 몰라 4차시까지 대상으로 추정(*)
   const est = await page.$$eval('.dash-grid tbody tr', trs => { const tr = trs.find(t => t.innerText.startsWith('최도윤')); return tr.querySelectorAll('td.is-estimated').length; });
@@ -1036,6 +1040,7 @@ test('DB05 대시보드: 0건이면 "처리할 일이 없어요", 문항 분석�
   const { page } = await openApp(b, { file: 'admin.html', user: 'admin1', seed });
   await pause(page, 1200);
   assert((await page.innerText('.dash-all-clear')).includes('처리할 일이 없어요'), '0건 안내 없음');
+  await page.click('[data-dash-tab="items"]'); await pause(page, 250); // 2026-10-30: 대시보드 탭
   await page.selectOption('#dash-item-session', 'w1'); await pause(page, 500);
   const meta = await page.innerText('.dash-item-meta');
   assert(meta.includes('첫 응시 2명'), '문항 분석 n: ' + meta);
@@ -1074,14 +1079,37 @@ test('DB06 공개 누락: 만들어 둔 예습이 안 보이는 차시만 셈(�
   eq(r.none, [false, false, false], '예습 없음·제목만');
 });
 
+test('DB07 대시보드 탭: 처리할 일이 처음, 탭마다 그 묶음만, 다시 그려도·다른 화면에 다녀와도 고른 탭 유지', async b => {
+  const { page } = await openAs(b, 'admin.html', 'admin1');
+  await pause(page, 700);
+  const visible = () => page.$$eval('[data-dash-panel]', els => els.filter(e => !e.hidden).map(e => e.dataset.dashPanel));
+  eq(await visible(), ['todo'], '처음 탭');
+  assert(await page.$('#dash-panel-todo .dash-action') && await page.$('#dash-panel-todo .dash-watch'), '처리할 일 탭에 카드·챙겨 볼 학생이 없음');
+  await page.click('[data-dash-tab="progress"]'); await pause(page, 200);
+  eq(await visible(), ['progress'], '학습 현황 탭');
+  assert((await page.getAttribute('[data-dash-tab="progress"]', 'aria-pressed')) === 'true', '고른 탭 표시(aria-pressed)');
+  await page.click('#dash-jump-items'); await pause(page, 300);
+  eq(await visible(), ['items'], '문항 분석 보기 → 문항 분석 탭');
+  assert(await page.evaluate(() => document.activeElement?.dataset.dashTab === 'items'), '문항 분석 탭으로 포커스가 가지 않음');
+  await page.evaluate(() => window.__mock.remoteWrite('classes/c1/weeks/w1/attendance/s2', { status: 'present', note: '' }));
+  await pause(page, 700);
+  eq(await visible(), ['items'], '실시간으로 다시 그린 뒤 탭');
+  await page.click('[data-page="classes"]'); await pause(page, 400);
+  await page.click('[data-page="overview"]'); await pause(page, 900);
+  eq(await visible(), ['items'], '다른 화면에 다녀온 뒤 탭');
+});
+
 // ----- 배치 10: 학생 동선 · 새 소식 -----
-test('ST01 홈: 다음 수업·이번 차시 할 일·새 소식·예습·출석 요약', async b => {
+test('ST01 홈(2026-10-30 다시 설계): 인사 옆 다음 수업 상자(예습 링크), 이번 차시 할 일은 차시 표시와 남은 것만, 출석·예습 카드 없음', async b => {
   const { page } = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 }, tab: 'home' });
-  assert((await page.innerText('.home-next')).includes('5차시 · 카페에서 주문하기') && (await page.innerText('.home-next')).includes('오늘'), '다음 수업: ' + await page.innerText('.home-next'));
+  const next = await page.innerText('#home-next');
+  assert(next.includes('5차시 · 카페에서 주문하기') && next.includes('오늘') && await page.$('#home-next [data-home-go="preview"]'), '다음 수업 상자: ' + next);
+  eq(await page.innerText('.home-session-chip'), '4차시', '이번 차시 표시');
   const todo = await page.$$eval('.todo-row', rows => rows.map(r => r.innerText.replace(/\s+/g, ' ')));
-  assert(todo.length === 3 && todo[0].startsWith('예습') && todo[0].includes('5차시') && todo[1].startsWith('과제') && todo[1].includes('미제출') && todo[1].includes('4차시') && todo[2].startsWith('복습') && todo[2].includes('미응시'), '할 일: ' + todo.join(' | '));
+  assert(todo.length === 2 && todo[0].startsWith('과제') && todo[0].includes('미제출') && todo[1].startsWith('복습') && todo[1].includes('미응시'), '할 일(남은 것만): ' + todo.join(' | '));
   eq(await page.$$eval('.news-item span:first-child', els => els.map(e => e.textContent)), ['새 피드백 · 2차시 과제', '새 피드백 · 1차시 과제'], '새 소식');
-  assert((await page.innerText('.home-attendance')).includes('4 / 4차시 출석'), '출석 요약: ' + await page.innerText('.home-attendance'));
+  assert(!(await page.$('.home-attendance')) && !(await page.$('.home-preview')), '홈에 출석·예습 카드가 남아 있음');
+  assert(!(await page.innerText('.page-head')).includes('확인해 보세요'), '홈 제목 아래 설명이 남아 있음');
   // 모바일 첫 화면 안에 할 일 카드가 보임
   const top = await page.$eval('.home-todo', el => el.getBoundingClientRect().top);
   assert(top < 844, '할 일 카드가 첫 화면 밖: ' + top);
@@ -1419,6 +1447,7 @@ test('RC02 복습 수업 영상(학생): 홈 할 일 → 수업 영상 화면, �
   assert(await page.$('#quiz-stage') && !(await page.$('.recap-card')), '퀴즈 화면으로 바뀌지 않음');
   assert(await page.evaluate(() => document.activeElement?.dataset.reviewView === 'quiz'), '화면을 바꾼 뒤 포커스가 탭에 없음');
   await page.click('[data-tab="home"]'); await pause(page, 500);
+  assert(!(await page.$('.todo-row [data-view="video"]')), '수업 영상을 연 뒤에도 홈 할 일에 남아 있음');
   await page.click('[data-tab="quiz"]'); await pause(page, 600);
   assert(await page.$('#quiz-stage'), '메뉴로 다시 왔을 때 고른 화면(퀴즈)이 유지되지 않음');
   await page.click('.review-tabs [data-review-view="video"]'); await pause(page, 500);
@@ -1513,9 +1542,11 @@ test('NT03 공지사항: 강사 화면의 읽음 수와 안 읽은 학생', asyn
   const { page } = await openApp(b, { file: 'admin.html', user: 'admin1', rules: 'v4', seed });
   await pause(page, 900);
   await page.click('[data-page="notices"]'); await pause(page, 900);
-  const reads = await page.$$eval('.announce-reads > .hint', els => els.map(e => e.textContent));
+  const reads = await page.$$eval('.announce-reads > .announce-read-count', els => els.map(e => e.textContent));
   eq(reads, Array(3).fill(`읽음 1/${active}명`), '공지별 읽음 수');
-  assert((await page.innerText('.announce-unread summary')).includes(`안 읽은 학생 ${active - 1}명`), '안 읽은 학생 수');
+  const read = await page.innerText('.announce-card >> nth=0 >> [data-reads="read"]'), unread = await page.innerText('.announce-card >> nth=0 >> [data-reads="unread"]');
+  assert(read.includes('읽음 1명') && read.includes('김민지'), '읽은 학생 이름: ' + read);
+  assert(unread.includes(`안 읽음 ${active - 1}명`) && !unread.includes('김민지') && unread.includes('이준호'), '안 읽은 학생 이름: ' + unread);
 });
 
 test('NT04 공지사항: 보관된 반은 지난 반 안내 줄에서 읽기만(확인 시각을 쓰지 않음)', async b => {
@@ -1536,7 +1567,7 @@ test('NT04 공지사항: 보관된 반은 지난 반 안내 줄에서 읽기만(
 test('NT05 공지사항: 공지 규칙을 게시하기 전(v3)에도 학생 홈은 그대로, 강사 공지 화면은 권한 안내', async b => {
   let r = await openApp(b, { file: 'index.html', user: 's1', rules: 'v3', seed: noticeSeed(), viewport: { width: 390, height: 844 } });
   await pause(r.page, 900);
-  assert(!(await r.page.$('.home-notices')) && await r.page.$('.home-next'), '규칙 게시 전 홈이 달라짐');
+  assert(!(await r.page.$('.home-notices')) && await r.page.$('#home-next .home-next-title'), '규칙 게시 전 홈이 달라짐');
   assert((await r.page.getAttribute('.nav-item[data-tab="home"]', 'aria-label')) === '홈', '규칙 게시 전 홈 배지가 뜸');
   assert(!r.errors.length, '학생 오류: ' + r.errors.join(' | '));
   await r.context.close();
@@ -1554,6 +1585,35 @@ test('CP01 수강 코드 복사: 안내문 없이 코드만 복사하고, 버튼
   await page.click('[data-copy-class="c1"]'); await pause(page, 300);
   eq(await page.evaluate(() => window.__copied), ['HOLA2026'], '복사한 글자');
   assert((await lastToast(page)).includes('HOLA2026'), '복사 안내: ' + await lastToast(page));
+});
+
+// ----- 2026-10-30 검수 반영 -----
+test('LV01 과제 화면을 연 채로 피드백이 오면 피드백 칸과 "제출한 답안" 상태 표시가 함께 바뀜', async b => {
+  const { page } = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 } });
+  await page.selectOption('#student-week-picker', 'w3'); await pause(page, 700);
+  assert((await page.innerText('#submitted-state')).includes('선생님 확인 전'), '처음 상태: ' + await page.innerText('#submitted-state'));
+  await page.evaluate(() => window.__mock.remoteWrite('classes/c1/weeks/w3/submissions/s1', { feedbacks: [{ id: 'lv1', text: '실시간으로 도착한 피드백', createdAt: new Date().toISOString(), author: '유진', forRevision: 1 }] }));
+  await pause(page, 900);
+  assert((await page.innerText('#student-assignment-feedback')).includes('실시간으로 도착한 피드백'), '피드백 칸이 바뀌지 않음');
+  assert((await page.innerText('#submitted-state')).includes('피드백 받음'), '상태 표시가 바뀌지 않음: ' + await page.innerText('#submitted-state'));
+});
+
+test('HM01 홈 할 일: 과제를 내고 복습을 풀면 빠지고 "모두 마쳤어요", 다른 기기에서 해도 바로 반영', async b => {
+  const { page } = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 }, tab: 'home' });
+  eq((await page.$$eval('.todo-row .todo-kind', els => els.map(e => e.textContent))), ['과제', '복습'], '처음 할 일');
+  await page.evaluate(() => window.__mock.remoteWrite('classes/c1/weeks/w4/submissions/s1', { userId: 's1', text: 'Tengo veinte años.', audioPath: '', submittedAt: new Date().toISOString() }));
+  await pause(page, 600);
+  eq((await page.$$eval('.todo-row .todo-kind', els => els.map(e => e.textContent))), ['복습'], '과제를 낸 뒤 할 일');
+  await page.evaluate(() => window.__mock.remoteWrite('classes/c1/weeks/w4/quizResults/s1', { userId: 's1', score: 2, total: 3, answers: ['1', '0', '1'], submittedAt: new Date().toISOString(), attemptCount: 1, firstAttempt: { score: 2, total: 3, legacy: false } }));
+  await pause(page, 600);
+  assert(!(await page.$('.todo-row')) && (await page.innerText('.home-todo')).includes('이번 차시 할 일을 모두 마쳤어요'), '다 한 뒤: ' + await page.innerText('.home-todo'));
+});
+
+test('CL01 학생 화면 문구: 답안 입력칸은 "여기에 답안을 작성해 주세요.", 앱 동작을 설명하는 문구는 다시 넣지 않음', async () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'index.html'), 'utf8');
+  assert(src.includes('placeholder="여기에 답안을 작성해 주세요."'), '답안 입력칸 안내');
+  const removed = ['스페인어로 답안', '다운로드 메뉴는 숨겨져', '앱 안에서 재생', '유튜브에서 재생됩니다', '펼치면 불러옵니다', '답변은 실시간으로 표시됩니다', '오늘 할 일과 새 소식을 확인해 보세요', '말하기와 쓰기를 차근차근', '반 변경이 필요하시면'];
+  eq(removed.filter(t => src.includes(t)), [], '남아 있는 설명 문구');
 });
 
 test('기본: 학생 과제 텍스트 제출, 퀴즈 3/3, 강사 화면 주요 메뉴 오류 없음', async b => {

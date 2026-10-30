@@ -15,8 +15,8 @@
 <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;1,9..144,500&display=swap">
 <!-- 배포할 때 CSS를 바꾸면 ?v= 값을 함께 올려 브라우저 캐시를 갱신하세요 -->
-<link rel="stylesheet" href="common.css?v=20261029m">
-<link rel="stylesheet" href="admin.css?v=20261029m">
+<link rel="stylesheet" href="common.css?v=20261030a">
+<link rel="stylesheet" href="admin.css?v=20261030a">
 </head>
 <body>
 <div id="root"></div>
@@ -36,8 +36,8 @@ window.__appStarted=true; // 모듈(외부 SDK 포함)을 모두 불러와 앱�
 import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import { doc, getDoc, getDocs, collection, query, where, setDoc, updateDoc, deleteDoc, serverTimestamp, arrayUnion, onSnapshot, writeBatch, runTransaction, deleteField } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
 import { ref as storageRef, deleteObject } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-storage.js';
-import { CONFIGURED, auth, db, storage, $, $$, esc, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, mountAuth, formatDuration, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalDialog, modalConfirm, modalInput, formatDateTime, todayKey, statusPill, paintPill, needsReply, linkifyText, sortNotices, IS_MAC, byLastActivity, feedbackItems, reviewState, REVIEW_LABEL, openModalLayer, toDate, quizContentKey, answersFor, audioMarkup, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded, modalChoice, sessionState, sessionDateText, parseYouTube, SIZE_LABEL, uploadsInProgress, filePicker, wireFilePickers, wasActiveAt, daysBetween, partsInZone, attendanceValue, normalizeQuizQuestion, isCorrectAnswer, questionSessionTag, shortLabel, isComposingKey } from './common.js?v=20261029m';
-import { computeDashboard, analyzeQuiz, feedbackQueue, firstAttemptOf, WATCH_RULES, TREND_SESSIONS } from './dashboard.js?v=20261029m';
+import { CONFIGURED, auth, db, storage, $, $$, esc, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, mountAuth, formatDuration, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalDialog, modalConfirm, modalInput, formatDateTime, todayKey, statusPill, paintPill, needsReply, linkifyText, sortNotices, IS_MAC, byLastActivity, feedbackItems, reviewState, REVIEW_LABEL, openModalLayer, toDate, quizContentKey, answersFor, audioMarkup, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded, modalChoice, sessionState, sessionDateText, parseYouTube, SIZE_LABEL, uploadsInProgress, filePicker, wireFilePickers, wasActiveAt, daysBetween, partsInZone, attendanceValue, normalizeQuizQuestion, isCorrectAnswer, questionSessionTag, shortLabel, isComposingKey } from './common.js?v=20261030a';
+import { computeDashboard, analyzeQuiz, feedbackQueue, firstAttemptOf, WATCH_RULES, TREND_SESSIONS } from './dashboard.js?v=20261030a';
 
 
 // ===== ADMIN PAGE =====
@@ -342,7 +342,7 @@ function dashKpisMarkup(d){
     tile('quiz','첫 응시 정답률',qz.average===null?'—':Math.round(qz.average)+'%',qz.firstN?`첫 응시 ${qz.firstN}건 평균`:'',
       [qz.expected?`응시 ${qz.attempted}/${qz.expected}건 (${pctText(qz.participation)})`:'완료한 차시에 공개된 복습이 없어요',qz.current?`${now(qz.current)} ${qz.current.attempted}/${qz.current.targets}명 응시`:'',qz.legacy?`첫 응시를 알 수 없는 이전 기록 ${qz.legacy}건은 뺐어요`:''],
       '공개된 복습마다 학생의 첫 응시 점수만 평균해요(다시 푼 점수는 넣지 않아요). 응시하지 않은 학생을 0점으로 계산하지 않고, 응시 비율로 따로 보여 줘요. 첫 응시를 알 수 없는 이전 기록은 빼고 건수를 표시해요.',
-      d.sessions.some(s=>s.hasQuiz&&s.state!=='upcoming')?'<button type="button" class="linkbutton dash-kpi-link" id="dash-jump-items">문항별 분석 보기 ↓</button>':''),
+      d.sessions.some(s=>s.hasQuiz&&s.state!=='upcoming')?'<button type="button" class="linkbutton dash-kpi-link" id="dash-jump-items">문항 분석 보기 →</button>':''),
   ].join('')}</section>`;
 }
 // 차시별 추이: 최근 완료 8차시. 한 축(0~100%) 가로 막대, 옆에 n. 기록이 없으면 0으로 그리지 않습니다.
@@ -443,9 +443,16 @@ async function showOverview(b){
   if(!quizList.some(s=>s.id===ui.itemSession))ui.itemSession=([...quizList].reverse().find(s=>s.state==='done'&&s.quiz.attempted)||quizList.at(-1))?.id||'';
   const scrollLeft=$('.dash-grid-scroll',host)?.scrollLeft||0;
   host.removeAttribute('aria-busy');
-  loaded(host,`<section class="dash-section" aria-labelledby="dash-actions-title"><h2 class="dash-section-title" id="dash-actions-title">처리할 일${d.actions.total?` <small>${d.actions.total}건</small>`:''}</h2>${dashActionsMarkup(d)}</section>
-   ${d.eventsUnavailable?'<p class="notice dash-section">수강 기간 기록을 읽지 못해 등록일 기준으로 대상 학생을 추정했어요. 최신 보안 규칙을 게시하면 정확해져요.</p>':''}
-   ${dashKpisMarkup(d)}${dashTrendsMarkup(d)}${dashGridMarkup(d)}${dashWatchMarkup(d)}${dashItemsShell(d,ui.itemSession)}`);
+  // 탭(2026-10-30): 처리할 일(카드 + 챙겨 볼 학생) · 학습 현황(지표·추이·진행표) · 문항 분석. 실시간으로 다시 그려도 고른 탭과 탭 포커스를 유지합니다.
+  const tab=['todo','progress','items'].includes(A.dashTab)?A.dashTab:'todo',focusTab=document.activeElement?.dataset?.dashTab||'';
+  const tabBtn=(key,label,extra='')=>`<button type="button" class="tab${tab===key?' active':''}" data-dash-tab="${key}" aria-pressed="${tab===key}" aria-controls="dash-panel-${key}">${label}${extra}</button>`;
+  const panel=(key,html)=>`<div id="dash-panel-${key}" class="dash-tab-panel" data-dash-panel="${key}"${tab===key?'':' hidden'}>${html}</div>`;
+  loaded(host,`<div class="tabset dash-tabs" role="group" aria-label="대시보드 보기">${tabBtn('todo','처리할 일',d.actions.total?` <span class="dash-tab-count">${d.actions.total}</span>`:'')}${tabBtn('progress','학습 현황')}${tabBtn('items','문항 분석')}</div>`+
+   panel('todo',`<section class="dash-section" aria-labelledby="dash-actions-title"><h2 class="dash-section-title sr-only" id="dash-actions-title">처리할 일${d.actions.total?` ${d.actions.total}건`:''}</h2>${dashActionsMarkup(d)}</section>${dashWatchMarkup(d)}`)+
+   panel('progress',`${d.eventsUnavailable?'<p class="notice dash-section">수강 기간 기록을 읽지 못해 등록일 기준으로 대상 학생을 추정했어요. 최신 보안 규칙을 게시하면 정확해져요.</p>':''}${dashKpisMarkup(d)}${dashTrendsMarkup(d)}${dashGridMarkup(d)}`)+
+   panel('items',dashItemsShell(d,ui.itemSession)));
+  $$('[data-dash-tab]',host).forEach(el=>el.onclick=()=>showDashTab(el.dataset.dashTab));
+  if(focusTab)$(`[data-dash-tab="${focusTab}"]`,host)?.focus();
   $('#dash-updated').textContent=lastUpdate?` · 마지막 갱신 ${clockText(lastUpdate)}`:'';
   // 실시간으로 다시 그려도 펼쳐 둔 설명·차시 목록과 진행표 스크롤은 그대로 둡니다.
   for(const key of ui.openDefs){const def=$('#dash-def-'+key,host);if(def){def.hidden=false;$(`[data-kpi-info="${key}"]`,host)?.setAttribute('aria-expanded','true')}}
@@ -455,8 +462,14 @@ async function showOverview(b){
   $$('[data-student-uid]',host).forEach(el=>el.onclick=()=>navigateAdminPage('students',{studentUid:el.dataset.studentUid}));
   $$('[data-kpi-info]',host).forEach(el=>el.onclick=()=>{const key=el.dataset.kpiInfo,def=$('#dash-def-'+key,host),open=def.hidden;def.hidden=!open;el.setAttribute('aria-expanded',String(open));if(open)ui.openDefs.add(key);else ui.openDefs.delete(key)});
   $$('details[data-action-kind]',host).forEach(el=>el.addEventListener('toggle',()=>{if(el.open)ui.openActions.add(el.dataset.actionKind);else ui.openActions.delete(el.dataset.actionKind)}));
-  $('#dash-jump-items',host)?.addEventListener('click',()=>$('#dash-items')?.scrollIntoView({behavior:'smooth',block:'start'}));
+  $('#dash-jump-items',host)?.addEventListener('click',()=>showDashTab('items',true));
   const pick=$('#dash-item-session',host);if(pick){pick.onchange=()=>{ui.itemSession=pick.value;ui.itemVersion=null;drawItems()};drawItems()}
+ }
+ function showDashTab(key,focus=false){
+  A.dashTab=key;
+  $$('[data-dash-tab]',host).forEach(b=>{const on=b.dataset.dashTab===key;b.classList.toggle('active',on);b.setAttribute('aria-pressed',String(on))});
+  $$('[data-dash-panel]',host).forEach(p=>{p.hidden=p.dataset.dashPanel!==key});
+  if(focus)$(`[data-dash-tab="${key}"]`,host)?.focus();
  }
  // 문항 분석: 같은 버전의 첫 응시만 모읍니다. 문항은 그 버전의 강사 전용 사본(quizVersions)에서 읽습니다.
  async function drawItems(){
@@ -1585,8 +1598,10 @@ function showNotices(b){
     if(data.reads===undefined||data.students===null)return '<span class="hint">읽음 확인 중</span>';
     if(data.reads===null)return '<span class="hint">읽음 정보를 불러오지 못했어요</span>';
     const students=data.students;if(!students.length)return '<span class="hint">수강 중인 학생이 없어요</span>';
-    const unread=students.filter(s=>(toDate(data.reads.get(s.uid))?.getTime()||0)<at);
-    return `<span class="hint">읽음 ${students.length-unread.length}/${students.length}명</span>${unread.length?`<details class="announce-unread"><summary>안 읽은 학생 ${unread.length}명</summary><p>${unread.map(s=>esc(s.studentName)).join(', ')}</p></details>`:''}`;
+    // 누가 읽었는지 강사가 바로 보도록 이름을 펼쳐 둡니다(2026-10-30 요청). 기호(✓/–)와 글자로 구분합니다.
+    const opened=s=>(toDate(data.reads.get(s.uid))?.getTime()||0)>=at,read=students.filter(opened),unread=students.filter(s=>!opened(s));
+    const names=(list,kind,label)=>`<div class="announce-names" data-reads="${kind}"><span class="announce-names-label">${label} ${list.length}명</span>${list.length?list.map(s=>statusPill(kind==='read'?'success':'neutral',s.studentName)).join(''):'<span class="hint">없음</span>'}</div>`;
+    return `<span class="hint announce-read-count">읽음 ${read.length}/${students.length}명</span>${names(read,'read','읽음')}${names(unread,'unread','안 읽음')}`;
   };
   const draw=()=>{
     if(!isCurrent()||data.notices===null)return;
