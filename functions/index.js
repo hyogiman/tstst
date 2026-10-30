@@ -1,7 +1,7 @@
 // 쎄뇨라유 강사 알림(2026-10-30 D14): 학생이 새 질문·추가 질문을 남기거나 과제를 내면(수정본 포함) 강사 기기로 웹 푸시를 보냅니다.
 // 강사 기기 목록은 Firestore adminDevices/{기기ID}(강사 화면의 '알림 설정'에서 등록)에 있습니다.
 // 알림 문구는 notify.js(순수 함수)가 만들고, 이 파일은 Firestore 이벤트를 받아 보내는 일만 합니다.
-// 배포: 저장소 README '강사 알림(Functions) 배포' 참고. 앱(화면 파일)을 다른 저장소로 옮겨도 이 함수들은 그대로 둡니다.
+// 배포: 저장소 README 9장(Cloud Shell). 앱(화면 파일)을 다른 저장소로 옮겨도 이 함수들은 그대로 둡니다.
 'use strict';
 const { onDocumentCreated, onDocumentWritten, onDocumentUpdated } = require('firebase-functions/v2/firestore');
 const { setGlobalOptions } = require('firebase-functions/v2');
@@ -12,7 +12,8 @@ const { getMessaging } = require('firebase-admin/messaging');
 const notify = require('./notify');
 
 initializeApp();
-// 지역은 정하지 않습니다. Firebase CLI가 Firestore 트리거를 데이터베이스가 있는 지역(가까운 지역)에 둡니다.
+// 지역은 정하지 않습니다. Firestore 트리거의 위치는 Firebase CLI가 데이터베이스 위치에 맞추고, 함수가 도는 지역은
+// 배포 뒤 functions:list로 확인합니다(이 반 규모에서는 지역 차이로 생기는 지연·비용이 아주 작음).
 // 동시에 뜨는 인스턴스는 3개까지로 막아 둡니다(갑자기 많이 실행되는 경우의 비용 안전장치).
 setGlobalOptions({ maxInstances: 3 });
 const db = getFirestore();
