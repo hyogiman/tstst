@@ -8,7 +8,9 @@ const { makeSeed } = require('../fixtures/seed.cjs');
 const ROOT = path.resolve(__dirname, '..', '..');
 const MOCK_DIR = path.join(ROOT, 'tests', 'mock');
 const FONT_DIR = process.env.PRETENDARD_DIR || path.join(ROOT, 'tests', '.cache', 'pretendard');
-const BASE = 'http://localhost:8123/'; // localhost는 보안 컨텍스트라 마이크(getUserMedia)를 쓸 수 있습니다
+// localhost는 보안 컨텍스트라 마이크(getUserMedia)를 쓸 수 있습니다. 다른 주소·경로에서도 되는지 볼 때는 TEST_BASE로 바꿉니다
+// (예: TEST_BASE=http://senorayu.localhost:8123/senorayu/ — 끝의 / 포함, 저장소를 옮긴 뒤 주소 확인용).
+const BASE = process.env.TEST_BASE || 'http://localhost:8123/';
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
 
 function serveFile(route, file) {

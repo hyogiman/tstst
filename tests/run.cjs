@@ -575,7 +575,7 @@ test('D06 수강 중지·재등록 기록과 날짜별 수강 판정(wasActiveAt
   const types = await page.evaluate(() => window.__mock.list('enrollments/s2_c1/events/').map(p => window.__mock.dump(p).type));
   assert(JSON.stringify(types.sort()) === JSON.stringify(['resumed', 'stopped']), '기록: ' + types.join(','));
   const verdicts = await page.evaluate(async () => {
-    const { wasActiveAt } = await import('/common.js?v=test');
+    const { wasActiveAt } = await import(new URL('common.js?v=test', document.baseURI).href);
     const ts = s => ({ seconds: Date.parse(s + 'T03:00:00Z') / 1000 });
     const en = { status: 'inactive', joinedAt: ts('2026-09-01') };
     const ev = [{ type: 'joined', at: ts('2026-09-01') }, { type: 'stopped', at: ts('2026-10-10') }];
@@ -796,7 +796,7 @@ test('S02 반 수정 모달과 + 새 차시 어느 쪽으로 만들어도 차시
 test('S03 sessionState: 어제·오늘·내일·날짜 없음(출결 있음/없음)', async b => {
   const { page } = await openAs(b, 'admin.html', 'admin1');
   const r = await page.evaluate(async () => {
-    const { sessionState, todayKey } = await import('/common.js?v=test');
+    const { sessionState, todayKey } = await import(new URL('common.js?v=test', document.baseURI).href);
     const day = n => todayKey(new Date(Date.now() + n * 86400000));
     return [sessionState({ date: day(-1) }), sessionState({ date: day(0) }), sessionState({ date: day(1) }), sessionState({}, undefined, { hasAttendance: true }), sessionState({})];
   });
@@ -901,8 +901,8 @@ test('B14c 대시보드: 수강 기간 기록을 읽지 못하면(이전 규칙)
 test('DB01 computeDashboard: 대상자·출석률·입력률·제출률·참여율·첫 응시 정답률(이전 기록 제외)·처리할 일', async b => {
   const { page } = await openAs(b, 'admin.html', 'admin1');
   const r = await page.evaluate(async () => {
-    const { computeDashboard } = await import('/dashboard.js');
-    const c = await import('/common.js?v=test');
+    const { computeDashboard } = await import(new URL('dashboard.js', document.baseURI).href);
+    const c = await import(new URL('common.js?v=test', document.baseURI).href);
     const today = c.todayKey(), at = n => new Date(Date.now() + n * 86400000), day = n => c.todayKey(at(n));
     const quiz = { enabled: true, questions: [{ id: 'q1', type: 'single', options: ['a', 'b'], correctIndices: [0] }] };
     const off = { enabled: false };
@@ -968,8 +968,8 @@ test('DB01 computeDashboard: 대상자·출석률·입력률·제출률·참여�
 test('DB02 analyzeQuiz: 같은 버전 첫 응시만 · 문항별 정답률 · 보기별 선택 수 · 가장 많이 고른 오답', async b => {
   const { page } = await openAs(b, 'admin.html', 'admin1');
   const r = await page.evaluate(async () => {
-    const { analyzeQuiz } = await import('/dashboard.js');
-    const c = await import('/common.js?v=test');
+    const { analyzeQuiz } = await import(new URL('dashboard.js', document.baseURI).href);
+    const c = await import(new URL('common.js?v=test', document.baseURI).href);
     const questions = [
       { id: 'q1', type: 'single', stem: '1', options: ['a', 'b', 'c', 'd'], correctIndices: [0] },
       { id: 'q2', type: 'multiple', stem: '2', options: ['p', 'q', 'r'], correctIndices: [0, 2] },
@@ -1054,8 +1054,8 @@ test('DB05 대시보드: 0건이면 "처리할 일이 없어요", 문항 분석�
 test('DB06 공개 누락: 만들어 둔 예습이 안 보이는 차시만 셈(예습을 쓰지 않는 차시·빈 편집기·이미지 없는 이미지 모드·꺼 둔 영상·첨부는 제외)', async b => {
   const { page } = await openAs(b, 'admin.html', 'admin1');
   const r = await page.evaluate(async () => {
-    const { computeDashboard, previewPrepared } = await import('/dashboard.js');
-    const c = await import('/common.js?v=test');
+    const { computeDashboard, previewPrepared } = await import(new URL('dashboard.js', document.baseURI).href);
+    const c = await import(new URL('common.js?v=test', document.baseURI).href);
     const today = c.todayKey(), day = n => c.todayKey(new Date(Date.now() + n * 86400000));
     const text = html => ({ enabled: false, mode: 'rich', richHtml: html });
     const s = (id, date, published, preview) => ({ id, label: id + '차시', date, published, assignment: { enabled: false }, quiz: { enabled: false, questions: [] }, preview });
@@ -2012,6 +2012,36 @@ test('PV02 예습의 강의 영상·파일 첨부 공개 토글(학생): 꺼 둔
   await r.page.selectOption('#student-week-picker', 'ow1'); await pause(r.page, 400);
   await r.page.click('[data-tab="preview"]'); await pause(r.page, 600);
   assert(!(await r.page.innerText('#student-body')).includes('수강 기간에만'), '꺼 둔 영상의 지난 반 안내가 보임');
+});
+
+test('SU01 새로 가입한 수강생: 새로고침 없이 내 정보·홈 인사·수강 등록·반 명단·질문에 가입할 때 쓴 이름(2026-10-30)', async b => {
+  const { page, errors } = await openAs(b, 'index.html', null, { rules: 'current', viewport: { width: 390, height: 844 }, tab: 'home' });
+  await page.click('#auth-alt'); await pause(page, 150);
+  await page.fill('#signup-name', '한소희');
+  await page.fill('#auth-email', 'sohee@example.com');
+  await page.fill('#signup-password', 'hola1234');
+  await page.click('#login-form button[type="submit"]'); await pause(page, 1200);
+  await page.fill('#join-form input[name="code"]', 'HOLA2026');
+  await page.click('#join-form button[type="submit"]'); await pause(page, 1200);
+  const uid = await page.evaluate(() => window.__mock.list('users/').map(p => p.split('/')[1]).find(id => id.startsWith('new_')));
+  const saved = await dump(page, `users/${uid}`);
+  eq([saved?.displayName, saved?.realName], ['한소희', '한소희'], '저장된 프로필');
+  const enrollment = await page.evaluate(id => window.__mock.list('enrollments/').filter(p => p.split('/').length === 2).map(p => window.__mock.dump(p)).find(d => d.uid === id), uid);
+  eq(enrollment?.studentName, '한소희', '수강 등록의 이름');
+  eq((await dump(page, `classes/c1/members/${uid}`))?.name, '한소희', '반 명단의 이름');
+  await page.click('[data-tab="home"]'); await pause(page, 600);
+  assert((await page.innerText('.home-head h1')).includes('한소희'), '홈 인사: ' + await page.innerText('.home-head h1'));
+  await page.click('[data-tab="mypage"]'); await pause(page, 700);
+  const myName = await page.evaluate(() => { const dt = [...document.querySelectorAll('.info-grid dt')].find(x => x.textContent.trim() === '내 이름'); return dt?.nextElementSibling?.textContent.trim(); });
+  eq(myName, '한소희', '내 정보의 내 이름');
+  await page.click('[data-tab="questions"]'); await pause(page, 700);
+  await page.fill('#question-title', '처음 질문');
+  await page.fill('#question-content', '가입하고 바로 남기는 질문이에요.');
+  await page.click('#question-create button[type="submit"]'); await pause(page, 900);
+  const q = await page.evaluate(() => window.__mock.list('classes/c1/questions/').filter(p => p.split('/').length === 4).map(p => window.__mock.dump(p)).find(d => d.title === '처음 질문'));
+  eq(q?.studentName, '한소희', '질문 작성자 이름');
+  const real = errors.filter(e => !/Failed to load resource/.test(e));
+  assert(!real.length, '오류: ' + real.join(' | '));
 });
 
 test('기본: 학생 과제 텍스트 제출, 퀴즈 3/3, 강사 화면 주요 메뉴 오류 없음', async b => {

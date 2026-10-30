@@ -22,7 +22,7 @@
 | `admin.webmanifest` · `admin-sw.js` · `push-view.js` | 강사 화면을 앱으로 설치하는 정보 / 알림을 받아 띄우는 서비스 워커 / 과제 제출 알림 묶기(9장) |
 | `functions/` · `firebase.json` · `.firebaserc` | 강사 알림을 보내는 Cloud Functions와 배포 설정(9장) |
 | `tests/` | 모의 Firebase 시나리오 테스트, 정적 검사, 보안 규칙 에뮬레이터 테스트, 화면 캡처 |
-| `docs/` | 검토 보고서, 개발 계획, 배치별 작업 지시서 |
+| `docs/` | 검토 보고서, 개발 계획, 배치별 작업 지시서, 저장소를 다른 계정으로 옮기는 안내(`MIGRATION.md`) |
 
 ## 2. 처음 설정 (Firebase)
 
@@ -44,12 +44,12 @@ python3 -m http.server 8000
 그다음 브라우저에서 `http://localhost:8000/index.html`(학생), `http://localhost:8000/admin.html`(강사)을 엽니다. 녹음(마이크)은 `https://` 또는 `localhost`에서만 동작합니다.
 
 ### 배포(정적 호스팅)
-- 이 저장소는 **GitHub Pages**로 배포됩니다. `main`에 올리면 GitHub의 'pages build and deployment' 작업이 저절로 돌아 화면 파일이 바뀝니다(저장소의 Actions 탭에서 확인, 지난 기록 기준 1분 안쪽). 기본 주소 형식은 `https://hyogiman.github.io/tstst/`입니다. 사용자 지정 도메인을 쓰면 주소가 다르니 GitHub 저장소의 Settings → Pages에서 확인하세요.
+- 이 저장소는 **GitHub Pages**로 배포됩니다. `main`에 올리면 GitHub의 'pages build and deployment' 작업이 저절로 돌아 화면 파일이 바뀝니다(저장소의 Actions 탭에서 확인, 지난 기록 기준 1분 안쪽). 기본 주소 형식은 `https://계정.github.io/저장소이름/`입니다(사용자 지정 도메인을 쓰면 다름). 실제 주소는 GitHub 저장소의 Settings → Pages 맨 위(*Your site is live at …*)에서 확인합니다. 저장소를 다른 계정으로 옮기는 순서는 [docs/MIGRATION.md](docs/MIGRATION.md)에 있습니다.
 - **배포 순서:** ① 보안 규칙 게시 → ② 화면 파일 반영(`main`에 병합). 새 화면은 새 규칙(질문의 차시 연결, 틀린 문제 연습, 학습 목표 등)을 전제로 합니다. 규칙이 이전 버전이면 일부 저장이 거부되거나(화면에 안내) 기능이 조용히 빠집니다. 반대로 규칙은 이전 화면이 쓰는 저장 형식도 받도록 유지합니다(`tests/rules/legacyclient.test.mjs`). 배포할 때 이미 열려 있던 학생 화면(새로고침 전)에서도 저장이 되게 하려는 것입니다.
-- **캐시 버전(`?v=`):** CSS·JS를 바꾸면 두 HTML 안의 `?v=` 값을 함께 올려야 학생 브라우저가 새 파일을 받습니다. 지금 값은 `20261030e`이고, 한 번에 바꾸는 명령은 다음과 같습니다(예: e → f).
+- **캐시 버전(`?v=`):** CSS·JS를 바꾸면 두 HTML 안의 `?v=` 값을 함께 올려야 학생 브라우저가 새 파일을 받습니다. 지금 값은 `20261030f`이고, 한 번에 바꾸는 명령은 다음과 같습니다(예: f → g).
 
 ```bash
-sed -i 's/20261030e/20261030f/g' index.html admin.html
+sed -i 's/20261030f/20261030g/g' index.html admin.html
 ```
 
 ## 4. 보안 규칙 게시 · 되돌리기
@@ -74,6 +74,7 @@ git show <커밋ID>:firestore.rules
 | 무엇 | 명령 | 비고 |
 |---|---|---|
 | 시나리오 테스트(모의 Firebase) | `node tests/run.cjs` | Playwright(Chromium)가 필요합니다. 이름 일부로 골라 실행: `node tests/run.cjs DB0` |
+| 다른 주소·경로에서 | `TEST_BASE=http://senorayu.localhost:8123/senorayu/ node tests/run.cjs` | 같은 시나리오를 다른 호스트·하위 경로로 띄워, 앱이 주소에 기대지 않는지 확인(저장소를 옮기기 전 점검) |
 | 정적 검사 | `node tests/lint.cjs` | ESLint 필요. 정의되지 않은 이름·쓰지 않는 import를 찾습니다 |
 | 보안 규칙 | `cd tests/rules && npm install && npm test` | Firebase 에뮬레이터(Java 필요)로 `firestore.rules`·`storage.rules`를 검증합니다 |
 | 화면 캡처 | `node tests/screens.cjs 출력폴더 390,1440` | 화면 전후 비교용(`tests/screenshots/`는 저장소에 올리지 않음) |
@@ -123,10 +124,10 @@ adminDevices/{id}                강사 알림 받는 기기(알림 주소·기�
 - **Storage(음성·영상·자료 파일):** 별도 자동 백업은 없습니다. 필요하면 `gsutil`·`gcloud storage` 명령으로 버킷의 `classes/` 폴더를 내려받아 보관합니다(명령 형식은 Google Cloud 문서 기준으로 확인 필요).
 - 앱 안에는 반 **보관**(기록 유지, 복원 가능)과 **영구 삭제**(되돌릴 수 없음)가 따로 있습니다. 수업이 끝난 반은 삭제 대신 보관하세요.
 - **반 내보내기(2026-10-30):** 클래스 관리 → 그 반의 '내보내기'. 학생 명단·출석표·과제(답안·음성·피드백)·제출 이력·복습 결과·복습 문항을 ZIP 하나로 내려받습니다. CSV는 엑셀에서 두 번 눌러 열면 됩니다(UTF-8 BOM). 강의 영상·예습 자료(강사 원본)·질문함·공지사항은 넣지 않습니다. 압축 파일 안 이름은 영문·숫자이고, 각 파일 설명은 안의 README.txt에 있습니다.
-- **음성까지 받으려면 Storage CORS 설정(한 번만):** 브라우저가 Storage 파일 내용을 직접 내려받으려면 버킷에 CORS 설정이 필요합니다(Firebase 문서 '웹에서 Cloud Storage로 파일 다운로드'). 설정 전에는 기록(CSV)만 들어가고 받지 못한 음성 목록이 README.txt에 남습니다. Google Cloud 콘솔에서 같은 프로젝트를 고른 뒤 Cloud Shell에서 아래 두 명령을 실행합니다. 버킷 이름은 Firebase 콘솔 Storage 화면 위쪽의 `gs://…`입니다. 앱 주소가 바뀌면 `origin`도 바꿉니다.
+- **음성까지 받으려면 Storage CORS 설정(한 번만):** 브라우저가 Storage 파일 내용을 직접 내려받으려면 버킷에 CORS 설정이 필요합니다(Firebase 문서 '웹에서 Cloud Storage로 파일 다운로드'). 설정 전에는 기록(CSV)만 들어가고 받지 못한 음성 목록이 README.txt에 남습니다. Google Cloud 콘솔에서 같은 프로젝트를 고른 뒤 Cloud Shell에서 아래 두 명령을 실행합니다. 버킷 이름은 Firebase 콘솔 Storage 화면 위쪽의 `gs://…`입니다. `앱도메인`은 앱 주소에서 `https://` 뒤부터 첫 `/` 앞까지입니다(예: `https://2nhyeok.kr/tstst/` → `2nhyeok.kr`, `https://아내아이디.github.io/senorayu/` → `아내아이디.github.io`). 앱 주소가 바뀌면 9장 끝의 안내대로 다시 설정합니다.
 
 ```bash
-echo '[{"origin":["https://2nhyeok.kr"],"method":["GET"],"maxAgeSeconds":3600}]' > cors.json
+echo '[{"origin":["https://앱도메인"],"method":["GET"],"maxAgeSeconds":3600}]' > cors.json
 ```
 
 ```bash
@@ -154,10 +155,10 @@ gsutil cors set cors.json gs://버킷이름
 2. **웹 푸시 인증서(선택이지만 권장)**: Firebase 콘솔 → 프로젝트 설정 → 클라우드 메시징 → 웹 구성 → 웹 푸시 인증서 → '키 쌍 생성'. 나온 **공개 키**를 `admin.html`의 `PUSH_VAPID_KEY`에 넣습니다. 비워 두면 Firebase 기본 키를 씁니다. 나중에 키를 넣으면 기기는 앱을 열 때 새 주소로 바뀝니다.
 
 ### Functions 배포(Google Cloud Shell에서)
-Google Cloud 콘솔에서 같은 프로젝트를 고르고 오른쪽 위 Cloud Shell을 엽니다. 아래 명령을 차례로 실행합니다. 앱을 다른 저장소로 옮긴 뒤라면 첫 줄의 주소만 새 저장소로 바꿉니다.
+Google Cloud 콘솔에서 같은 프로젝트를 고르고 오른쪽 위 Cloud Shell을 엽니다. 아래 명령을 차례로 실행합니다. 첫 줄의 주소는 저장소 첫 화면의 초록색 **Code** 버튼에 나오는 주소이고, `cd` 뒤에는 저장소 이름을 씁니다(옮기기 전 `hyogiman/tstst` → `cd tstst`, 옮긴 뒤 예: `아내아이디/senorayu` → `cd senorayu`).
 
 ```bash
-git clone https://github.com/hyogiman/tstst.git && cd tstst
+git clone https://github.com/저장소주인/저장소이름.git && cd 저장소이름
 ```
 
 ```bash
@@ -187,6 +188,8 @@ npx firebase-tools@latest deploy --only functions --project senora-c9b84
 아이폰은 iOS 16.4 이상에서 Safari 공유 버튼 → '홈 화면에 추가'로 설치한 앱에서만 알림을 받을 수 있습니다.
 
 ### 저장소·주소를 옮길 때 확인할 것
+
+다른 GitHub 계정으로 옮기는 전체 순서(소유권 이전 → Pages → Firebase·CORS → 동작 확인 → 정리)는 [docs/MIGRATION.md](docs/MIGRATION.md)에 있습니다. 아래는 주소가 바뀔 때 공통으로 할 일입니다.
 
 **그대로 두는 것:** Firebase 프로젝트(Firestore·Storage·Authentication·Functions)와 `common.js`의 `firebaseConfig`, 보안 규칙, 학생 계정과 기록. 알림은 화면 위치(예: `questions?class=…`)만 담고 주소는 설치된 앱이 붙이므로 Functions도 다시 배포하지 않습니다.
 

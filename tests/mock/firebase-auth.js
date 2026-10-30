@@ -29,6 +29,7 @@ export async function createUserWithEmailAndPassword(auth, email, password) {
   return { user: state.user };
 }
 export async function updateProfile(user, { displayName }) {
+  await new Promise(r => setTimeout(r, 80)); // 실제 SDK처럼 서버를 다녀온 뒤 반영(가입 직후 경쟁 상태 재현)
   user.displayName = displayName;
   const u = state.authUsers.find(x => x.uid === user.uid); if (u) u.displayName = displayName;
 }

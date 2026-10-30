@@ -15,8 +15,8 @@
 <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;1,9..144,500&display=swap">
 <!-- 배포할 때 CSS를 바꾸면 ?v= 값을 함께 올려 브라우저 캐시를 갱신하세요 -->
-<link rel="stylesheet" href="common.css?v=20261030e">
-<link rel="stylesheet" href="student.css?v=20261030e">
+<link rel="stylesheet" href="common.css?v=20261030f">
+<link rel="stylesheet" href="student.css?v=20261030f">
 </head>
 <body>
 <div id="root"></div>
@@ -35,7 +35,7 @@ window.__appStarted=true; // 모듈(외부 SDK 포함)을 모두 불러와 앱�
 
 import { onAuthStateChanged, updateProfile, signOut } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import { doc, getDoc, getDocs, collection, query, where, addDoc, setDoc, updateDoc, serverTimestamp, onSnapshot, runTransaction, writeBatch } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
-import { CONFIGURED, auth, db, $, $$, esc, fmt, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, ensureProfile, mountAuth, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalConfirm, formatDateTime, statusPill, paintPill, needsReply, byLastActivity, feedbackItems, reviewState, toDate, todayKey, daysBetween, audioMarkup, parseAnswer, encodeAnswer, normalizeQuizQuestion, isCorrectAnswer, answersFor, shortLabel, questionSessionTag, setErrorAudience, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded, sessionState, sessionDateText, youtubeEmbedUrl, linkifyText, sortNotices } from './common.js?v=20261030e';
+import { CONFIGURED, auth, db, $, $$, esc, fmt, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, ensureProfile, signupSettled, mountAuth, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalConfirm, formatDateTime, statusPill, paintPill, needsReply, byLastActivity, feedbackItems, reviewState, toDate, todayKey, daysBetween, audioMarkup, parseAnswer, encodeAnswer, normalizeQuizQuestion, isCorrectAnswer, answersFor, shortLabel, questionSessionTag, setErrorAudience, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded, sessionState, sessionDateText, youtubeEmbedUrl, linkifyText, sortNotices } from './common.js?v=20261030f';
 
 
 // ===== INDEX PAGE =====
@@ -1048,7 +1048,7 @@ function startClassmatesLive(){
 
 // 새로고침하면 보던 화면(주소의 #과제 등)으로 돌아갑니다. 페이지를 연 뒤 처음 로그인할 때 한 번만 씁니다.
 let tabFromHash=location.hash.slice(1);
-if(CONFIGURED){onAuthStateChanged(auth,async user=>{try{if(!user){resetStudentSession();mountAuth(root);return}S.user=user;if(['home','assignment','quiz','questions','mypage','preview','notices'].includes(tabFromHash))S.tab=tabFromHash;tabFromHash='';root.innerHTML='<div class="loading" style="min-height:90vh">학습 정보를 준비하고 있습니다</div>';S.profile=await ensureProfile(user);if(S.profile.role==='admin'){root.innerHTML=`<div style="max-width:450px;margin:100px auto;padding:24px" class="card"><h2>강사 계정입니다</h2><p style="margin:15px 0">강사 관리 페이지를 이용해 주세요.</p><a class="btn" href="admin.html">강사 페이지로 이동 →</a></div>`;return}await loadStudent()}catch(e){console.error(e);root.innerHTML=`<div class="card" style="max-width:550px;margin:70px auto"><h3>불러오기 실패</h3><p class="error">${esc(ex(e))}</p><button class="btn secondary" id="retry-student">다시 시도</button></div>`;$('#retry-student').onclick=()=>location.reload()}})}else mountAuth(root);
+if(CONFIGURED){onAuthStateChanged(auth,async user=>{try{if(!user){resetStudentSession();mountAuth(root);return}S.user=user;if(['home','assignment','quiz','questions','mypage','preview','notices'].includes(tabFromHash))S.tab=tabFromHash;tabFromHash='';root.innerHTML='<div class="loading" style="min-height:90vh">학습 정보를 준비하고 있습니다</div>';await signupSettled();S.profile=await ensureProfile(user);if(S.profile.role==='admin'){root.innerHTML=`<div style="max-width:450px;margin:100px auto;padding:24px" class="card"><h2>강사 계정입니다</h2><p style="margin:15px 0">강사 관리 페이지를 이용해 주세요.</p><a class="btn" href="admin.html">강사 페이지로 이동 →</a></div>`;return}await loadStudent()}catch(e){console.error(e);root.innerHTML=`<div class="card" style="max-width:550px;margin:70px auto"><h3>불러오기 실패</h3><p class="error">${esc(ex(e))}</p><button class="btn secondary" id="retry-student">다시 시도</button></div>`;$('#retry-student').onclick=()=>location.reload()}})}else mountAuth(root);
 
 
 </script>
