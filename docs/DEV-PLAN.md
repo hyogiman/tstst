@@ -13,7 +13,7 @@
 
 | 배치 | 상태 | 비고 |
 |---|---|---|
-| 01 검증 환경 | **완료 (배치마다 확장)** | 모의 Firebase 하네스 + 시나리오 테스트(`node tests/run.cjs`, 102개), 규칙 에뮬레이터 테스트(`tests/rules`, 156개), 정적 검사(`node tests/lint.cjs`), 반응형 스크린샷(`node tests/screens.cjs`) |
+| 01 검증 환경 | **완료 (배치마다 확장)** | 모의 Firebase 하네스 + 시나리오 테스트(`node tests/run.cjs`, 108개), 규칙 에뮬레이터 테스트(`tests/rules`, 171개), 알림 함수 테스트(`functions` 단위 8개 · `tests/functions` 에뮬레이터 10개), 정적 검사(`node tests/lint.cjs`), 반응형 스크린샷(`node tests/screens.cjs`) |
 | 02 보안 규칙 | **완료 (모두 게시)** | 게시된 규칙: Firestore v4(2026-10-30, 공지사항·복습 수업 영상), Storage 2026-10-30본(강사 폴더 목록 추가, 반·차시 삭제 때 미연결 파일 정리). Storage CORS(origin https://2nhyeok.kr, GET) 설정 완료(2026-10-30, 내보내기 음성). **배포는 사용자가 콘솔에서 직접** |
 | 03 공통 모듈 | **완료** | `common.js`(두 화면 공용), 정적 검사 |
 | 04 기록 보호·오전달 | **완료** | P0-01(D2: 출석·불참 2단계), P0-02, P0-08(D4), P0-09, P0-10 |
