@@ -30,7 +30,7 @@
 2. 웹 앱을 등록해 받은 설정값을 `common.js` 맨 위 `firebaseConfig`에 넣습니다(두 HTML이 이 파일 하나를 함께 씁니다).
 3. **보안 규칙 게시:** `firestore.rules`와 `storage.rules`의 내용을 각각 콘솔의 Firestore·Storage 규칙 편집기에 붙여 넣고 게시합니다(4장).
 4. **강사 계정:** 강사 계정은 가입 화면으로 만들 수 없습니다. Authentication에서 사용자를 만든 뒤, Firestore에 `users/{그 사용자 UID}` 문서를 만들고 `role` 필드를 `admin`으로 넣습니다. 강사 화면에 로그인하면 UID가 화면에 안내됩니다.
-5. **승인된 도메인:** 앱을 올린 주소(예: `내아이디.github.io`)를 Authentication 설정의 승인된 도메인에 추가합니다. 빠뜨리면 로그인 창에서 도메인 오류가 납니다.
+5. **승인된 도메인:** 앱을 올린 주소(예: `내아이디.github.io`)를 Authentication 설정의 승인된 도메인에 넣어 둡니다. 이 목록은 구글 로그인 같은 팝업·리디렉션 로그인과 돌아갈 주소가 있는 메일 링크에서 확인하며, 이메일·비밀번호 로그인에도 필요한지는 공식 문서로 확인하지 못했습니다(9장 '저장소·주소를 옮길 때').
 
 ## 3. 실행과 배포
 
@@ -187,6 +187,41 @@ npx firebase-tools@latest deploy --only functions --project senora-c9b84
 아이폰은 iOS 16.4 이상에서 Safari 공유 버튼 → '홈 화면에 추가'로 설치한 앱에서만 알림을 받을 수 있습니다.
 
 ### 저장소·주소를 옮길 때 확인할 것
-- Functions와 Firestore·Storage는 Firebase 프로젝트에 있으므로 그대로 둡니다. 알림은 화면 위치(예: `questions?class=…`)만 담고, 주소는 설치된 앱이 붙이므로 함수를 다시 배포하지 않아도 됩니다.
-- 주소(도메인)가 바뀌면: Firebase Authentication의 **승인된 도메인**에 새 주소를 넣고, Storage **CORS**의 `origin`을 새 주소로 다시 설정합니다(8장).
-- 알림 받는 기기는 주소마다 따로입니다. 옮긴 뒤 새 주소에서 앱을 설치하고 알림을 켭니다. 옮기기 전에 시험으로 켜 둔 기기는 🔔 알림 → 알림 받는 기기에서 지웁니다.
+
+**그대로 두는 것:** Firebase 프로젝트(Firestore·Storage·Authentication·Functions)와 `common.js`의 `firebaseConfig`, 보안 규칙, 학생 계정과 기록. 알림은 화면 위치(예: `questions?class=…`)만 담고 주소는 설치된 앱이 붙이므로 Functions도 다시 배포하지 않습니다.
+
+**주소(도메인)가 바뀌는지 먼저 봅니다.** 여기서 도메인은 `https://` + 호스트 이름(예: `https://2nhyeok.kr`)이고, 뒤의 경로(`/tstst/`)는 상관없습니다. 지금 저장소에는 사용자 지정 도메인 파일(CNAME)이 없어, `2nhyeok.kr`은 저장소 주인 계정의 GitHub Pages에 연결되고 이 저장소가 그 아래 경로(`/tstst/`)로 붙은 구조로 보입니다.
+
+| 옮긴 뒤 주소 예 | 도메인 | 할 일 |
+|---|---|---|
+| `https://2nhyeok.kr/새저장소/` 또는 `https://2nhyeok.kr/` (2nhyeok.kr을 새 계정·저장소에 연결) | 같음 | 아래 A·B 필요 없음 |
+| `https://새계정.github.io/새저장소/` (GitHub 기본 주소) | 바뀜 | A·B |
+| `https://class.2nhyeok.kr/` 같은 새 사용자 지정 도메인 | 바뀜 | A·B |
+
+**A. Firebase Authentication 승인된 도메인에 새 주소 넣기**
+1. Firebase 콘솔 → 프로젝트 `senora-c9b84` → 왼쪽 '빌드' → **Authentication** → 위쪽 **설정** 탭 → **승인된 도메인**.
+2. **도메인 추가** → 호스트 이름만 입력(예: `새계정.github.io`, `https://`와 경로 없이) → 추가.
+3. 옛 주소(`2nhyeok.kr`)는 새 주소로 잘 쓰게 된 뒤에 지웁니다. 기본으로 들어 있는 `localhost`, `senora-c9b84.firebaseapp.com` 등은 그대로 둡니다.
+- 참고: 이 목록은 구글 로그인 같은 팝업·리디렉션 로그인과 '앱으로 돌아가기' 주소가 있는 메일 링크에서 확인합니다(Firebase 문서). 이 앱이 쓰는 이메일·비밀번호 로그인과 비밀번호 재설정 메일(돌아갈 주소 없이 보냄)이 이 목록을 확인하는지는 공식 문서로 확인하지 못했습니다. 넣어 두면 손해가 없고, 나중에 구글 로그인 등을 붙이면 꼭 필요합니다.
+
+**B. Storage CORS에 새 주소 넣기(반 내보내기의 음성 파일)**
+브라우저가 Storage 파일 내용을 직접 내려받는 기능(반 내보내기의 음성)은 버킷 CORS에 적힌 주소에서만 됩니다. 영상·음성 재생, 이미지, 첨부 열기는 CORS와 상관없이 됩니다. Google Cloud 콘솔 → 프로젝트 `senora-c9b84` → Cloud Shell에서, 옛 주소와 새 주소를 함께 넣어 다시 설정합니다(`cors set`은 기존 설정을 통째로 바꿉니다). `origin`에는 경로 없이 `https://호스트`만 씁니다.
+
+```bash
+echo '[{"origin":["https://2nhyeok.kr","https://새계정.github.io"],"method":["GET"],"maxAgeSeconds":3600}]' > cors.json
+```
+
+```bash
+gsutil cors set cors.json gs://senora-c9b84.firebasestorage.app
+```
+
+```bash
+gsutil cors get gs://senora-c9b84.firebasestorage.app
+```
+
+마지막 명령에 두 주소가 보이면 됩니다. 새 주소에서 클래스 관리 → 내보내기 → [음성까지 내려받기]를 해 보고, ZIP 안 README.txt에 '내려받지 못한 음성 파일'이 없으면 성공입니다. 옛 주소를 더 쓰지 않으면 새 주소만 넣어 같은 명령을 다시 실행합니다.
+
+**옮긴 뒤 알아 둘 것**
+- 로그인 상태와 기기에 임시 저장된 내용(작성 중 답안·피드백 초안, 고른 차시 등)은 주소마다 따로 저장됩니다. 새 주소에서는 강사·학생 모두 **한 번 다시 로그인**하고, 옛 주소에서 쓰던 임시 저장 내용은 넘어오지 않습니다(서버에 저장한 기록은 그대로).
+- 알림 받는 기기도 주소마다 따로입니다. 새 주소에서 앱을 설치하고 🔔 알림을 켭니다. 옛 주소로 시험 등록한 기기는 🔔 알림 → 알림 받는 기기에서 지웁니다.
+- 학생에게 새 주소를 안내하고, 옛 저장소의 GitHub Pages는 끄거나 새 주소로 넘겨주는 안내 페이지로 바꿉니다. 옛 주소가 살아 있으면 고쳐지지 않은 옛 화면이 같은 Firebase에 계속 접속하게 됩니다.
