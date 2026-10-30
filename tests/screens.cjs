@@ -75,6 +75,7 @@ const scenes = [
   ['admin-weeks-preview-media', 'admin.html', 'admin1', async p => { await click(p, '[data-page="weeks"]'); await click(p, '[data-week-open="w5"]'); }, withPreviewMedia],
   ['student-preview-media', 'index.html', 's1', async p => { await pause(p, 600); await click(p, '#home-next [data-home-go="preview"]'); }, withPreviewMedia],
   ['admin-class-export', 'admin.html', 'admin1', async p => { await click(p, '[data-page="classes"]'); await click(p, '[data-export-class="c1"]'); }],
+  ['admin-push-settings', 'admin.html', 'admin1', async p => { await p.evaluate(() => { window.Notification = class { static async requestPermission() { return 'granted'; } }; window.Notification.permission = 'default'; }); await click(p, '#push-settings'); await pause(p, 400); }, null, 'v6'],
   ['student-home-multi-todo', 'index.html', 's1', async p => pause(p, 600), withEarlyAssignment],
   ['admin-attendance', 'admin.html', 'admin1', async p => { await click(p, '[data-page="attendance"]'); await p.selectOption('#quick-session', 'w2').catch(() => {}); await pause(p, 500); }],
 ];
@@ -83,10 +84,10 @@ const scenes = [
   fs.mkdirSync(OUT, { recursive: true });
   const browser = await launch();
   const problems = [];
-  for (const [name, file, user, act, seedOf] of scenes) {
+  for (const [name, file, user, act, seedOf, rules] of scenes) {
     if (ONLY && !ONLY.test(name)) continue;
     for (const width of WIDTHS) {
-      const { context, page, errors } = await openApp(browser, { file, user, viewport: { width, height: width < 700 ? 844 : 900 }, seed: seedOf ? seedOf() : undefined });
+      const { context, page, errors } = await openApp(browser, { file, user, viewport: { width, height: width < 700 ? 844 : 900 }, seed: seedOf ? seedOf() : undefined, ...(rules ? { rules } : {}) });
       try { await pause(page, 500); await act(page); await pause(page, 400); }
       catch (e) { problems.push(`${name}@${width}: ${e.message.split('\n')[0]}`); }
       await page.screenshot({ path: path.join(OUT, `${name}-${width}.png`), fullPage: true });

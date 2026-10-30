@@ -18,7 +18,7 @@ const browserGlobals = ['window', 'document', 'navigator', 'location', 'history'
   'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'requestAnimationFrame', 'cancelAnimationFrame', 'matchMedia',
   'URL', 'File', 'Blob', 'FormData', 'DOMParser', 'Node', 'CSS', 'MediaRecorder', 'crypto', 'Audio', 'Event', 'CustomEvent',
   'HTMLElement', 'KeyboardEvent', 'addEventListener', 'removeEventListener', 'getComputedStyle', 'performance', 'structuredClone',
-  'alert', 'confirm', 'innerWidth', 'scrollTo', 'IntersectionObserver', 'ResizeObserver', 'AbortController', 'queueMicrotask', 'TextEncoder', 'CompressionStream', 'Response'];
+  'alert', 'confirm', 'innerWidth', 'scrollTo', 'IntersectionObserver', 'ResizeObserver', 'AbortController', 'queueMicrotask', 'TextEncoder', 'CompressionStream', 'Response', 'URLSearchParams', 'Notification'];
 
 const sources = [];
 for (const file of ['index.html', 'admin.html']) {

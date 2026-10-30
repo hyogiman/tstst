@@ -5,3 +5,4 @@ tests/rules/node_modules/
 tests/rules/*.log
 tests/rules/*.rules
 tests/rules/package-lock.json
+tests/functions/*.log

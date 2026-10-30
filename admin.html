@@ -8,6 +8,9 @@
 <title>쎄뇨라유 스페인어 | 강사 관리공간</title>
 <link rel="icon" type="image/png" href="senorayu-icon.png">
 <link rel="icon" type="image/svg+xml" href="senorayu-mark.svg">
+<!-- 강사 화면을 휴대폰·PC에 앱으로 설치(2026-10-30, 알림용) -->
+<link rel="manifest" href="admin.webmanifest">
+<link rel="apple-touch-icon" href="senorayu-app-192.png">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,8 +18,8 @@
 <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;1,9..144,500&display=swap">
 <!-- 배포할 때 CSS를 바꾸면 ?v= 값을 함께 올려 브라우저 캐시를 갱신하세요 -->
-<link rel="stylesheet" href="common.css?v=20261030d">
-<link rel="stylesheet" href="admin.css?v=20261030d">
+<link rel="stylesheet" href="common.css?v=20261030e">
+<link rel="stylesheet" href="admin.css?v=20261030e">
 </head>
 <body>
 <div id="root"></div>
@@ -36,9 +39,10 @@ window.__appStarted=true; // 모듈(외부 SDK 포함)을 모두 불러와 앱�
 import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import { doc, getDoc, getDocs, collection, query, where, setDoc, updateDoc, deleteDoc, serverTimestamp, arrayUnion, onSnapshot, writeBatch, runTransaction, deleteField } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
 import { ref as storageRef, deleteObject, listAll, getBlob } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-storage.js';
-import { CONFIGURED, auth, db, storage, $, $$, esc, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, mountAuth, formatDuration, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalDialog, modalConfirm, modalInput, formatDateTime, todayKey, statusPill, paintPill, needsReply, linkifyText, sortNotices, IS_MAC, byLastActivity, feedbackItems, reviewState, REVIEW_LABEL, openModalLayer, toDate, quizContentKey, answersFor, audioMarkup, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded, modalChoice, sessionState, sessionDateText, parseYouTube, SIZE_LABEL, uploadsInProgress, filePicker, wireFilePickers, wasActiveAt, daysBetween, partsInZone, attendanceValue, normalizeQuizQuestion, isCorrectAnswer, questionSessionTag, shortLabel, isComposingKey } from './common.js?v=20261030d';
-import { computeDashboard, analyzeQuiz, feedbackQueue, firstAttemptOf, WATCH_RULES, TREND_SESSIONS } from './dashboard.js?v=20261030d';
-import { exportPlan, exportFiles, makeZip, exportFileName } from './classexport.js?v=20261030d';
+import { getMessaging, getToken, isSupported as messagingSupported } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-messaging.js';
+import { CONFIGURED, app, auth, db, storage, $, $$, esc, ex, toast, loading, loaded, empty, makeId, enId, uploadMedia, useMediaPaths, sanitizeRich, mountAuth, formatDuration, isRecording, stopRecordingForNavigation, makeMediaUi, wireMediaUi, showLiveNotice, modalDialog, modalConfirm, modalInput, formatDateTime, todayKey, statusPill, paintPill, needsReply, linkifyText, sortNotices, IS_MAC, byLastActivity, feedbackItems, reviewState, REVIEW_LABEL, openModalLayer, toDate, quizContentKey, answersFor, audioMarkup, installOfflineBanner, showLoadFailed, drafts, draftKey, removeUploaded, modalChoice, sessionState, sessionDateText, parseYouTube, SIZE_LABEL, uploadsInProgress, filePicker, wireFilePickers, wasActiveAt, daysBetween, partsInZone, attendanceValue, normalizeQuizQuestion, isCorrectAnswer, questionSessionTag, shortLabel, isComposingKey } from './common.js?v=20261030e';
+import { computeDashboard, analyzeQuiz, feedbackQueue, firstAttemptOf, WATCH_RULES, TREND_SESSIONS } from './dashboard.js?v=20261030e';
+import { exportPlan, exportFiles, makeZip, exportFileName } from './classexport.js?v=20261030e';
 
 
 // ===== ADMIN PAGE =====
@@ -236,9 +240,11 @@ function startAdminBadges(){
     if(badges.cid!==cid)return;
     let feedback=0;for(const list of Object.values(data.subs)){const q=feedbackQueue(list,data.active,reviewState);feedback+=q.pending+q.rereview}
     badges.counts={questions:data.questions.filter(needsReply).length,feedback};paintSideBadges();
+    const open=new Set(data.questions.filter(needsReply).map(q=>`q-${cid}-${q.id}`));
+    closePushNotifications(n=>n.tag.startsWith(`q-${cid}-`)&&!open.has(n.tag));refreshAppBadge();
   };
   const warn=key=>err=>console.warn('사이드바 배지 구독 실패',key,err);
-  badges.live.questions=onSnapshot(collection(db,'classes',cid,'questions'),snap=>{data.questions=snap.docs.map(d=>d.data());recount()},warn('questions'));
+  badges.live.questions=onSnapshot(collection(db,'classes',cid,'questions'),snap=>{data.questions=snap.docs.map(d=>({id:d.id,...d.data()}));recount()},warn('questions'));
   badges.live.enrollments=onSnapshot(query(collection(db,'enrollments'),where('classId','==',cid)),snap=>{data.active=new Set(snap.docs.map(d=>d.data()).filter(e=>e.status==='active').map(e=>e.uid));recount()},warn('enrollments'));
   for(const w of A.weeks){
     if(sessionState({date:sessionDateOf(w)},today)==='upcoming'&&!w.assignment?.enabled)continue;
@@ -249,7 +255,7 @@ function frame(){
   enterHistory();
   const sidebarEntries=[['overview','대시보드'],['classes','클래스 관리'],['weeks','차시별 학습자료'],['feedback','과제 · 복습 관리'],['questions','질문함'],['notices','공지사항'],['attendance','출석체크']];
   const sideMenu=sidebarEntries.map(([key,label])=>`<div class="side-menu-group"><button type="button" data-page="${key}" class="side-link ${A.page===key||(key==='classes'&&A.page==='students')?'active':''}">${sideIcon(key)}<span>${label}</span>${key==='classes'?'<span class="side-chevron">⌄</span>':''}</button>${key==='classes'?`<div class="side-submenu" aria-label="운영 중인 클래스 목록">${A.classes.filter(c=>!c.archived).map(c=>`<button type="button" class="side-class-link ${A.page==='students'&&A.classId===c.id?'active':''}" data-side-class="${esc(c.id)}" title="${esc(c.name)} 수강생 보기">${esc(c.name)}</button>`).join('')||'<span class="side-class-empty">운영 중인 클래스 없음</span>'}</div>`:''}</div>`).join('');
-  root.innerHTML=`<div class="admin-shell senorayu-admin-v6"><aside class="sidebar"><div class="sidebar-identity"><img src="senorayu-mark-white.svg" alt="쎄뇨라유 올리브유 병 심벌"><span>당신의 스페인어 가이드</span><strong>쎄뇨라유</strong></div><div class="side-nav">${sideMenu}</div><div class="sidebar-footnote">ESPAÑOL · LEARNING STUDIO</div></aside><div class="admin-main"><header class="admin-topbar"><div><p class="eyebrow" lang="es">Espacio docente</p><div class="topbar-greeting"><strong>${esc(A.profile?.displayName||'스페인어 강사')}${String(A.profile?.displayName||'').includes('선생님')?'':' 선생님'}</strong><span class="pill">강사</span></div></div><div class="topbar-actions"><div class="field"><label for="admin-class-switch">운영 중인 반</label><select id="admin-class-switch">${A.classes.map(c=>`<option value="${esc(c.id)}" ${c.id===A.classId?'selected':''}>${esc(c.name)}${c.archived?' (보관)':''}</option>`).join('')||'<option value="">개설된 반이 없습니다</option>'}</select></div><button id="admin-logout" type="button" class="btn secondary small">로그아웃</button></div></header><main id="admin-body"></main></div></div>`;
+  root.innerHTML=`<div class="admin-shell senorayu-admin-v6"><aside class="sidebar"><div class="sidebar-identity"><img src="senorayu-mark-white.svg" alt="쎄뇨라유 올리브유 병 심벌"><span>당신의 스페인어 가이드</span><strong>쎄뇨라유</strong></div><div class="side-nav">${sideMenu}</div><div class="sidebar-footnote">ESPAÑOL · LEARNING STUDIO</div></aside><div class="admin-main"><header class="admin-topbar"><div><p class="eyebrow" lang="es">Espacio docente</p><div class="topbar-greeting"><strong>${esc(A.profile?.displayName||'스페인어 강사')}${String(A.profile?.displayName||'').includes('선생님')?'':' 선생님'}</strong><span class="pill">강사</span></div></div><div class="topbar-actions"><div class="field"><label for="admin-class-switch">운영 중인 반</label><select id="admin-class-switch">${A.classes.map(c=>`<option value="${esc(c.id)}" ${c.id===A.classId?'selected':''}>${esc(c.name)}${c.archived?' (보관)':''}</option>`).join('')||'<option value="">개설된 반이 없습니다</option>'}</select></div><button id="push-settings" type="button" class="btn secondary small" aria-haspopup="dialog"><span aria-hidden="true">🔔</span> 알림</button><button id="admin-logout" type="button" class="btn secondary small">로그아웃</button></div></header><main id="admin-body"></main></div></div>`;
   $('#admin-logout').onclick=async()=>{
     if(!(await confirmLeaveWeekEditor()))return;
     // P1-07: 공용 PC에서 다음 사람이 보지 않도록 이 기기에 임시 저장된 피드백을 지웁니다.
@@ -258,6 +264,7 @@ function frame(){
     drafts.clearUser(A.user.uid);
     resetAdminSession();signOut(auth); // P0-09: 구독을 먼저 끊고 로그아웃
   };
+  $('#push-settings').onclick=()=>showPushSettings();
   $('#admin-class-switch')?.addEventListener('change',async e=>{if(!(await confirmLeaveWeekEditor())){e.target.value=A.classId;return}rememberAdminWeek();adminClearLive();A.classId=e.target.value;localStorage.setItem(classPrefKey(),A.classId);A.weekId='';if(A.classId)await loadWeeks();renderPage()});
   $$('[data-page]').forEach(el=>el.onclick=()=>navigateAdminPage(el.dataset.page));
   $$('[data-side-class]').forEach(el=>el.onclick=()=>openClassRoster(el.dataset.sideClass));
@@ -268,6 +275,8 @@ function renderPage(){
   stopRecordingForNavigation(); // P0-02: 화면을 옮기면 녹음을 멈춥니다.
   adminClearLive();$$('.side-link').forEach(el=>el.classList.toggle('active',el.dataset.page===A.page));const b=$('#admin-body');if(!b)return;
   if(!A.classId&&A.page!=='classes'&&A.page!=='overview'){b.innerHTML=`<div class="section-title"><div><h1>첫 번째 반을 개설해 보세요</h1><p>학습자에게 전달할 수강 코드 하나를 발급합니다.</p></div></div>${empty('아직 생성한 반이 없습니다')}<button id="go-classes" class="btn" style="margin-top:17px">반 개설하기 →</button>`;$('#go-classes').onclick=()=>{navigateAdminPage('classes')};return}
+  if(A.page==='feedback')closePushNotifications(n=>n.tag==='submissions');
+  if(A.page==='questions'&&A.activeQuestionId)closePushNotifications(n=>n.tag===`q-${A.classId}-${A.activeQuestionId}`);
   if(A.page==='overview')showOverview(b);if(A.page==='classes')showClasses(b);if(A.page==='weeks')showWeeks(b);if(A.page==='feedback')showFeedback(b);if(A.page==='attendance')showAttendance(b);if(A.page==='students')showStudents(b);if(A.page==='questions')showAdminQuestions(b);if(A.page==='notices')showNotices(b);
 }
 async function loadAdmin(preferred=''){const cs=await getDocs(collection(db,'classes'));A.classes=cs.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.name||'').localeCompare(b.name||'','ko'));await syncJoinCodes(A.classes);const choice=preferred||A.classId||localStorage.getItem(classPrefKey());A.classId=A.classes.some(c=>c.id===choice)?choice:(A.classes.find(c=>!c.archived)?.id||A.classes[0]?.id||'');if(A.classId){localStorage.setItem(classPrefKey(),A.classId);await loadWeeks();await syncMemberDirectory().catch(e=>console.warn('명단 동기화 실패',e))}else{A.weeks=[];A.weekId=''}frame()}
@@ -509,6 +518,135 @@ async function showOverview(b){
  }
  // 진행표·챙겨 볼 학생에 쓰는 이름은 최신 프로필 기준(수강생 관리와 같은 이름)으로 한 번 읽습니다.
  roster().then(list=>{if(!isCurrent())return;data.names=Object.fromEntries(list.map(m=>[m.uid,m.studentName]));schedule()}).catch(err=>console.warn('대시보드 이름 조회 실패',err));
+}
+// ---------- 강사 알림 (2026-10-30 D14) ----------
+// 이 기기를 '알림 받는 기기'로 등록합니다(adminDevices/{기기ID}). 보내는 일은 Cloud Functions(functions/), 받아서 띄우는 일은 서비스 워커(admin-sw.js).
+// 알림: 새 질문 · 추가 질문 · 과제 제출 · 수정본 제출. 잠금 화면에는 학생 이름과 글 첫 줄(2026-10-30 결정).
+// 웹 푸시 인증서 공개 키(Firebase 콘솔 → 프로젝트 설정 → 클라우드 메시징 → 웹 구성 → 웹 푸시 인증서). 비어 있으면 Firebase 기본 키를 씁니다.
+const PUSH_VAPID_KEY='';
+const PUSH_KEYS={device:'senorayu:push-device',token:'senorayu:push-token',seen:'senorayu:push-seen'};
+const pushStore={get:k=>{try{return localStorage.getItem(k)||''}catch(e){return ''}},set:(k,v)=>{try{v?localStorage.setItem(k,v):localStorage.removeItem(k)}catch(e){/* 이 기기에서는 기억하지 못함 */}}};
+const isInstalledApp=()=>matchMedia('(display-mode: standalone)').matches;
+function pushDeviceLabel(){
+  const ua=navigator.userAgent;
+  const os=/Android/i.test(ua)?'안드로이드':/iPhone|iPad/i.test(ua)?'아이폰·아이패드':/Windows/i.test(ua)?'Windows PC':/Macintosh/i.test(ua)?'Mac':'기기';
+  const browser=/SamsungBrowser/i.test(ua)?'삼성 인터넷':/Edg\//i.test(ua)?'Edge':/Chrome|CriOS/i.test(ua)?'Chrome':/Firefox/i.test(ua)?'Firefox':/Safari/i.test(ua)?'Safari':'브라우저';
+  return `${os} · ${browser}${isInstalledApp()?' · 설치한 앱':''}`;
+}
+let pushRegistration=null;
+// 알림을 받을 수 있는 브라우저면 서비스 워커를 등록해 돌려줍니다(못 받으면 null).
+async function pushReady(){
+  if(!('serviceWorker' in navigator)||!('Notification' in window)||!(await messagingSupported().catch(()=>false)))return null;
+  try{
+    pushRegistration=pushRegistration||await navigator.serviceWorker.register('admin-sw.js',{updateViaCache:'none'}); // push-view.js까지 늘 새 파일 확인
+    await Promise.race([navigator.serviceWorker.ready,new Promise(r=>setTimeout(r,8000))]);
+    return pushRegistration;
+  }catch(e){console.warn('알림 서비스 워커를 등록하지 못했습니다',e);return null}
+}
+// 알림 주소(FCM 토큰)를 받아 기기 문서에 저장합니다. 처음 켤 때(fresh)가 아니면 주소가 바뀌었거나 하루가 지났을 때만 씁니다.
+async function savePushDevice(reg,{fresh=false}={}){
+  const token=await getToken(getMessaging(app),{...(PUSH_VAPID_KEY?{vapidKey:PUSH_VAPID_KEY}:{}),serviceWorkerRegistration:reg});
+  if(!token)throw Error('알림 주소를 받지 못했어요. 잠시 후 다시 시도해 주세요.');
+  // 기기 ID는 문서를 저장한 뒤에만 기억합니다(저장이 거부되면 켜진 것으로 보이지 않게).
+  const id=pushStore.get(PUSH_KEYS.device)||makeId();
+  const stale=Date.now()-Number(pushStore.get(PUSH_KEYS.seen)||0)>24*3600e3;
+  if(fresh||token!==pushStore.get(PUSH_KEYS.token)||stale){
+    await setDoc(doc(db,'adminDevices',id),{uid:A.user.uid,token,label:pushDeviceLabel(),updatedAt:serverTimestamp(),lastSeenAt:serverTimestamp(),...(fresh?{createdAt:serverTimestamp()}:{})},{merge:true});
+    pushStore.set(PUSH_KEYS.device,id);pushStore.set(PUSH_KEYS.token,token);pushStore.set(PUSH_KEYS.seen,String(Date.now()));
+  }
+  return id;
+}
+function forgetPushDevice(){for(const key of Object.values(PUSH_KEYS))pushStore.set(key,'')}
+async function enablePush(){
+  const reg=await pushReady();
+  if(!reg)throw Error('이 브라우저에서는 알림을 받을 수 없어요. 안드로이드는 Chrome, 아이폰은 홈 화면에 추가한 앱에서 켜 주세요.');
+  const permission=await Notification.requestPermission();
+  if(permission!=='granted')throw Error(permission==='denied'?'알림이 차단되어 있어요. 휴대폰(브라우저) 설정에서 이 앱의 알림을 허용한 뒤 다시 눌러 주세요.':'알림 허용을 고르지 않았어요.');
+  await savePushDevice(reg,{fresh:true});
+}
+async function disablePush(){
+  const id=pushStore.get(PUSH_KEYS.device);
+  try{const sub=await (await pushReady())?.pushManager.getSubscription();await sub?.unsubscribe()}catch(e){console.warn('알림 구독 해제 실패',e)}
+  if(id)await deleteDoc(doc(db,'adminDevices',id));
+  forgetPushDevice();
+}
+// 강사 화면을 열 때: 알림을 켜 둔 기기면 주소를 새로 확인합니다. 다른 기기에서 이 기기를 지웠으면 꺼진 것으로 봅니다.
+async function refreshPushDevice(){
+  const id=pushStore.get(PUSH_KEYS.device);
+  if(!id||!('Notification' in window)||Notification.permission!=='granted')return;
+  try{
+    if(!(await getDoc(doc(db,'adminDevices',id))).exists()){forgetPushDevice();return}
+    const reg=await pushReady();if(reg)await savePushDevice(reg);
+  }catch(e){console.warn('알림 기기 정보를 새로 고치지 못했습니다',e)}
+}
+// 처리한 알림은 알림창에서 지웁니다(안드로이드 앱 아이콘의 점은 남은 알림이 있을 때만 보임).
+async function closePushNotifications(match){
+  try{const reg=pushRegistration||await navigator.serviceWorker?.getRegistration();for(const n of await reg?.getNotifications()||[])if(match(n))n.close()}catch(e){/* 알림을 지원하지 않는 환경 */}
+}
+// 앱 아이콘 숫자 = 운영 중인 반의 답할 질문 수(지원하는 기기만: PC에 설치한 앱·아이폰. 안드로이드는 알림이 남아 있으면 점으로 표시).
+let appBadgeTimer=null;
+function refreshAppBadge(){
+  if(!('setAppBadge' in navigator)||!A.user)return;
+  clearTimeout(appBadgeTimer);
+  appBadgeTimer=setTimeout(async()=>{
+    try{
+      const counts=await Promise.all(A.classes.filter(c=>!c.archived).map(c=>getDocs(query(collection(db,'classes',c.id,'questions'),where('needsTeacherReply','==',true))).then(s=>s.size)));
+      const n=counts.reduce((a,b)=>a+b,0);await (n?navigator.setAppBadge(n):navigator.clearAppBadge());
+    }catch(e){console.warn('앱 아이콘 숫자를 바꾸지 못했습니다',e)}
+  },800);
+}
+// 알림에서 연 화면 위치(예: questions?class=c1&q=q1 · feedback?class=c1&week=w3&uid=s1)로 이동합니다.
+async function openRoute(route){
+  const [page,qs='']=String(route||'').split('?'),p=new URLSearchParams(qs);
+  if(!ADMIN_PAGES.includes(page)||!A.user)return;
+  const cid=p.get('class');
+  if(cid&&cid!==A.classId&&A.classes.some(c=>c.id===cid)){
+    if(A.page==='weeks'&&!(await confirmLeaveWeekEditor()))return;
+    rememberAdminWeek();adminClearLive();A.classId=cid;localStorage.setItem(classPrefKey(),cid);A.weekId='';await loadWeeks();frame();
+  }
+  const opts={};
+  if(page==='questions'&&p.get('q'))opts.activeQuestionId=p.get('q');
+  if(page==='feedback'){opts.feedbackTab='submissions';if(p.get('week'))opts.weekId=p.get('week');if(p.get('uid'))opts.feedbackSelectedUid=p.get('uid')}
+  await navigateAdminPage(page,opts);
+}
+navigator.serviceWorker?.addEventListener('message',e=>{if(e.data?.type==='senorayu:open')openRoute(e.data.route)});
+async function showPushSettings(){
+  const layer=document.createElement('div');layer.className='app-modal-backdrop';
+  layer.innerHTML=`<section class="app-modal push-modal" role="dialog" aria-modal="true" aria-labelledby="push-title"><header class="app-modal-head"><div><div class="eyebrow" lang="es">Avisos</div><h2 id="push-title">알림 설정</h2></div><button type="button" class="app-modal-x" aria-label="닫기">×</button></header>
+   <div class="stack">
+    <div id="push-status" class="push-status" role="status"></div>
+    <div id="push-actions" class="row push-actions"></div>
+    <section class="push-section"><h3>알림이 오는 일</h3><ul class="push-events"><li><span aria-hidden="true">❓</span> 새 질문</li><li><span aria-hidden="true">💬</span> 추가 질문(질문 대화에 학생이 남긴 글)</li><li><span aria-hidden="true">📝</span> 과제 제출 · 수정본 제출(여러 건은 알림 하나로 묶음)</li></ul><p class="hint">잠금 화면에는 학생 이름과 글 첫 줄이 보여요. 숨기려면 휴대폰 설정의 알림 항목에서 바꿀 수 있어요.</p></section>
+    <section class="push-section"><h3>알림 받는 기기</h3><div id="push-devices" class="stack"><div class="loading">불러오는 중</div></div></section>
+   </div></section>`;
+  const close=openModalLayer(layer,{onEscape:()=>close()});
+  layer.querySelector('.app-modal-x').onclick=close;
+  const busy=async(btn,work,done)=>{btn.disabled=true;try{await work();if(done)toast(done)}catch(e){toast(ex(e),true)}finally{if(btn.isConnected)btn.disabled=false;await draw()}};
+  const draw=async()=>{
+    if(!layer.isConnected)return;
+    const supported=('serviceWorker' in navigator)&&('Notification' in window)&&await messagingSupported().catch(()=>false);
+    const id=pushStore.get(PUSH_KEYS.device),permission=supported?Notification.permission:'unsupported',on=!!id&&permission==='granted';
+    const mobile=/Android|iPhone|iPad/i.test(navigator.userAgent);
+    $('#push-status',layer).innerHTML=!supported?statusPill('neutral','이 브라우저는 알림을 지원하지 않아요')+'<p class="hint">안드로이드는 Chrome에서, 아이폰은 Safari로 홈 화면에 추가한 앱에서 켤 수 있어요.</p>'
+      :on?statusPill('success','이 기기에서 알림을 받고 있어요')
+      :permission==='denied'?statusPill('danger','알림이 차단되어 있어요')+'<p class="hint">휴대폰(브라우저) 설정 → 알림에서 이 앱을 허용한 뒤 아래 버튼을 눌러 주세요.</p>'
+      :statusPill('neutral','이 기기는 알림을 받지 않아요')+(mobile&&!isInstalledApp()?'<p class="hint">휴대폰에서는 먼저 앱으로 설치하는 것을 권해요. 안드로이드 Chrome 메뉴(⋮) → \'앱 설치\' 또는 \'홈 화면에 추가\'.</p>':'');
+    const actions=$('#push-actions',layer);
+    actions.innerHTML=!supported?'':on?'<button type="button" class="btn small" id="push-test">테스트 알림 보내기</button><button type="button" class="btn secondary small" id="push-off">이 기기 알림 끄기</button>':'<button type="button" class="btn small" id="push-on">이 기기에서 알림 받기</button>';
+    const onBtn=$('#push-on',actions),offBtn=$('#push-off',actions),testBtn=$('#push-test',actions);
+    if(onBtn)onBtn.onclick=()=>busy(onBtn,enablePush,'이 기기에서 알림을 받아요.');
+    if(offBtn)offBtn.onclick=()=>busy(offBtn,disablePush,'이 기기의 알림을 껐어요.');
+    if(testBtn)testBtn.onclick=()=>busy(testBtn,()=>updateDoc(doc(db,'adminDevices',id),{testRequestedAt:serverTimestamp()}),'테스트 알림을 보냈어요. 몇 초 안에 이 기기에 알림이 와요.');
+    const list=$('#push-devices',layer);
+    try{
+      const snap=await getDocs(collection(db,'adminDevices'));
+      const devices=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(toDate(b.lastSeenAt)?.getTime()||0)-(toDate(a.lastSeenAt)?.getTime()||0));
+      list.innerHTML=devices.length?devices.map(d=>`<div class="push-device"><div><strong>${esc(d.label||'기기')}${d.id===id?' <span class="pill brand">이 기기</span>':''}</strong><small>마지막 확인 ${esc(formatDateTime(d.lastSeenAt,{empty:'—'}))}</small></div><button type="button" class="btn danger small" data-push-remove="${esc(d.id)}" aria-label="${esc(d.label||'기기')} 알림 받는 기기에서 지우기">지우기</button></div>`).join(''):'<p class="hint">아직 알림을 받는 기기가 없어요.</p>';
+      $$('[data-push-remove]',list).forEach(btn=>btn.onclick=()=>busy(btn,async()=>{if(btn.dataset.pushRemove===id)await disablePush();else await deleteDoc(doc(db,'adminDevices',btn.dataset.pushRemove))},'알림 받는 기기에서 지웠어요.'));
+    }catch(e){list.innerHTML=`<p class="error">기기 목록을 불러오지 못했어요. ${esc(ex(e))}</p>`}
+  };
+  await draw();
+  requestAnimationFrame(()=>layer.querySelector('#push-actions .btn')?.focus());
 }
 // ---------- 반 내보내기 (2026-10-30) ----------
 // 출석·과제(답안·음성·피드백)·복습 결과를 ZIP 하나로 내려받습니다. 강의 영상과 예습 자료는 강사 원본이 있어 넣지 않습니다.
@@ -1743,7 +1881,7 @@ function noticeEditor(cid,n){
   requestAnimationFrame(()=>title.focus());
 }
 
-if(CONFIGURED){onAuthStateChanged(auth,async user=>{try{if(!user){resetAdminSession();mountAuth(root,{signup:false,variant:'admin'});return}root.innerHTML='<div class="loading" style="min-height:95vh">강사 권한을 확인하고 있습니다</div>';A.user=user;const snap=await getDoc(doc(db,'users',user.uid));if(!snap.exists()||snap.data().role!=='admin'){root.innerHTML=`<div class="card" style="max-width:620px;margin:8vh auto"><div class="eyebrow" lang="es">Acceso</div><h2>강사 권한이 필요합니다</h2><p style="margin-top:12px">관리자 계정은 가입만으로 생성되지 않습니다. Firebase Authentication에 강사 계정을 만든 뒤, Firestore <code>users/${esc(user.uid)}</code> 문서의 <code>role</code> 필드를 <code>admin</code>으로 등록해 주세요.</p><div class="subtle" style="margin-top:18px"><strong>현재 로그인 UID</strong><p style="overflow-wrap:anywhere">${esc(user.uid)}</p></div><div class="row" style="margin-top:18px"><button class="btn secondary" id="admin-signout">다른 계정으로 로그인</button><a class="btn soft" href="index.html">수강생 페이지</a></div></div>`;$('#admin-signout').onclick=()=>{resetAdminSession();signOut(auth)};return}A.profile=snap.data();if(history.state?.senorayu&&ADMIN_PAGES.includes(history.state.page))A.page=history.state.page;await loadAdmin()}catch(err){root.innerHTML=`<div class="card" style="max-width:570px;margin:60px auto"><h3>관리자 페이지 불러오기 실패</h3><p class="error">${esc(ex(err))}</p><button class="btn secondary" onclick="location.reload()">새로고침</button></div>`}})}else mountAuth(root,{signup:false});
+if(CONFIGURED){onAuthStateChanged(auth,async user=>{try{if(!user){resetAdminSession();mountAuth(root,{signup:false,variant:'admin'});return}root.innerHTML='<div class="loading" style="min-height:95vh">강사 권한을 확인하고 있습니다</div>';A.user=user;const snap=await getDoc(doc(db,'users',user.uid));if(!snap.exists()||snap.data().role!=='admin'){root.innerHTML=`<div class="card" style="max-width:620px;margin:8vh auto"><div class="eyebrow" lang="es">Acceso</div><h2>강사 권한이 필요합니다</h2><p style="margin-top:12px">관리자 계정은 가입만으로 생성되지 않습니다. Firebase Authentication에 강사 계정을 만든 뒤, Firestore <code>users/${esc(user.uid)}</code> 문서의 <code>role</code> 필드를 <code>admin</code>으로 등록해 주세요.</p><div class="subtle" style="margin-top:18px"><strong>현재 로그인 UID</strong><p style="overflow-wrap:anywhere">${esc(user.uid)}</p></div><div class="row" style="margin-top:18px"><button class="btn secondary" id="admin-signout">다른 계정으로 로그인</button><a class="btn soft" href="index.html">수강생 페이지</a></div></div>`;$('#admin-signout').onclick=()=>{resetAdminSession();signOut(auth)};return}A.profile=snap.data();if(history.state?.senorayu&&ADMIN_PAGES.includes(history.state.page))A.page=history.state.page;const route=location.hash.slice(1);await loadAdmin();if(route.includes('?'))await openRoute(route);closePushNotifications(n=>n.tag==='test');refreshPushDevice()}catch(err){root.innerHTML=`<div class="card" style="max-width:570px;margin:60px auto"><h3>관리자 페이지 불러오기 실패</h3><p class="error">${esc(ex(err))}</p><button class="btn secondary" onclick="location.reload()">새로고침</button></div>`}})}else mountAuth(root,{signup:false});
 
 
 </script>

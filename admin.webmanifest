@@ -1,0 +1,17 @@
+{
+  "id": "./admin.html",
+  "name": "쎄뇨라유 강사",
+  "short_name": "쎄뇨라유 강사",
+  "description": "쎄뇨라유 스페인어 강사 화면 · 새 질문과 과제 제출 알림",
+  "lang": "ko",
+  "start_url": "./admin.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#faf7f2",
+  "theme_color": "#a91e3c",
+  "icons": [
+    { "src": "senorayu-app-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "senorayu-app-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "senorayu-app-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

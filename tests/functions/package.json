@@ -1,0 +1,7 @@
+{
+  "name": "tstst-functions-tests",
+  "private": true,
+  "scripts": {
+    "test": "../rules/node_modules/.bin/firebase emulators:exec --only firestore,functions --project demo-tstst \"node e2e.cjs\""
+  }
+}

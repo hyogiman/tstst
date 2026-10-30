@@ -523,3 +523,14 @@ button.dash-action:hover{border-color:var(--wine-200);box-shadow:var(--shadow-md
 /* 대시보드 탭(2026-10-30) */
 .dash-tabs{margin:0 0 18px}
 .dash-tab-count{display:inline-block;min-width:20px;margin-left:6px;padding:0 6px;border-radius:999px;background:var(--wine-600);color:#fff;font-size:12px;line-height:20px;text-align:center}
+/* 강사 알림 설정(2026-10-30 D14) */
+.push-modal{width:min(560px,100%)}
+.push-status{display:grid;gap:6px;justify-items:start}
+.push-actions{flex-wrap:wrap;gap:8px}
+.push-actions:empty{display:none}
+.push-section{display:grid;gap:8px;padding-top:14px;border-top:1px solid var(--line)}
+.push-section h3{font-size:15px}
+.push-events{margin:0;padding:0;list-style:none;display:grid;gap:4px;font-size:14px;color:var(--ink-2)}
+.push-device{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface-2)}
+.push-device strong{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:14px}
+.push-device small{display:block;margin-top:2px;font-size:12px;color:var(--muted)}

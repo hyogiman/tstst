@@ -18,7 +18,9 @@
 | `classexport.js` | 반 내보내기(순수 함수). 출석·과제·복습 결과를 CSV로 만들고 음성 파일과 함께 ZIP 하나로 묶음 |
 | `common.css` · `student.css` · `admin.css` | 디자인 토큰과 공통 컴포넌트 / 학생 화면 / 강사 화면 스타일 |
 | `firestore.rules` · `storage.rules` | 보안 규칙(저장소의 파일이 기준입니다. 콘솔에 **직접 게시**해야 적용됩니다) |
-| `senorayu-*.svg/png/jpg` | 로고·아이콘·배너 이미지 |
+| `senorayu-*.svg/png/jpg` | 로고·아이콘·배너 이미지(앱 아이콘 `senorayu-app-192/512.png`, 알림 작은 아이콘 `senorayu-badge-96.png`) |
+| `admin.webmanifest` · `admin-sw.js` · `push-view.js` | 강사 화면을 앱으로 설치하는 정보 / 알림을 받아 띄우는 서비스 워커 / 과제 제출 알림 묶기(9장) |
+| `functions/` · `firebase.json` · `.firebaserc` | 강사 알림을 보내는 Cloud Functions와 배포 설정(9장) |
 | `tests/` | 모의 Firebase 시나리오 테스트, 정적 검사, 보안 규칙 에뮬레이터 테스트, 화면 캡처 |
 | `docs/` | 검토 보고서, 개발 계획, 배치별 작업 지시서 |
 
@@ -44,10 +46,10 @@ python3 -m http.server 8000
 ### 배포(정적 호스팅)
 - 이 저장소는 **GitHub Pages**로 배포됩니다. `main`에 올리면 GitHub의 'pages build and deployment' 작업이 저절로 돌아 화면 파일이 바뀝니다(저장소의 Actions 탭에서 확인, 지난 기록 기준 1분 안쪽). 기본 주소 형식은 `https://hyogiman.github.io/tstst/`입니다. 사용자 지정 도메인을 쓰면 주소가 다르니 GitHub 저장소의 Settings → Pages에서 확인하세요.
 - **배포 순서:** ① 보안 규칙 게시 → ② 화면 파일 반영(`main`에 병합). 새 화면은 새 규칙(질문의 차시 연결, 틀린 문제 연습, 학습 목표 등)을 전제로 합니다. 규칙이 이전 버전이면 일부 저장이 거부되거나(화면에 안내) 기능이 조용히 빠집니다. 반대로 규칙은 이전 화면이 쓰는 저장 형식도 받도록 유지합니다(`tests/rules/legacyclient.test.mjs`). 배포할 때 이미 열려 있던 학생 화면(새로고침 전)에서도 저장이 되게 하려는 것입니다.
-- **캐시 버전(`?v=`):** CSS·JS를 바꾸면 두 HTML 안의 `?v=` 값을 함께 올려야 학생 브라우저가 새 파일을 받습니다. 지금 값은 `20261030d`이고, 한 번에 바꾸는 명령은 다음과 같습니다(예: d → e).
+- **캐시 버전(`?v=`):** CSS·JS를 바꾸면 두 HTML 안의 `?v=` 값을 함께 올려야 학생 브라우저가 새 파일을 받습니다. 지금 값은 `20261030e`이고, 한 번에 바꾸는 명령은 다음과 같습니다(예: e → f).
 
 ```bash
-sed -i 's/20261030d/20261030e/g' index.html admin.html
+sed -i 's/20261030e/20261030f/g' index.html admin.html
 ```
 
 ## 4. 보안 규칙 게시 · 되돌리기
@@ -75,6 +77,8 @@ git show <커밋ID>:firestore.rules
 | 정적 검사 | `node tests/lint.cjs` | ESLint 필요. 정의되지 않은 이름·쓰지 않는 import를 찾습니다 |
 | 보안 규칙 | `cd tests/rules && npm install && npm test` | Firebase 에뮬레이터(Java 필요)로 `firestore.rules`·`storage.rules`를 검증합니다 |
 | 화면 캡처 | `node tests/screens.cjs 출력폴더 390,1440` | 화면 전후 비교용(`tests/screenshots/`는 저장소에 올리지 않음) |
+| 알림 문구(Functions) | `cd functions && npm install && npm test` | 알림 제목·본문·이동 위치·제출 판단 단위 테스트 |
+| 알림 함수 전체 | `cd tests/functions && npm test` | 에뮬레이터(Firestore + Functions)에서 질문·답글·제출을 쓰고 보낼 알림을 확인(`tests/rules`의 firebase-tools 사용) |
 
 모의 Firebase(`tests/mock/`)는 실제 SDK 대신 쓰는 가짜 모듈이라 실제 규칙과 100% 같지는 않습니다. 규칙은 에뮬레이터 테스트를 기준으로 봅니다.
 
@@ -98,6 +102,7 @@ classes/{cid}                    반(이름, 수강 코드, 보관 여부, 일�
     quizVersions/{v}             퀴즈 문항 사본(강사 전용, 응시 당시 문제로 해석)
     attendance/{uid}             출결(출석·불참)
 joinCodes/{CODE}                 수강 코드 → 반 연결표
+adminDevices/{id}                강사 알림 받는 기기(알림 주소·기기 이름, 강사만, 9장)
 ```
 
 ## 7. 자주 생기는 문제
@@ -129,3 +134,59 @@ gsutil cors set cors.json gs://버킷이름
 ```
 
 - **영구 삭제와 저장 용량:** 반을 영구 삭제하면 Firestore 기록과 Storage의 그 반 파일(강의·수업 영상, 예습 자료, 학생·피드백 음성)을 지웁니다. 문서에 연결되지 않은 파일(저장하지 않고 닫은 업로드, 예전에 지운 차시의 영상)까지 찾으려면 2026-10-30 Storage 규칙(강사 폴더 목록)을 게시해야 합니다. 게시 전에는 연결된 파일과 차시별 영상 폴더까지만 지웁니다. 유튜브 링크 영상은 유튜브에 있으므로 지워지지 않습니다.
+
+## 9. 강사 알림(앱 설치 · Cloud Functions, 2026-10-30)
+
+학생이 **새 질문 · 추가 질문**을 남기거나 **과제를 내면(수정본 포함)** 강사 휴대폰·PC로 알림이 옵니다. 알림을 누르면 강사 앱의 그 질문·그 학생 답안이 열립니다.
+
+| 부분 | 파일 | 하는 일 |
+|---|---|---|
+| 보내기 | `functions/` (Cloud Functions, Node 22) | Firestore에 질문·답글·제출이 생기면 강사 기기 목록(`adminDevices`)으로 FCM 웹 푸시를 보냅니다. 문구는 `functions/notify.js` |
+| 받기 | `admin-sw.js` · `push-view.js` | 앱이 꺼져 있어도 알림을 띄웁니다. 과제 제출은 알림 하나로 묶고(10분 안에는 소리 없이 내용만 바꿈), 질문은 질문마다 하나 |
+| 설치·설정 | `admin.webmanifest` · 강사 화면 상단 **🔔 알림** | 휴대폰에 앱으로 설치, 이 기기 알림 켜기·끄기, 테스트 알림, 알림 받는 기기 목록 |
+
+- 잠금 화면에는 **학생 이름 + 글 첫 줄**이 보입니다(휴대폰 설정에서 숨길 수 있음).
+- **앱 아이콘 숫자**(답할 질문 수)는 PC에 설치한 앱과 아이폰에서만 표시됩니다. 안드로이드는 이 기능을 지원하지 않아, 처리하지 않은 알림이 남아 있으면 아이콘에 **점**으로 표시됩니다. 앱에서 질문에 답하거나 과제·복습 관리를 열면 해당 알림을 지웁니다.
+- Functions는 **Blaze 요금제**가 필요합니다. FCM(푸시 발송)은 무료이고, 이 반 규모의 알림은 Functions 무료 사용량 안에 들 것으로 예상합니다(정확한 요금은 Google 가격 페이지 기준).
+
+### 처음 한 번: 준비
+1. **Firestore 규칙 게시**: `firestore.rules`의 `adminDevices`(강사 알림 기기) 규칙이 들어간 판을 콘솔에 게시합니다(4장).
+2. **웹 푸시 인증서(선택이지만 권장)**: Firebase 콘솔 → 프로젝트 설정 → 클라우드 메시징 → 웹 구성 → 웹 푸시 인증서 → '키 쌍 생성'. 나온 **공개 키**를 `admin.html`의 `PUSH_VAPID_KEY`에 넣습니다. 비워 두면 Firebase 기본 키를 씁니다. 나중에 키를 넣으면 기기는 앱을 열 때 새 주소로 바뀝니다.
+
+### Functions 배포(Google Cloud Shell에서)
+Google Cloud 콘솔에서 같은 프로젝트를 고르고 오른쪽 위 Cloud Shell을 엽니다. 아래 명령을 차례로 실행합니다. 앱을 다른 저장소로 옮긴 뒤라면 첫 줄의 주소만 새 저장소로 바꿉니다.
+
+```bash
+git clone https://github.com/hyogiman/tstst.git && cd tstst
+```
+
+```bash
+cd functions && npm ci && cd ..
+```
+
+```bash
+npx firebase-tools@latest login --no-localhost
+```
+
+```bash
+npx firebase-tools@latest deploy --only functions --project senora-c9b84
+```
+
+- 로그인 명령은 주소를 하나 보여 줍니다. 그 주소를 열어 Firebase 계정으로 로그인하고, 받은 코드를 Cloud Shell에 붙여 넣습니다.
+- 처음 배포할 때는 필요한 Google Cloud 기능을 켜느라 몇 분 걸립니다. 컨테이너 이미지 보관 기간을 물으면 기본값(Enter)으로 둡니다.
+- 처음 배포에서 권한(Eventarc·서비스 계정) 오류가 나면 몇 분 뒤 같은 배포 명령을 다시 실행합니다. 처음 켠 권한이 퍼지는 데 시간이 걸리는 경우입니다.
+- 배포된 함수 확인: `npx firebase-tools@latest functions:list --project senora-c9b84` → `notifyNewQuestion` · `notifyStudentReply` · `notifySubmission` · `sendTestNotification` 4개.
+- 함수 코드를 고쳤을 때만 다시 배포합니다. 화면 파일(HTML·CSS·JS)을 바꾸거나 저장소를 옮기는 것만으로는 다시 배포할 필요가 없습니다.
+
+### 강사 휴대폰(안드로이드)에 설치
+1. Chrome으로 강사 화면 주소(`…/admin.html`)를 엽니다.
+2. Chrome 메뉴(⋮) → **'앱 설치'**(또는 '홈 화면에 추가')를 누릅니다.
+3. 홈 화면의 '쎄뇨라유 강사' 아이콘으로 열고 로그인합니다.
+4. 상단 **🔔 알림** → **이 기기에서 알림 받기** → 허용 → **테스트 알림 보내기**로 확인합니다.
+
+아이폰은 iOS 16.4 이상에서 Safari 공유 버튼 → '홈 화면에 추가'로 설치한 앱에서만 알림을 받을 수 있습니다.
+
+### 저장소·주소를 옮길 때 확인할 것
+- Functions와 Firestore·Storage는 Firebase 프로젝트에 있으므로 그대로 둡니다. 알림은 화면 위치(예: `questions?class=…`)만 담고, 주소는 설치된 앱이 붙이므로 함수를 다시 배포하지 않아도 됩니다.
+- 주소(도메인)가 바뀌면: Firebase Authentication의 **승인된 도메인**에 새 주소를 넣고, Storage **CORS**의 `origin`을 새 주소로 다시 설정합니다(8장).
+- 알림 받는 기기는 주소마다 따로입니다. 옮긴 뒤 새 주소에서 앱을 설치하고 알림을 켭니다. 옮기기 전에 시험으로 켜 둔 기기는 🔔 알림 → 알림 받는 기기에서 지웁니다.

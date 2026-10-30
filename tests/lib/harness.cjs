@@ -9,7 +9,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const MOCK_DIR = path.join(ROOT, 'tests', 'mock');
 const FONT_DIR = process.env.PRETENDARD_DIR || path.join(ROOT, 'tests', '.cache', 'pretendard');
 const BASE = 'http://localhost:8123/'; // localhost는 보안 컨텍스트라 마이크(getUserMedia)를 쓸 수 있습니다
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2', '.json': 'application/json' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
 
 function serveFile(route, file) {
   if (!fs.existsSync(file)) return route.fulfill({ status: 404, body: 'not found: ' + file });

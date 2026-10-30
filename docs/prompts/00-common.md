@@ -30,6 +30,8 @@
 users/{uid}               role('admin'|'student'), displayName, realName, nickname, email,
                           assignedClassId, createdAt, updatedAt
 joinCodes/{CODE}          classId, createdBy, updatedAt                 ← 코드 단건 조회용
+adminDevices/{기기ID}     uid, token(FCM 알림 주소), label(기기 이름), createdAt, updatedAt, lastSeenAt, testRequestedAt
+                          ← 2026-10-30 D14 강사 알림 받는 기기. 강사만 읽고 씀. Cloud Functions(functions/)가 이 목록으로 보냄
 enrollments/{uid}_{cid}   uid, classId, studentName, email, joinCode,
                           status('active'|'inactive'|'transferred'), joinedAt
   events/{eid}            type('joined'|'stopped'|'resumed'|'transferred_out'|'transferred_in'),

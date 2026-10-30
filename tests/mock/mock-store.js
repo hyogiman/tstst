@@ -113,8 +113,9 @@ export function makeUser(u) {
 export function autoId() { state.seq += 1; return 'auto' + String(state.seq).padStart(4, '0') + Math.random().toString(36).slice(2, 6); }
 
 // ---------- 보안 규칙(일부) 흉내 ----------
-// v5(2026-10-30): Storage에서 강사가 반 폴더 목록을 볼 수 있음(Firestore 규칙은 v4와 같음)
-const RULE_VERSIONS = { v1: 1, v2: 2, v3: 3, v4: 4, v5: 5, current: 4, proposed: 5 };
+// v5(2026-10-30 게시): Storage에서 강사가 반 폴더 목록을 볼 수 있음(Firestore 규칙은 v4와 같음)
+// v6(2026-10-30 제안): 강사 알림 기기 목록 adminDevices(강사만)
+const RULE_VERSIONS = { v1: 1, v2: 2, v3: 3, v4: 4, v5: 5, v6: 6, current: 5, proposed: 6 };
 // 지금 흉내 내는 규칙이 해당 버전 이상인지
 export function rulesAt(v) { return (RULE_VERSIONS[state.rulesMode] ?? 4) >= RULE_VERSIONS[v]; }
 export function permissionError(message) { return Object.assign(new Error('Missing or insufficient permissions. ' + (message || '')), { code: 'permission-denied' }); }
@@ -143,6 +144,7 @@ export function canReadDoc(path, data) {
   const u = me(); if (!u) return false;
   // v4: 공지·공지 확인 시각은 새 규칙을 게시해야 읽을 수 있음(그 전에는 강사도 거부)
   if (/^classes\/[^/]+\/(notices|noticeReads)(\/|$)/.test(path) && !rulesAt('v4')) return false;
+  if (/^adminDevices(\/|$)/.test(path)) return rulesAt('v6') && isAdmin(); // v6: 강사 알림 기기는 강사만
   if (isAdmin()) return true;
   const s = path.split('/');
   if (s[0] === 'users') return s[1] === u;
@@ -179,6 +181,12 @@ export function checkWrite(op) {
   const admin = isAdmin();
   const after = op.type === 'delete' ? null : op.after;
   if (s[0] === 'classes' && ['notices', 'noticeReads'].includes(s[2]) && !rulesAt('v4')) throw permissionError('notices (before v4 rules)');
+  if (s[0] === 'adminDevices') {
+    // v6: 강사 알림 기기. 강사만, 자기 uid로만
+    if (!rulesAt('v6') || !admin) throw permissionError('adminDevices');
+    if (after && after.uid !== u) throw permissionError('adminDevices uid');
+    return;
+  }
   if (s[0] === 'enrollments' && s.length > 2) {
     // P1-04 수강 기간 기록: v3 규칙부터. 학생은 자기 등록의 'joined' 기록만
     if (!rulesAt('v3')) throw permissionError('enrollment events (before v3 rules)');

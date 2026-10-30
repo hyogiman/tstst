@@ -330,6 +330,16 @@ service cloud.firestore {
         }
       }
     }
+    // 강사 알림 기기(2026-10-30 D14): 강사 화면의 '알림 설정'에서 등록한 기기의 알림 주소(FCM 토큰).
+    // 강사만 읽고 씁니다. 알림은 Cloud Functions가 보내며, 함수는 관리자 권한이라 이 규칙과 상관없이 읽습니다.
+    match /adminDevices/{deviceId} {
+      allow read, delete: if admin();
+      allow create, update: if admin() &&
+        request.resource.data.keys().hasOnly(['uid','token','label','createdAt','updatedAt','lastSeenAt','testRequestedAt']) &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.token is string && request.resource.data.token.size() > 0 && request.resource.data.token.size() <= 4096 &&
+        request.resource.data.get('label', '') is string && request.resource.data.get('label', '').size() <= 80;
+    }
     match /{document=**} { allow read, write: if false; }
   }
 }

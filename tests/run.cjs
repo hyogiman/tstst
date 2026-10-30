@@ -1774,6 +1774,154 @@ test('DL01 반 영구 삭제: 새 규칙(v5)이면 반 폴더의 파일을 모�
   eq((await r.page.evaluate(() => window.__mock.files())).filter(p => p.startsWith('classes/c2/')), ['classes/c2/previews/cw1/file/unsaved.pdf', 'classes/c2/previews/cw9/video/old-week.mp4'], '남은 파일(v4: 차시 영상 폴더만 찾음)');
 });
 
+// ----- 2026-10-30 강사 알림(D14): 앱 설치·알림 설정·알림에서 화면 열기 -----
+// 헤드리스 Chromium은 알림 권한을 늘 'denied'로 알려 주므로, 이 테스트들만 Notification을 대신하는 객체를 넣습니다(앱 코드는 그대로).
+const openPushAdmin = async (b, { rules = 'v6', hash = '', permission = 'default' } = {}) => {
+  const context = await b.newContext({ viewport: { width: 1280, height: 860 }, timezoneId: 'Asia/Seoul', locale: 'ko-KR', permissions: ['microphone'] });
+  await context.addInitScript(start => {
+    class FakeNotification { static async requestPermission() { FakeNotification.permission = 'granted'; return 'granted'; } }
+    FakeNotification.permission = start;
+    window.Notification = FakeNotification;
+  }, permission);
+  const r = await openApp(b, { file: 'admin.html' + hash, user: 'admin1', rules, context });
+  await pause(r.page, 900);
+  return { ...r, context };
+};
+const devicesOf = page => page.evaluate(() => window.__mock.list('adminDevices/').map(p => ({ id: p.split('/')[1], ...window.__mock.dump(p) })));
+
+test('PU01 강사 알림 설정: 이 기기 알림 받기 → 기기 등록, 테스트 알림 요청, 끄면 목록에서 빠짐', async b => {
+  const { page } = await openPushAdmin(b);
+  await page.click('#push-settings'); await pause(page, 400);
+  assert((await page.innerText('.push-modal')).includes('새 질문') && (await page.innerText('#push-status')).includes('이 기기는 알림을 받지 않아요'), '처음 상태: ' + await page.innerText('#push-status'));
+  assert((await page.innerText('#push-devices')).includes('아직 알림을 받는 기기가 없어요'), '빈 기기 목록');
+  await page.click('#push-on'); await pause(page, 1500);
+  assert((await page.innerText('#push-status')).includes('이 기기에서 알림을 받고 있어요'), '켠 뒤 상태: ' + await page.innerText('#push-status'));
+  let devices = await devicesOf(page);
+  assert(devices.length === 1 && devices[0].uid === 'admin1' && devices[0].token === 'mock-token-1' && /Chrome/.test(devices[0].label), '기기 문서: ' + JSON.stringify(devices));
+  eq((await page.evaluate(() => window.__mock.tokenRequests())).map(t => t.withRegistration), [true], '알림 주소를 서비스 워커와 함께 요청');
+  assert((await page.innerText('#push-devices')).includes('이 기기'), '목록에 이 기기 표시 없음');
+  await page.click('#push-test'); await pause(page, 600);
+  assert((await devicesOf(page))[0].testRequestedAt, '테스트 알림 요청이 기록되지 않음');
+  assert((await lastToast(page)).includes('테스트 알림을 보냈어요'), '알림: ' + await lastToast(page));
+  await page.click('#push-off'); await pause(page, 800);
+  eq(await devicesOf(page), [], '끈 뒤 기기 목록');
+  assert((await page.innerText('#push-status')).includes('이 기기는 알림을 받지 않아요'), '끈 뒤 상태');
+});
+
+test('PU02 강사 알림: 규칙 게시 전(v5)이면 켜기 실패를 알리고 켠 것으로 보이지 않음 · 다른 기기에서 지운 기기는 다시 열 때 꺼짐', async b => {
+  let r = await openPushAdmin(b, { rules: 'v5' });
+  await r.page.click('#push-settings'); await pause(r.page, 400);
+  assert((await r.page.innerText('#push-devices')).includes('불러오지 못했어요'), '기기 목록 오류 표시 없음');
+  await r.page.click('#push-on'); await pause(r.page, 1200);
+  assert((await lastToast(r.page)).includes('권한'), '규칙 게시 전 안내: ' + await lastToast(r.page));
+  assert(!(await r.page.innerText('#push-status')).includes('받고 있어요'), '실패했는데 켜진 것으로 보임');
+  await r.context.close();
+  // 켜 둔 기기인데 문서가 지워졌으면(다른 기기에서 지움) 열 때 꺼진 것으로 정리
+  r = await openPushAdmin(b, { permission: 'granted' });
+  await r.page.evaluate(() => localStorage.setItem('senorayu:push-device', 'gone-device'));
+  await r.page.reload(); await pause(r.page, 1500);
+  eq(await r.page.evaluate(() => localStorage.getItem('senorayu:push-device')), null, '지워진 기기 기억이 남음');
+  eq(await devicesOf(r.page), [], '지워진 기기를 다시 만듦');
+});
+
+test('PU03 알림을 누르면 그 화면으로: 질문(다른 반 포함) · 과제 제출 학생, 앱이 열려 있으면 그 창에서 바뀜', async b => {
+  let r = await openPushAdmin(b, { hash: '#questions?class=c1&q=q2' });
+  assert(await r.page.$('[data-page="questions"].active'), '질문함이 열리지 않음');
+  assert((await r.page.innerText('#admin-question-detail')).includes('숫자 15와 50 발음'), '그 질문이 열리지 않음: ' + (await r.page.innerText('#admin-question-detail')).slice(0, 80));
+  // 열려 있는 앱: 서비스 워커가 보낸 메시지로 과제·복습 관리의 그 차시·학생으로 이동
+  await r.page.evaluate(() => navigator.serviceWorker.dispatchEvent(new MessageEvent('message', { data: { type: 'senorayu:open', route: 'feedback?class=c1&week=w1&uid=s1' } })));
+  await pause(r.page, 1200);
+  assert(await r.page.$('[data-page="feedback"].active'), '과제·복습 관리로 바뀌지 않음');
+  eq(await r.page.inputValue('#admin-week-picker'), 'w1', '알림의 차시');
+  assert(await r.page.$('[data-feedback-uid="s1"][aria-current="true"], [data-feedback-uid="s1"].active, [data-feedback-uid="s1"][aria-pressed="true"]'), '알림의 학생이 선택되지 않음');
+  await r.context.close();
+  r = await openPushAdmin(b, { hash: '#questions?class=c2&q=nothing' });
+  eq(await r.page.inputValue('#admin-class-switch'), 'c2', '다른 반 질문 알림이면 그 반으로 바뀜');
+});
+
+test('PU04 과제 제출 알림 묶기(push-view.js): 같은 알림에 이름을 합치고 10분 안에는 소리 없이, 같은 반·차시면 그 화면으로', async () => {
+  const vm = require('node:vm'), src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'push-view.js'), 'utf8');
+  const sandbox = { self: {} }; vm.runInNewContext(src, sandbox);
+  const P = sandbox.self.senorayuPush, t0 = 1_000_000;
+  const d = (name, session, revised, route) => ({ kind: 'submission', name, session, revised, className: '', title: `📝 ${name} · ${session} 과제 제출`, body: '본문', route });
+  let v = P.submissionView(null, d('김민지', '3차시', '0', 'feedback?class=c1&week=w3&uid=s1'), t0);
+  eq([v.title, v.body, v.renotify, v.data.route], ['📝 김민지 · 3차시 과제 제출', '본문', true, 'feedback?class=c1&week=w3&uid=s1'], '첫 제출');
+  v = P.submissionView(v.data, d('이준호', '3차시', '1', 'feedback?class=c1&week=w3&uid=s2'), t0 + 60_000);
+  eq([v.title, v.body, v.renotify, v.data.route], ['📝 과제 제출 2건', '이준호 · 3차시 수정본, 김민지 · 3차시', false, 'feedback?class=c1&week=w3'], '1분 뒤 둘째(소리 없이 합침)');
+  v = P.submissionView(v.data, d('김민지', '3차시', '1', 'feedback?class=c1&week=w3&uid=s1'), t0 + 11 * 60_000);
+  eq([v.title, v.body, v.renotify], ['📝 과제 제출 2건', '김민지 · 3차시 수정본, 이준호 · 3차시 수정본', true], '같은 학생·차시는 한 줄, 10분 지나면 다시 알림');
+  v = P.submissionView(v.data, d('박서연', '2차시', '0', 'feedback?class=c1&week=w2&uid=s3'), t0 + 12 * 60_000);
+  eq(v.data.route, 'feedback?class=c1', '차시가 섞이면 반만');
+  eq(P.commonRoute(['feedback?class=c1&week=w1', 'feedback?class=c2&week=w1']), 'feedback', '반이 섞이면 첫 화면');
+  let many = null; for (let i = 0; i < 6; i++) many = P.submissionView(many?.data || null, d('학생' + i, '1차시', '0', 'feedback?class=c1&week=w1'), t0);
+  assert(many.body.endsWith('외 2건') && many.title === '📝 과제 제출 6건', '6건 묶음: ' + many.title + ' / ' + many.body);
+});
+
+test('PU05 앱 설치 정보: 강사 화면에 manifest 연결, 이름·시작 화면·아이콘(192·512·maskable) 크기 맞음, 학생 화면에는 없음', async () => {
+  const fsx = require('node:fs'), pathx = require('node:path'), root = pathx.join(__dirname, '..');
+  const m = JSON.parse(fsx.readFileSync(pathx.join(root, 'admin.webmanifest'), 'utf8'));
+  eq([m.name, m.start_url, m.scope, m.display], ['쎄뇨라유 강사', './admin.html', './', 'standalone'], 'manifest');
+  const size = f => { const b = fsx.readFileSync(pathx.join(root, f)); return [b.readUInt32BE(16), b.readUInt32BE(20)]; };
+  for (const icon of m.icons) eq(size(icon.src), icon.sizes.split('x').map(Number), '아이콘 크기 ' + icon.src);
+  assert(m.icons.some(i => i.purpose === 'maskable') && m.icons.some(i => i.sizes === '192x192'), '아이콘 종류');
+  eq(size('senorayu-badge-96.png'), [96, 96], '알림 작은 아이콘');
+  assert(fsx.readFileSync(pathx.join(root, 'admin.html'), 'utf8').includes('<link rel="manifest" href="admin.webmanifest">'), '강사 화면 manifest 연결');
+  assert(!fsx.readFileSync(pathx.join(root, 'index.html'), 'utf8').includes('rel="manifest"'), '학생 화면에 manifest가 붙음');
+});
+
+test('PU06 서비스 워커(admin-sw.js): 데이터 메시지 → 알림(태그·묶음·아이콘 숫자), 누르면 열린 앱에 메시지 또는 새 창', async () => {
+  const vm = require('node:vm'), fsx = require('node:fs'), pathx = require('node:path'), root = pathx.join(__dirname, '..');
+  const listeners = {}, notifications = [], badges = [], posted = [], opened = [];
+  let windows = [];
+  const self = {
+    registration: {
+      scope: 'https://2nhyeok.kr/tstst/',
+      getNotifications: async ({ tag } = {}) => notifications.filter(n => !tag || n.tag === tag),
+      showNotification: async (title, options) => {
+        const n = { title, ...options }, i = notifications.findIndex(x => x.tag === options.tag);
+        if (i >= 0) notifications[i] = n; else notifications.push(n);
+      },
+    },
+    navigator: { setAppBadge: async n => badges.push(n), clearAppBadge: async () => badges.push(0) },
+    clients: { claim: async () => {}, matchAll: async () => windows, openWindow: async url => { opened.push(url); } },
+    addEventListener: (type, fn) => { listeners[type] = fn; },
+    skipWaiting: () => {},
+  };
+  const sandbox = { self, URL, console };
+  const ctx = vm.createContext(sandbox);
+  sandbox.importScripts = (...files) => files.forEach(f => vm.runInContext(fsx.readFileSync(pathx.join(root, f), 'utf8'), ctx));
+  vm.runInContext(fsx.readFileSync(pathx.join(root, 'admin-sw.js'), 'utf8'), ctx);
+  const fire = async (type, event) => { let wait; listeners[type]({ ...event, waitUntil: p => { wait = p; } }); await wait; };
+  const push = data => fire('push', { data: { json: () => ({ data, from: '89833541051', fcmMessageId: 'm1' }) } });
+
+  await push({ kind: 'question', tag: 'q-c1-q1', badge: '2', title: '❓ 이준호 · 새 질문', body: 'ser와 estar', route: 'questions?class=c1&q=q1' });
+  const q = notifications[0];
+  eq([q.title, q.body, q.tag, q.renotify, q.data.route, q.icon, q.badge], ['❓ 이준호 · 새 질문', 'ser와 estar', 'q-c1-q1', true, 'questions?class=c1&q=q1', 'https://2nhyeok.kr/tstst/senorayu-app-192.png', 'https://2nhyeok.kr/tstst/senorayu-badge-96.png'], '질문 알림');
+  eq(badges, [2], '앱 아이콘 숫자');
+  await push({ kind: 'reply', tag: 'q-c1-q1', badge: '2', title: '💬 이준호 · 추가 질문', body: '그럼 estoy는요?', route: 'questions?class=c1&q=q1' });
+  eq(notifications.map(n => n.title), ['💬 이준호 · 추가 질문'], '같은 질문의 추가 질문은 그 알림을 바꿈');
+  const sub = (name, uid) => ({ kind: 'submission', tag: 'submissions', badge: '0', name, session: '3차시', revised: '0', className: '', title: `📝 ${name} · 3차시 과제 제출`, body: '답안', route: `feedback?class=c1&week=w3&uid=${uid}` });
+  await push(sub('김민지', 's1'));
+  await push(sub('박서연', 's3'));
+  const s = notifications.find(n => n.tag === 'submissions');
+  eq([s.title, s.body, s.renotify, s.data.route], ['📝 과제 제출 2건', '박서연 · 3차시, 김민지 · 3차시', false, 'feedback?class=c1&week=w3'], '과제 제출 묶음');
+  eq(badges.slice(-1), [0], '답할 질문이 없으면 숫자를 지움');
+  await push({});
+  assert(notifications.some(n => n.title === '쎄뇨라유' && n.tag === 'senorayu'), '내용을 알 수 없는 메시지도 알림은 띄움');
+
+  // 누르기: 열린 강사 앱이 있으면 그 창으로 메시지, 없으면 그 화면으로 새 창
+  const closed = [];
+  windows = [{ url: 'https://2nhyeok.kr/tstst/index.html', focus: async () => {}, postMessage: m => posted.push(['student', m]) },
+    { url: 'https://2nhyeok.kr/tstst/admin.html#feedback', focus: async () => { posted.push(['focus']); }, postMessage: m => posted.push(['admin', m]) }];
+  await fire('notificationclick', { notification: { data: { route: 'questions?class=c1&q=q1' }, close: () => closed.push(1) } });
+  eq(posted, [['focus'], ['admin', { type: 'senorayu:open', route: 'questions?class=c1&q=q1' }]], '열린 강사 앱');
+  eq(opened, [], '열린 앱이 있는데 새 창을 엶');
+  windows = [];
+  await fire('notificationclick', { notification: { data: { route: 'feedback?class=c1&week=w3' }, close: () => closed.push(1) } });
+  eq(opened, ['https://2nhyeok.kr/tstst/admin.html#feedback?class=c1&week=w3'], '새 창 주소');
+  eq(closed.length, 2, '누른 알림은 닫힘');
+});
+
 test('CL01 학생 화면 문구: 답안 입력칸은 "여기에 답안을 작성해 주세요.", 앱 동작을 설명하는 문구는 다시 넣지 않음', async () => {
   const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'index.html'), 'utf8');
   assert(src.includes('placeholder="여기에 답안을 작성해 주세요."'), '답안 입력칸 안내');
