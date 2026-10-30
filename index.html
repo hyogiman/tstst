@@ -280,20 +280,6 @@ function assignmentStatus(w,d){
   return {pill:statusPill('success','제출함'),note:'선생님 확인을 기다리는 중',action:'답안 보기'};
 }
 const scorePct=(score,total)=>Math.round(100*(Number(score)||0)/Math.max(1,Number(total)||1));
-function quizStatus(d){
-  if(!d)return {pill:statusPill('neutral','미응시'),note:'',action:'복습하기'};
-  if(hasNewFeedback(d))return {pill:statusPill('brand','새 피드백'),note:'선생님 피드백이 도착했어요',action:'결과 보기'};
-  const first=d.firstAttempt||d;
-  return {pill:statusPill('success',`첫 점수 ${scorePct(first.score,first.total)}%`),note:'다시 풀기 가능',action:'결과 보기'};
-}
-// 예습 자료 미리보기 글(서식을 뺀 앞부분)
-function previewExcerpt(p){
-  if(!p)return '';
-  if(p.mode==='image')return '이미지로 정리된 예습 자료가 있어요.';
-  const html=sanitizeRich(p.richHtml||'').replace(/<\/(p|h[1-6]|li|div|blockquote|tr)>|<br\s*\/?>/gi,m=>' '+m); // 문단 사이를 띄어 이어 붙입니다
-  const text=new DOMParser().parseFromString(html,'text/html').body.textContent.replace(/\s+/g,' ').trim();
-  return text.length>120?text.slice(0,120)+'…':text;
-}
 function renderHome(body){
   const name=((S.profile?.displayName==='수강생'&&S.user?.displayName)?S.user.displayName:S.profile?.displayName)||'';
   body.innerHTML=`<div class="home-head"><div class="page-head"><div class="eyebrow" lang="es">Mi aprendizaje</div><h1>¡Hola${name?', '+esc(name):''}!</h1></div><aside class="home-next-box" id="home-next" aria-label="다음 수업"></aside></div><div class="stack home-main" id="home-main"></div>`;
