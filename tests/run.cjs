@@ -2044,6 +2044,15 @@ test('SU01 새로 가입한 수강생: 새로고침 없이 내 정보·홈 인�
   assert(!real.length, '오류: ' + real.join(' | '));
 });
 
+test('CP02 문구(2026-10-31): 강사 화면 맨 위는 이름만(선생님 없음), 학생 내 정보의 반 명단 제목은 "우리 반 수강생"', async b => {
+  let r = await openAs(b, 'admin.html', 'admin1');
+  eq(await r.page.innerText('.topbar-greeting strong'), '유진', '강사 상단 인사');
+  await r.context.close();
+  r = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 }, tab: 'mypage' });
+  const title = await r.page.innerText('.classmates-card h3');
+  assert(title.startsWith('우리 반 수강생') && !title.includes('친구'), '반 명단 제목: ' + title);
+});
+
 test('기본: 학생 과제 텍스트 제출, 퀴즈 3/3, 강사 화면 주요 메뉴 오류 없음', async b => {
   const r = await openAs(b, 'index.html', 's2', { viewport: { width: 390, height: 844 } });
   await r.page.selectOption('#student-week-picker', 'w4'); await pause(r.page, 700);
