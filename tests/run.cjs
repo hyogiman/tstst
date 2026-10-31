@@ -2053,6 +2053,36 @@ test('CP02 문구(2026-10-31): 강사 화면 맨 위는 이름만(선생님 없�
   assert(title.startsWith('우리 반 수강생') && !title.includes('친구'), '반 명단 제목: ' + title);
 });
 
+test('CP03 강사 이름(2026-10-31): 학생 화면의 피드백 제목·질문 답글·공지에 "선생님" 대신 강사 이름(displayName), 강사가 여럿이면 피드백마다 이름', async b => {
+  let r = await openApp(b, { file: 'index.html', user: 's1', rules: 'v4', seed: noticeSeed(), viewport: { width: 390, height: 844 } });
+  await pause(r.page, 900);
+  await r.page.click('[data-tab="assignment"]'); await pause(r.page, 600);
+  await r.page.selectOption('#student-week-picker', 'w1'); await pause(r.page, 700);
+  const head = await r.page.innerText('.student-feedback h3');
+  assert(head.startsWith('유진의 피드백'), '피드백 제목: ' + head);
+  eq(await r.page.getAttribute('.student-feedback', 'aria-label'), '유진의 피드백', '피드백 영역 이름');
+  await r.page.click('[data-tab="questions"]'); await pause(r.page, 600);
+  await r.page.click('[data-qid="q1"]'); await pause(r.page, 700);
+  const label = await r.page.$eval('#student-replies .reply-bubble.teacher .hint', el => el.textContent);
+  assert(label.startsWith('유진 · '), '답글 표시: ' + label);
+  await r.page.click('[data-tab="home"]'); await pause(r.page, 600);
+  await r.page.click('.announce-row:has-text("11월 5일")'); await pause(r.page, 700);
+  const meta = await r.page.$eval('#notice-n2 .hint', el => el.textContent);
+  assert(meta.includes('유진') && !meta.includes('선생님'), '공지 작성자: ' + meta);
+  const real = r.errors.filter(e => !/Failed to load resource/.test(e));
+  assert(!real.length, '오류: ' + real.join(' | '));
+  await r.context.close();
+  // 강사가 둘이면 제목은 '선생님의 피드백' 그대로, 피드백마다 이름을 작게
+  const seed = makeSeed();
+  seed.docs['classes/c1/weeks/w1/submissions/s1'].feedbacks.push({ id: 'fbx', text: '두 번째 강사의 피드백', audioPath: '', createdAt: new Date().toISOString(), author: '마리아' });
+  r = await openApp(b, { file: 'index.html', user: 's1', rules: 'v4', seed, viewport: { width: 390, height: 844 } });
+  await pause(r.page, 900);
+  await r.page.click('[data-tab="assignment"]'); await pause(r.page, 600);
+  await r.page.selectOption('#student-week-picker', 'w1'); await pause(r.page, 700);
+  assert((await r.page.innerText('.student-feedback h3')).startsWith('선생님의 피드백'), '강사가 둘일 때 제목: ' + await r.page.innerText('.student-feedback h3'));
+  eq(await r.page.$$eval('.student-feedback .feedback-tags', els => els.map(e => e.querySelector('.feedback-tag')?.textContent)), ['마리아', '유진'], '피드백마다 강사 이름(최신 순)');
+});
+
 test('기본: 학생 과제 텍스트 제출, 퀴즈 3/3, 강사 화면 주요 메뉴 오류 없음', async b => {
   const r = await openAs(b, 'index.html', 's2', { viewport: { width: 390, height: 844 } });
   await r.page.selectOption('#student-week-picker', 'w4'); await pause(r.page, 700);

@@ -550,9 +550,12 @@ function feedbackMarkup(obj,{askable=false,newSince=Number.MAX_SAFE_INTEGER}={})
   if(!comments.length)return '';
   const revised=(Number(obj?.revision)||1)>1;
   const items=[...comments].sort((a,b)=>(toDate(b.createdAt)?.getTime()||0)-(toDate(a.createdAt)?.getTime()||0));
-  return `<section class="card stack student-feedback" aria-label="선생님의 피드백"><h3>선생님의 피드백 <small>${items.length}</small></h3>${items.map(f=>{
+  // 2026-10-31: 제목에 피드백을 쓴 강사 이름(displayName)을 붙입니다. 강사가 여럿이면 제목은 그대로 두고 피드백마다 이름을 작게 붙입니다.
+  const authors=[...new Set(items.map(f=>String(f.author||'').trim()).filter(a=>a&&a!=='선생님'))];
+  const title=authors.length===1?`${authors[0]}의 피드백`:'선생님의 피드백';
+  return `<section class="card stack student-feedback" aria-label="${esc(title)}"><h3>${esc(title)} <small>${items.length}</small></h3>${items.map(f=>{
     // 2026-10-30: 작성자('선생님')와 보낸 시각은 빼고 내용만 보여 줍니다. 다시 제출한 과제면 어느 회차에 대한 피드백인지만 작게 붙입니다.
-    const tags=[revised?`<span class="feedback-tag">${Number(f.forRevision)||1}차 제출</span>`:'',(toDate(f.createdAt)?.getTime()||0)>newSince?statusPill('brand','새 피드백'):''].join('');
+    const tags=[authors.length>1&&f.author&&f.author!=='선생님'?`<span class="feedback-tag">${esc(f.author)}</span>`:'',revised?`<span class="feedback-tag">${Number(f.forRevision)||1}차 제출</span>`:'',(toDate(f.createdAt)?.getTime()||0)>newSince?statusPill('brand','새 피드백'):''].join('');
     return `<article class="feedback">${tags?`<div class="feedback-tags">${tags}</div>`:''}${f.text?`<div class="feedback-text">${esc(f.text)}</div>`:''}${f.audioPath?`<div class="feedback-audio">${audioMarkup(f.audioPath,f.audioDuration)}</div>`:''}${askable?'<div class="feedback-ask"><button type="button" class="btn secondary small" data-ask-feedback aria-expanded="false">이 피드백에 질문하기</button><div data-ask-slot></div></div>':''}</article>`;
   }).join('')}</section>`;
 }
@@ -934,7 +937,7 @@ function drawNoticeFeed(){
   // 홈에서 누른 공지는 이 화면에 있는 동안 계속 강조합니다(확인 시각 저장 뒤 다시 그려도 유지).
   if(S.activeNoticeId)feed.dataset.target=S.activeNoticeId;
   const target=feed.dataset.target||'',list=sortNotices(raw),since=S.noticeSince??Number.MAX_SAFE_INTEGER;
-  const html=list.length?list.map(n=>`<article class="card announce-item${n.id===target?' is-target':''}" id="notice-${esc(n.id)}" aria-labelledby="notice-${esc(n.id)}-title" tabindex="-1"><div class="announce-item-head"><h2 id="notice-${esc(n.id)}-title">${esc(n.title)}</h2><div class="row">${n.pinned?statusPill('brand','상단 고정'):''}${noticeTime(n)>since?statusPill('brand','새 공지'):''}</div></div><p class="hint">${esc(formatDateTime(n.createdAt))}${n.authorName&&n.authorName!=='선생님'?` · ${esc(n.authorName)} 선생님`:''}</p>${n.body?`<p class="announce-body">${linkifyText(n.body)}</p>`:''}</article>`).join('')
+  const html=list.length?list.map(n=>`<article class="card announce-item${n.id===target?' is-target':''}" id="notice-${esc(n.id)}" aria-labelledby="notice-${esc(n.id)}-title" tabindex="-1"><div class="announce-item-head"><h2 id="notice-${esc(n.id)}-title">${esc(n.title)}</h2><div class="row">${n.pinned?statusPill('brand','상단 고정'):''}${noticeTime(n)>since?statusPill('brand','새 공지'):''}</div></div><p class="hint">${esc(formatDateTime(n.createdAt))}${n.authorName&&n.authorName!=='선생님'?` · ${esc(n.authorName)}`:''}</p>${n.body?`<p class="announce-body">${linkifyText(n.body)}</p>`:''}</article>`).join('')
     :empty('아직 공지가 없어요','선생님이 공지를 올리면 여기에 보여요.');
   if(feed.dataset.rendered!==html){
     const focused=feed.contains(document.activeElement)?document.activeElement.closest('.announce-item')?.id:''; // 다시 그려도 보던 공지에 포커스 유지
@@ -1036,7 +1039,7 @@ function showStudentThread(q){if(!q)return;stopLive('replies');const holder=$('#
     batch.set(doc(collection(db,...questionPath(q.id),'replies')),{uid:S.user.uid,role:'student',author:S.profile.displayName||'수강생',text,createdAt:serverTimestamp()});
     batch.update(doc(db,...questionPath(q.id)),{status:'open',needsTeacherReply:true,lastMessageAt:serverTimestamp(),lastSenderRole:'student',updatedAt:serverTimestamp()});
     await batch.commit();form.reset()}catch(err){toast(ex(err),true)}finally{btn.disabled=false}};
-  S.live.replies=onSnapshot(collection(db,...questionPath(q.id),'replies'),snap=>{if(S.activeQuestionId!==q.id)return;const list=$('#student-replies');if(!list)return;const replies=snap.docs.map(d=>d.data()).sort((a,b)=>(a.createdAt?.seconds||0)-(b.createdAt?.seconds||0));loaded(list,replies.map(r=>`<div class="reply-bubble ${r.role==='admin'?'teacher':'student'}"><p class="hint">${r.role==='admin'?'선생님':'나'} · ${fmt(r.createdAt)}</p><p style="white-space:pre-wrap">${esc(r.text)}</p></div>`).join('')||'<p class="hint">아직 댓글이 없습니다.</p>')},onLiveError);
+  S.live.replies=onSnapshot(collection(db,...questionPath(q.id),'replies'),snap=>{if(S.activeQuestionId!==q.id)return;const list=$('#student-replies');if(!list)return;const replies=snap.docs.map(d=>d.data()).sort((a,b)=>(a.createdAt?.seconds||0)-(b.createdAt?.seconds||0));loaded(list,replies.map(r=>`<div class="reply-bubble ${r.role==='admin'?'teacher':'student'}"><p class="hint">${r.role==='admin'?esc(r.author||'선생님'):'나'} · ${fmt(r.createdAt)}</p><p style="white-space:pre-wrap">${esc(r.text)}</p></div>`).join('')||'<p class="hint">아직 댓글이 없습니다.</p>')},onLiveError);
 }
 // 우리 반 수강생(2026-10-31 이름 변경, 배치 10: 하단 메뉴에서 내 정보 안으로 옮김). 반 명단에는 이름(별명)만 공개합니다.
 const classmatesCard=()=>`<div class="card classmates-card"><div class="between" style="margin-bottom:18px"><h3>우리 반 수강생 <small>${esc(currentClass()?.name||'')}</small></h3><span class="pill brand" id="classmate-count">—</span></div><div id="classmates-list" class="grid3"><div class="loading">수강생 확인 중</div></div></div>`;
