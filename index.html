@@ -123,8 +123,8 @@ function handleClassAccessError(err){
 }
 function startClassScheduleLive(){stopLive('classSchedule');if(!S.classId)return;const cid=S.classId;
   S.live.classSchedule=onSnapshot(doc(db,'classes',cid),snap=>{
-    if(!snap.exists()||S.classId!==cid)return;
-    if(snap.data().archived){reloadStudentClass();return}
+    if(S.classId!==cid)return;
+    if(!snap.exists()||snap.data().archived||snap.data().deleting){reloadStudentClass();return} // 보관·삭제되면 반을 다시 고릅니다
     const prev=JSON.stringify(currentClass()?.schedule||[]);
     S.classes=[{id:cid,...snap.data()}];
     if(prev!==JSON.stringify(snap.data().schedule||[])&&S.tab==='mypage'&&$('#student-body')){
@@ -144,7 +144,7 @@ async function sortEnrollments(enrollments){
   let current=null;const past=[];
   for(const e of enrollments.filter(x=>x.status==='active').sort(byJoinedDesc)){
     const cls=await readClass(e.classId);
-    if(!cls)continue;
+    if(!cls||cls.deleting)continue; // 삭제 중인 반은 지난 반으로도 보여 주지 않습니다(2026-10-31)
     if(cls.archived)past.push(cls);
     else if(!current)current={enrollment:e,cls};
   }
@@ -154,11 +154,15 @@ function startEnrollmentLive(){stopLive('enrollments');
   S.live.enrollments=onSnapshot(query(collection(db,'enrollments'),where('uid','==',S.user.uid)),async snap=>{
     const list=snap.docs.map(d=>({id:d.id,...d.data()}));
     S.enrollments=list;S.hadEnrollment=list.length>0;
+    // 보고 있던 지난 반이 삭제되면 그 화면을 닫습니다(2026-10-31).
+    if(S.past&&!list.some(e=>e.classId===S.classId&&e.status==='active')){toast('보고 있던 지난 반이 삭제되었어요.');closePastClass();return}
     if(S.joining||S.past)return; // 방금 직접 입장했거나 지난 반을 보는 중이면 loadStudent가 처리합니다.
     const {current:picked,past}=await sortEnrollments(list);
+    const pastChanged=(S.pastClasses||[]).map(c=>c.id).join()!==past.map(c=>c.id).join();
     S.pastClasses=past;
     const next=picked?.cls.id||'';
-    if(next===S.classId)return;
+    // 지난 반 목록만 바뀌었으면(반 삭제 등) 쓰는 중이 아닐 때 화면을 다시 그립니다.
+    if(next===S.classId){if(pastChanged&&!document.activeElement?.matches('input,textarea'))frame();return}
     stopLive('weeks');stopLive('classSchedule');clearPageLive();stopNewsLive();
     S.classId=next;S.classes=picked?[picked.cls]:[];S.weeks=[];S.weekId='';S.quiz=null;
     S.enrollmentRealName=String(picked?.enrollment.studentName||'').trim();
@@ -458,7 +462,7 @@ function resetStudentSession(){
 window.addEventListener('beforeunload',e=>{flushAssignmentDraft();if(S.user&&studentHasUnsavedWork()){e.preventDefault();e.returnValue=''}});
 // 지난 반 자료 보기: 그 반의 공개 차시를 읽기 전용으로 보여 줍니다. 강의 영상은 보여 주지 않습니다.
 async function openPastClass(cid){
-  const cls=S.pastClasses.find(c=>c.id===cid);if(!cls)return;
+  const cls=S.pastClasses.find(c=>c.id===cid);if(!cls){toast('이 반은 더 이상 볼 수 없어요.',true);frame();return}
   stopRecordingForNavigation();
   stopLive('weeks');stopLive('classSchedule');clearPageLive();stopNewsLive();
   S.past={returnTab:S.classId?'mypage':'home'};

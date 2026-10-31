@@ -63,7 +63,7 @@ function resetAdminSession(){
   adminClearLive();stopAdminBadges();
   Object.assign(A,adminInitialState());
 }
-window.addEventListener('beforeunload',e=>{flushFeedbackDraft();if(A.user&&(isRecording()||Object.keys(A.voiceDrafts).length||isFeedbackTextDirty()||isWeekEditorDirty()||uploadsInProgress()>0)){e.preventDefault();e.returnValue=''}});
+window.addEventListener('beforeunload',e=>{flushFeedbackDraft();if(A.user&&(A.deletingClass||isRecording()||Object.keys(A.voiceDrafts).length||isFeedbackTextDirty()||isWeekEditorDirty()||uploadsInProgress()>0)){e.preventDefault();e.returnValue=''}});
 function adminLiveError(err){console.error('실시간 연결 실패',err);toast('실시간 구독 오류: '+ex(err),true)}
 const weekKey=(cid,wid)=>`classes/${cid}/weeks/${wid}`;
 const codeGen=()=>Array.from(crypto.getRandomValues(new Uint8Array(8))).map(n=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[n%32]).join('');
@@ -71,7 +71,7 @@ const codeGen=()=>Array.from(crypto.getRandomValues(new Uint8Array(8))).map(n=>'
 // 기존 반은 강사 페이지에 로그인하면 자동으로 수강 코드 연결표가 생성됩니다.
 async function syncJoinCodes(classes){
   for(const c of classes){
-    if(!c.joinCode)continue;
+    if(!c.joinCode||c.deleting)continue; // 삭제 중인 반의 수강 코드는 다시 만들지 않습니다(2026-10-31)
     try{
       const r=doc(db,'joinCodes',String(c.joinCode).toUpperCase());
       const snap=await getDoc(r);
@@ -255,7 +255,7 @@ function frame(){
   enterHistory();
   const sidebarEntries=[['overview','대시보드'],['classes','클래스 관리'],['weeks','차시별 학습자료'],['feedback','과제 · 복습 관리'],['questions','질문함'],['notices','공지사항'],['attendance','출석체크']];
   const sideMenu=sidebarEntries.map(([key,label])=>`<div class="side-menu-group"><button type="button" data-page="${key}" class="side-link ${A.page===key||(key==='classes'&&A.page==='students')?'active':''}">${sideIcon(key)}<span>${label}</span>${key==='classes'?'<span class="side-chevron">⌄</span>':''}</button>${key==='classes'?`<div class="side-submenu" aria-label="운영 중인 클래스 목록">${A.classes.filter(c=>!c.archived).map(c=>`<button type="button" class="side-class-link ${A.page==='students'&&A.classId===c.id?'active':''}" data-side-class="${esc(c.id)}" title="${esc(c.name)} 수강생 보기">${esc(c.name)}</button>`).join('')||'<span class="side-class-empty">운영 중인 클래스 없음</span>'}</div>`:''}</div>`).join('');
-  root.innerHTML=`<div class="admin-shell senorayu-admin-v6"><aside class="sidebar"><div class="sidebar-identity"><img src="senorayu-mark-white.svg" alt="쎄뇨라유 올리브유 병 심벌"><span>당신의 스페인어 가이드</span><strong>쎄뇨라유</strong></div><div class="side-nav">${sideMenu}</div><div class="sidebar-footnote">ESPAÑOL · LEARNING STUDIO</div></aside><div class="admin-main"><header class="admin-topbar"><div><p class="eyebrow" lang="es">Espacio docente</p><div class="topbar-greeting"><strong>${esc(A.profile?.displayName||'스페인어 강사')}</strong><span class="pill">강사</span></div></div><div class="topbar-actions"><div class="field"><label for="admin-class-switch">운영 중인 반</label><select id="admin-class-switch">${A.classes.map(c=>`<option value="${esc(c.id)}" ${c.id===A.classId?'selected':''}>${esc(c.name)}${c.archived?' (보관)':''}</option>`).join('')||'<option value="">개설된 반이 없습니다</option>'}</select></div><button id="push-settings" type="button" class="btn secondary small" aria-haspopup="dialog"><span aria-hidden="true">🔔</span> 알림</button><button id="admin-logout" type="button" class="btn secondary small">로그아웃</button></div></header><main id="admin-body"></main></div></div>`;
+  root.innerHTML=`<div class="admin-shell senorayu-admin-v6"><aside class="sidebar"><div class="sidebar-identity"><img src="senorayu-mark-white.svg" alt="쎄뇨라유 올리브유 병 심벌"><span>당신의 스페인어 가이드</span><strong>쎄뇨라유</strong></div><div class="side-nav">${sideMenu}</div><div class="sidebar-footnote">ESPAÑOL · LEARNING STUDIO</div></aside><div class="admin-main"><header class="admin-topbar"><div><p class="eyebrow" lang="es">Espacio docente</p><div class="topbar-greeting"><strong>${esc(A.profile?.displayName||'스페인어 강사')}</strong><span class="pill">강사</span></div></div><div class="topbar-actions"><div class="field"><label for="admin-class-switch">운영 중인 반</label><select id="admin-class-switch">${A.classes.filter(c=>!c.deleting).map(c=>`<option value="${esc(c.id)}" ${c.id===A.classId?'selected':''}>${esc(c.name)}${c.archived?' (보관)':''}</option>`).join('')||'<option value="">개설된 반이 없습니다</option>'}</select></div><button id="push-settings" type="button" class="btn secondary small" aria-haspopup="dialog"><span aria-hidden="true">🔔</span> 알림</button><button id="admin-logout" type="button" class="btn secondary small">로그아웃</button></div></header><main id="admin-body"></main></div></div>`;
   $('#admin-logout').onclick=async()=>{
     if(!(await confirmLeaveWeekEditor()))return;
     // P1-07: 공용 PC에서 다음 사람이 보지 않도록 이 기기에 임시 저장된 피드백을 지웁니다.
@@ -279,7 +279,7 @@ function renderPage(){
   if(A.page==='questions'&&A.activeQuestionId)closePushNotifications(n=>n.tag===`q-${A.classId}-${A.activeQuestionId}`);
   if(A.page==='overview')showOverview(b);if(A.page==='classes')showClasses(b);if(A.page==='weeks')showWeeks(b);if(A.page==='feedback')showFeedback(b);if(A.page==='attendance')showAttendance(b);if(A.page==='students')showStudents(b);if(A.page==='questions')showAdminQuestions(b);if(A.page==='notices')showNotices(b);
 }
-async function loadAdmin(preferred=''){const cs=await getDocs(collection(db,'classes'));A.classes=cs.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.name||'').localeCompare(b.name||'','ko'));await syncJoinCodes(A.classes);const choice=preferred||A.classId||localStorage.getItem(classPrefKey());A.classId=A.classes.some(c=>c.id===choice)?choice:(A.classes.find(c=>!c.archived)?.id||A.classes[0]?.id||'');if(A.classId){localStorage.setItem(classPrefKey(),A.classId);await loadWeeks();await syncMemberDirectory().catch(e=>console.warn('명단 동기화 실패',e))}else{A.weeks=[];A.weekId=''}frame()}
+async function loadAdmin(preferred=''){const cs=await getDocs(collection(db,'classes'));A.classes=cs.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.name||'').localeCompare(b.name||'','ko'));await syncJoinCodes(A.classes);const choice=preferred||A.classId||localStorage.getItem(classPrefKey());A.classId=A.classes.some(c=>c.id===choice&&!c.deleting)?choice:(A.classes.find(c=>!c.archived)?.id||A.classes.find(c=>!c.deleting)?.id||'');if(A.classId){localStorage.setItem(classPrefKey(),A.classId);await loadWeeks();await syncMemberDirectory().catch(e=>console.warn('명단 동기화 실패',e))}else{A.weeks=[];A.weekId=''}frame()}
 async function loadWeeks(){const snap=await getDocs(collection(db,'classes',A.classId,'weeks'));A.weeks=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.order||0)-(b.order||0));if(!A.weeks.some(w=>w.id===A.weekId)){const kept=rememberedWeek(A.classId);A.weekId=A.weeks.some(w=>w.id===kept)?kept:(A.weeks[0]?.id||'')}startAdminBadges();}
 async function roster(cid=A.classId){
   const snap=await getDocs(query(collection(db,'enrollments'),where('classId','==',cid)));
@@ -712,7 +712,7 @@ function showClasses(b){
   b.innerHTML=`<div class="section-title"><div><div class="eyebrow" lang="es">Clases</div><h1>클래스 관리</h1><p>클래스별 차시·수업 날짜와 수강생을 관리합니다. 반 이름을 누르면 해당 수강생 목록으로 이동합니다.</p></div></div><section class="db-panel class-page-panel"><header class="db-panel-head"><div class="db-heading"><span class="db-heading-icon">${sideIcon('classes')}</span><h2>${archivedView?'보관된 반':'운영 중인 반'} <span class="db-subcount">${classes.length}개</span></h2></div><div class="db-heading-actions"><button type="button" class="btn" id="create-class">＋ 새 반 만들기</button><button type="button" class="btn btn-outline-red" id="toggle-class-filter">${archivedView?'← 운영 중인 반 보기':`▣ 보관된 반 보기 (${archivedCount})`}</button></div></header><div id="class-list" class="class-manager-list db-table-scroller"></div></section><p class="hint" style="margin-top:15px">※ 보관한 반은 복원할 수 있습니다. 영구 삭제하면 학생의 학습 기록과 연결 데이터가 함께 삭제되므로 주의해 주세요.</p>`;
   $('#toggle-class-filter').onclick=()=>{A.classFilter=archivedView?'active':'archived';showClasses(b);$('#toggle-class-filter')?.focus()};
   const list=$('#class-list');
-  list.innerHTML=`<table class="db-table db-class-table"><thead><tr><th>반 이름</th><th>소개</th><th>수강 코드</th><th>상태</th><th>생성일</th><th>관리</th></tr></thead><tbody>${classes.map(c=>`<tr class="class-manager-item ${c.archived?'is-archived':''}"><td><button type="button" class="db-class-name" data-open-roster="${esc(c.id)}">${esc(c.name)}</button></td><td class="db-muted db-ellipsis">${esc(c.description||'—')}</td><td><button class="db-code-copy" data-copy-class="${esc(c.id)}" aria-label="수강 코드 ${esc(c.joinCode||'')} 복사" title="수강 코드만 복사">${esc(c.joinCode||'—')} <span class="copy-svg"><svg aria-hidden="true" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></span></button></td><td><span class="db-status ${c.archived?'archived':'active'}"><span aria-hidden="true">${c.archived?'–':'✓'}</span> ${c.archived?'보관됨':'운영 중'}</span></td><td class="db-muted">${shortDate(c.createdAt)}</td><td><div class="db-action-row"><button class="db-light-button" data-edit-class="${esc(c.id)}">수정</button><button class="db-light-button" data-rotate-class="${esc(c.id)}">코드 변경</button><button class="db-light-button ${c.archived?'db-border-red':''}" data-archive-class="${esc(c.id)}">${c.archived?'복원':'보관'}</button><button class="db-light-button" data-export-class="${esc(c.id)}" aria-label="${esc(c.name)} 기록 내보내기">내보내기</button><button class="db-light-button db-danger-button" data-delete-class="${esc(c.id)}">삭제</button></div></td></tr>`).join('')||`<tr><td colspan="6" class="db-no-data">${archivedView?'보관된 반이 없습니다.':archivedCount?'운영 중인 반이 없습니다. 새 반을 만들거나 보관된 반을 복원해 보세요.':'아직 반이 없습니다. 새 반을 만들어 보세요.'}</td></tr>`}</tbody></table>`;
+  list.innerHTML=`<table class="db-table db-class-table"><thead><tr><th>반 이름</th><th>소개</th><th>수강 코드</th><th>상태</th><th>생성일</th><th>관리</th></tr></thead><tbody>${classes.map(c=>`<tr class="class-manager-item ${c.archived?'is-archived':''}"><td><button type="button" class="db-class-name" data-open-roster="${esc(c.id)}">${esc(c.name)}</button></td><td class="db-muted db-ellipsis">${esc(c.deleting?(c.deleteError?'멈춘 단계: '+c.deleteError:'삭제가 중간에 멈췄어요'):(c.description||'—'))}</td><td><button class="db-code-copy" data-copy-class="${esc(c.id)}" aria-label="수강 코드 ${esc(c.joinCode||'')} 복사" title="수강 코드만 복사">${esc(c.joinCode||'—')} <span class="copy-svg"><svg aria-hidden="true" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></span></button></td><td>${c.deleting?`<span class="db-status archived" title="${esc(c.deleteError||'')}"><span aria-hidden="true">⚠</span> 삭제가 끝나지 않음</span>`:`<span class="db-status ${c.archived?'archived':'active'}"><span aria-hidden="true">${c.archived?'–':'✓'}</span> ${c.archived?'보관됨':'운영 중'}</span>`}</td><td class="db-muted">${shortDate(c.createdAt)}</td><td><div class="db-action-row">${c.deleting?`<button class="db-light-button db-danger-button" data-delete-class="${esc(c.id)}">삭제 마저 하기</button>`:`<button class="db-light-button" data-edit-class="${esc(c.id)}">수정</button><button class="db-light-button" data-rotate-class="${esc(c.id)}">코드 변경</button><button class="db-light-button ${c.archived?'db-border-red':''}" data-archive-class="${esc(c.id)}">${c.archived?'복원':'보관'}</button><button class="db-light-button" data-export-class="${esc(c.id)}" aria-label="${esc(c.name)} 기록 내보내기">내보내기</button><button class="db-light-button db-danger-button" data-delete-class="${esc(c.id)}">삭제</button>`}</div></td></tr>`).join('')||`<tr><td colspan="6" class="db-no-data">${archivedView?'보관된 반이 없습니다.':archivedCount?'운영 중인 반이 없습니다. 새 반을 만들거나 보관된 반을 복원해 보세요.':'아직 반이 없습니다. 새 반을 만들어 보세요.'}</td></tr>`}</tbody></table>`;
   $('#create-class').onclick=()=>classEditor();
   $$('[data-open-roster]',list).forEach(el=>el.onclick=()=>openClassRoster(el.dataset.openRoster));
   // 수강 코드만 복사합니다. 안내 문구는 강사가 직접 씁니다(2026-10-29 요청).
@@ -721,7 +721,7 @@ function showClasses(b){
   $$('[data-rotate-class]',list).forEach(el=>el.onclick=async()=>{const c=A.classes.find(x=>x.id===el.dataset.rotateClass);if(!await modalConfirm(`${c.name} 반의 수강 코드를 새로 발급할까요? 기존 코드는 사용할 수 없지만 등록된 수강생은 유지됩니다.`,{title:'수강 코드 재발급',confirmText:'새 코드 발급'}))return;try{const code=await uniqueJoinCode(),batch=writeBatch(db);batch.update(doc(db,'classes',c.id),{joinCode:code,updatedAt:serverTimestamp()});batch.set(doc(db,'joinCodes',code),{classId:c.id,createdBy:A.user.uid,updatedAt:serverTimestamp()});if(c.joinCode)batch.delete(doc(db,'joinCodes',c.joinCode));await batch.commit();toast('수강 코드를 변경했습니다.');await loadAdmin(c.id)}catch(e){toast(ex(e),true)}});
   $$('[data-archive-class]',list).forEach(el=>el.onclick=async()=>{const c=A.classes.find(x=>x.id===el.dataset.archiveClass);if(!await modalConfirm(c.archived?`${c.name} 반을 다시 운영할까요?\n학생들이 이 반에서 다시 과제를 제출하고 질문할 수 있게 됩니다.`:`${c.name} 반을 보관할까요?\n학습 기록은 그대로 남고, 학생은 지난 자료(과제·피드백·복습·질문·출석·수업 자료)를 읽기 전용으로 볼 수 있어요. 강의 영상은 볼 수 없어요.\n학생은 다음 반의 수강 코드로 새 반에 입장할 수 있어요.`,{title:c.archived?'반 다시 운영':'반 보관',confirmText:c.archived?'다시 운영하기':'보관하기'}))return;try{await updateDoc(doc(db,'classes',c.id),{archived:!c.archived,updatedAt:serverTimestamp()});toast(c.archived?'반을 복원했어요. 운영 중인 반 목록에 다시 보여요.':'반을 보관했어요. \'보관된 반 보기\'에서 볼 수 있어요.');await loadAdmin(c.id)}catch(e){toast(ex(e),true)}});
   $$('[data-export-class]',list).forEach(el=>el.onclick=()=>exportClass(A.classes.find(x=>x.id===el.dataset.exportClass),el));
-  $$('[data-delete-class]',list).forEach(el=>el.onclick=async()=>{const c=A.classes.find(x=>x.id===el.dataset.deleteClass);const answer=await modalDialog({title:'반 영구 삭제',message:`${c.name} 반의 출석·과제·퀴즈·질문·공지·학생 메모·수강 등록 기록과, Storage에 있는 이 반의 파일(강의·수업 영상, 예습 자료, 학생·피드백 음성)이 모두 지워집니다. 되돌릴 수 없습니다.\n기록이 필요하면 먼저 '내보내기'로 받아 두세요. 보관만 하려면 취소 후 '보관'을 고르세요.`,value:'',verify:c.name,verifyLabel:'삭제할 반 이름',danger:true,confirmText:'반과 관련 기록 영구 삭제'});if(answer===null)return;el.disabled=true;try{await deleteClassDeep(c);toast(`${c.name} 반 삭제가 완료되었습니다.`);await loadAdmin()}catch(e){toast('삭제 중 오류가 발생했습니다: '+ex(e)+' · 남은 기록을 확인하고 다시 시도해 주세요.',true)}finally{if(el.isConnected)el.disabled=false}});
+  $$('[data-delete-class]',list).forEach(el=>el.onclick=async()=>{const c=A.classes.find(x=>x.id===el.dataset.deleteClass);if(c.deleting){if(!await modalConfirm(`${c.name} 반의 남은 기록과 파일을 마저 지울까요?\n학생 화면에서는 이미 보이지 않아요. 되돌릴 수 없습니다.`,{title:'반 삭제 마저 하기',confirmText:'남은 기록 지우기',danger:true}))return}else{const answer=await modalDialog({title:'반 영구 삭제',message:`${c.name} 반의 출석·과제·퀴즈·질문·공지·학생 메모·수강 등록 기록과, Storage에 있는 이 반의 파일(강의·수업 영상, 예습 자료, 학생·피드백 음성)이 모두 지워집니다. 되돌릴 수 없습니다.\n기록이 필요하면 먼저 '내보내기'로 받아 두세요. 보관만 하려면 취소 후 '보관'을 고르세요.`,value:'',verify:c.name,verifyLabel:'삭제할 반 이름',danger:true,confirmText:'반과 관련 기록 영구 삭제'});if(answer===null)return}const label=el.textContent;el.disabled=true;A.deletingClass=true;try{const {fileFailures}=await deleteClassDeep(c,text=>{if(el.isConnected)el.textContent='삭제 중 · '+text});toast(fileFailures?`${c.name} 반을 삭제했어요. 파일 ${fileFailures}개는 Storage에서 직접 정리해야 합니다.`:`${c.name} 반 삭제가 완료되었습니다.`,fileFailures>0)}catch(e){toast(e.steps?`삭제를 끝내지 못했어요(${ex(e)}${e.steps.length>1?` 외 ${e.steps.length-1}건`:''}). 학생 화면에서는 이 반이 이미 보이지 않아요. '보관된 반 보기'에서 [삭제 마저 하기]를 다시 눌러 주세요.`:'삭제를 시작하지 못했어요: '+ex(e),true)}finally{A.deletingClass=false;if(el.isConnected){el.disabled=false;el.textContent=label}}await loadAdmin().catch(e=>toast(ex(e),true))});
 }
 // Firestore는 상위 문서만 삭제해도 하위 컬렉션이 지워지지 않습니다. 알려진 하위 경로를 아래부터 먼저 지웁니다.
 async function purgeDocs(ref){const snap=await getDocs(ref);for(let i=0;i<snap.docs.length;i+=350){const batch=writeBatch(db);snap.docs.slice(i,i+350).forEach(x=>batch.delete(x.ref));await batch.commit()}return snap.docs}
@@ -759,34 +759,48 @@ async function listStorageFiles(folders,fallback){
   for(const f of fallback){try{await walk(f)}catch(e){console.warn('영상 폴더 목록을 읽지 못했습니다',f,e)}}
   return {paths:found,complete:false};
 }
-async function deleteClassDeep(c){
-  const cid=c.id,paths=new Set();
-  await updateDoc(doc(db,'classes',cid),{archived:true,updatedAt:serverTimestamp()});
-  const weeks=await getDocs(collection(db,'classes',cid,'weeks'));
-  // 2026-10-30: 문서에 연결되지 않은 파일(저장하지 않고 닫은 업로드 등)까지 반 폴더에서 찾아 지웁니다(Storage 저장 용량 과금 방지).
-  const listed=await listStorageFiles([`classes/${cid}`],weeks.docs.flatMap(w=>videoFolders(cid,w.id)));
-  for(const p of listed.paths)paths.add(p);
-  for(const w of weeks.docs)await purgeWeekRecords(cid,w.id,w.data(),paths);
-  await purgeDocs(collection(db,'classes',cid,'weeks'));
-  const questions=await getDocs(collection(db,'classes',cid,'questions'));
-  for(const q of questions.docs)await purgeDocs(collection(db,'classes',cid,'questions',q.id,'replies'));
-  await purgeDocs(collection(db,'classes',cid,'questions'));
-  await purgeDocs(collection(db,'classes',cid,'members'));
-  await purgeDocs(collection(db,'classes',cid,'teacherNotes'));
-  // 학습 목표(배치 11)와 공지. 공지 규칙을 게시하기 전이면 읽을 수 없으니 건너뜁니다.
-  for(const sub of ['studentGoals','notices','noticeReads']){try{await purgeDocs(collection(db,'classes',cid,sub))}catch(e){if(e?.code!=='permission-denied')throw e}}
-  const enrollments=await getDocs(query(collection(db,'enrollments'),where('classId','==',cid)));
-  for(const e of enrollments.docs){
-    await purgeDocs(collection(db,'enrollments',e.id,'events')); // P1-04
-    const uid=e.data().uid;const ref=doc(db,'users',uid),snap=await getDoc(ref);if(snap.exists()&&snap.data().assignedClassId===cid)await updateDoc(ref,{assignedClassId:deleteField()});
+// 반 영구 삭제(2026-10-31 다시 설계)
+// ① 반을 '삭제 중'으로 표시하고 ② 학생 쪽 연결(수강 기록·학생 소속반·수강 코드)을 가장 먼저 끊습니다. 도중에 멈춰도 학생 화면에 '지난 반'으로 남지 않습니다.
+// ③ 차시 기록·질문·명단·메모·목표·공지와 Storage 파일을 지우고 ④ 기록이 모두 지워졌을 때만 반 문서를 지웁니다.
+// 한 단계가 실패해도 다음 단계를 계속하고, 실패한 단계를 모아 알려 줍니다. 반 문서가 남으면 '삭제 마저 하기'로 남은 것부터 이어서 지웁니다(같은 순서로 다시 실행해도 안전).
+async function deleteClassDeep(c,progress=()=>{}){
+  const cid=c.id,paths=new Set(),failed=[];
+  const step=async(label,fn)=>{progress(label);try{await fn()}catch(e){console.warn('반 삭제 단계 실패:',label,e);failed.push(`${label}: ${ex(e)}`)}};
+  // 학습 목표·공지·공지 확인은 그 규칙을 게시하기 전이면 읽을 수 없고, 그때는 지울 기록도 생길 수 없습니다.
+  const optional=fn=>async()=>{try{await fn()}catch(e){if(e?.code!=='permission-denied')throw e}};
+  progress('준비');
+  await updateDoc(doc(db,'classes',cid),{archived:true,deleting:true,updatedAt:serverTimestamp()}); // 이 단계가 실패하면 아무것도 지우지 않고 멈춥니다
+  let enrollments=[];
+  await step('수강 기록 목록',async()=>{enrollments=(await getDocs(query(collection(db,'enrollments'),where('classId','==',cid)))).docs});
+  for(const e of enrollments){
+    const uid=e.data().uid;let historyCleared=true;
+    await step('수강 기록 이력',async()=>{try{await purgeDocs(collection(db,'enrollments',e.id,'events'))}catch(err){historyCleared=false;throw err}}); // P1-04
+    await step('학생 소속반 표시',async()=>{const ref=doc(db,'users',uid),snap=await getDoc(ref);if(snap.exists()&&snap.data().assignedClassId===cid)await updateDoc(ref,{assignedClassId:deleteField()})});
+    // 이력을 못 지웠으면 '삭제 마저 하기' 때 다시 찾을 수 있게 수강 기록을 남깁니다(학생 화면은 삭제 중인 반을 보여 주지 않음).
+    if(historyCleared)await step('수강 기록',()=>deleteDoc(e.ref));
   }
-  for(let i=0;i<enrollments.docs.length;i+=350){const batch=writeBatch(db);enrollments.docs.slice(i,i+350).forEach(e=>batch.delete(e.ref));await batch.commit()}
-  if(c.joinCode)await deleteDoc(doc(db,'joinCodes',String(c.joinCode).toUpperCase()));
-  // 반 폴더에서 찾은 파일과 문서에 연결된 파일을 지웁니다. 강사 목록 권한을 게시하기 전이면 영상 폴더 밖의 미연결 파일은 남을 수 있습니다.
-  let fileFailures=0;for(const path of paths){try{await deleteObject(storageRef(storage,path))}catch(e){if(e.code!=='storage/object-not-found'){fileFailures++;console.warn('파일 정리 필요',path,e)}}}
+  if(c.joinCode)await step('수강 코드',()=>deleteDoc(doc(db,'joinCodes',String(c.joinCode).toUpperCase())));
+  let weeks=[];
+  await step('차시 목록',async()=>{weeks=(await getDocs(collection(db,'classes',cid,'weeks'))).docs});
+  // 2026-10-30: 문서에 연결되지 않은 파일(저장하지 않고 닫은 업로드 등)까지 반 폴더에서 찾아 지웁니다(Storage 저장 용량 과금 방지).
+  await step('파일 목록',async()=>{const listed=await listStorageFiles([`classes/${cid}`],weeks.flatMap(w=>videoFolders(cid,w.id)));for(const p of listed.paths)paths.add(p)});
+  for(const w of weeks)await step(`${w.data().label||'차시'} 기록`,async()=>{await purgeWeekRecords(cid,w.id,w.data(),paths);await deleteDoc(w.ref)});
+  await step('질문',async()=>{const qs=await getDocs(collection(db,'classes',cid,'questions'));for(const q of qs.docs){await purgeDocs(collection(db,'classes',cid,'questions',q.id,'replies'));await deleteDoc(q.ref)}});
+  await step('반 명단',()=>purgeDocs(collection(db,'classes',cid,'members')));
+  await step('학생 메모',()=>purgeDocs(collection(db,'classes',cid,'teacherNotes')));
+  for(const [sub,label] of [['studentGoals','학습 목표'],['notices','공지'],['noticeReads','공지 확인 기록']])await step(label,optional(()=>purgeDocs(collection(db,'classes',cid,sub))));
+  // 반 폴더에서 찾은 파일과 문서에 연결된 파일을 8개씩 함께 지웁니다. 강사 목록 권한을 게시하기 전이면 영상 폴더 밖의 미연결 파일은 남을 수 있습니다.
+  progress('파일');
+  let fileFailures=0;const list=[...paths];
+  for(let i=0;i<list.length;i+=8)await Promise.all(list.slice(i,i+8).map(async path=>{try{await deleteObject(storageRef(storage,path))}catch(e){if(e.code!=='storage/object-not-found'){fileFailures++;console.warn('파일 정리 필요',path,e)}}}));
+  if(failed.length){
+    // 반 문서를 남겨 강사 화면에 '삭제가 끝나지 않음'으로 보이게 합니다. 학생 화면은 deleting인 반을 보여 주지 않습니다.
+    await updateDoc(doc(db,'classes',cid),{deleteError:failed.slice(0,3).join(' / ').slice(0,300),updatedAt:serverTimestamp()}).catch(e=>console.warn(e));
+    throw Object.assign(new Error(failed[0]),{steps:failed});
+  }
   await deleteDoc(doc(db,'classes',cid));
   if(A.classId===cid){A.classId='';localStorage.removeItem(classPrefKey())}
-  if(fileFailures)toast(`반은 삭제되었습니다. 파일 ${fileFailures}개는 Storage에서 직접 정리해야 합니다.`,true);
+  return {fileFailures};
 }
 function weekSelect(){return `<select id="admin-week-picker" class="input week-chooser" aria-label="차시 선택">${A.weeks.map(w=>`<option value="${esc(w.id)}" ${w.id===A.weekId?'selected':''}>${esc(w.label)}${w.published?' · 공개':' · 비공개'}</option>`).join('')}</select>`}
 function showWeeks(b){

@@ -1774,6 +1774,63 @@ test('DL01 반 영구 삭제: 새 규칙(v5)이면 반 폴더의 파일을 모�
   eq((await r.page.evaluate(() => window.__mock.files())).filter(p => p.startsWith('classes/c2/')), ['classes/c2/previews/cw1/file/unsaved.pdf', 'classes/c2/previews/cw9/video/old-week.mp4'], '남은 파일(v4: 차시 영상 폴더만 찾음)');
 });
 
+test('DL02 반 삭제 중 학생 화면(2026-10-31): 열려 있던 학생 화면에서 지난 반으로 바뀌지 않고 바로 사라짐 · 보고 있던 지난 반이 삭제되면 그 화면을 닫음', async b => {
+  // 지금 수강 중인 반: 강사 화면이 맨 먼저 '삭제 중'으로 표시하고 수강 기록을 지움
+  let r = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 }, tab: 'home' });
+  await r.page.evaluate(() => window.__mock.remoteWrite('classes/c1', { archived: true, deleting: true }));
+  await pause(r.page, 900);
+  assert(!(await r.page.$('.past-banner')) && !(await r.page.$('[data-past-class="c1"]')), '삭제 중인 반이 지난 반으로 보임');
+  assert(await r.page.$('#join-form'), '수강 코드 입력 화면이 아님');
+  await r.page.evaluate(() => window.__mock.remoteWrite('enrollments/s1_c1', null, { remove: true }));
+  await pause(r.page, 900);
+  assert(await r.page.$('#join-form') && !(await r.page.$('[data-past-class="c1"]')), '수강 기록을 지운 뒤 지난 반으로 남음');
+  await r.context.close();
+  // 보고 있던 지난 반
+  r = await openAs(b, 'index.html', 's1', { viewport: { width: 390, height: 844 } });
+  await r.page.evaluate(() => window.__mock.remoteWrite('enrollments/s1_c3', { uid: 's1', classId: 'c3', studentName: '김민지', email: 'minji@example.com', joinCode: 'OLA2025', status: 'active', joinedAt: window.__mock.ts(Date.now() - 200 * 86400000) }, { merge: false }));
+  await pause(r.page, 700);
+  await r.page.click('[data-tab="mypage"]'); await pause(r.page, 600);
+  await r.page.click('[data-past-class="c3"]'); await pause(r.page, 700);
+  assert(await r.page.$('.past-banner'), '지난 반 화면이 아님');
+  await r.page.evaluate(() => window.__mock.remoteWrite('enrollments/s1_c3', null, { remove: true }));
+  await pause(r.page, 1000);
+  assert(!(await r.page.$('.past-banner')), '삭제된 지난 반 화면이 그대로');
+  assert((await lastToast(r.page)).includes('보고 있던 지난 반이 삭제되었어요'), '안내: ' + await lastToast(r.page));
+  assert(!(await r.page.$('[data-past-class="c3"]')), '지난 반 목록에 남음');
+});
+
+test('DL03 반 삭제가 중간에 막힘(2026-10-31): 학생 연결을 먼저 끊고 "삭제가 끝나지 않음"으로 남김 · 수강 코드를 다시 만들지 않음 · [삭제 마저 하기]로 끝까지', async b => {
+  const r = await openApp(b, { file: 'admin.html', user: 'admin1', rules: 'current' });
+  await pause(r.page, 800);
+  await r.page.evaluate(() => window.__mock.failReads('^classes/c1/questions/'));
+  await deleteClass(r.page, 'c1', '스페인어 기초반 2기');
+  await pause(r.page, 600);
+  const notice = await lastToast(r.page);
+  assert(notice.includes('삭제를 끝내지 못했어요') && notice.includes('질문') && notice.includes('삭제 마저 하기'), '실패 안내: ' + notice);
+  const cls = await dump(r.page, 'classes/c1');
+  assert(cls?.deleting === true && cls.archived === true && (cls.deleteError || '').includes('질문'), '반 문서: ' + JSON.stringify(cls));
+  eq(await r.page.evaluate(() => window.__mock.list('enrollments/').filter(p => /_c1(\/|$)/.test(p))), [], '남은 수강 기록');
+  assert(!(await dump(r.page, 'joinCodes/HOLA2026')), '수강 코드가 남거나 다시 만들어짐');
+  assert((await dump(r.page, 'users/s1'))?.assignedClassId !== 'c1', '학생 소속반 표시가 남음');
+  assert(!(await r.page.$('#admin-class-switch option[value="c1"]')), '상단 반 선택에 삭제 중인 반이 보임');
+  eq(await r.page.evaluate(() => window.__mock.list('classes/c1/members/')), [], '한 단계가 막혀도 다음 단계(반 명단)는 계속 지움');
+  await r.page.click('#toggle-class-filter'); await pause(r.page, 400);
+  const row = await r.page.innerText('tr:has([data-delete-class="c1"])');
+  assert(row.includes('삭제가 끝나지 않음') && row.includes('삭제 마저 하기') && !row.includes('복원'), '목록: ' + row);
+  // 막힌 원인이 풀린 뒤: 반 이름을 다시 묻지 않고 남은 것부터 지움
+  await r.page.evaluate(() => { window.__mock.state.readFailures.length = 0; });
+  await r.page.click('[data-delete-class="c1"]'); await pause(r.page, 200);
+  assert(!(await r.page.$('.app-modal-input')) && (await r.page.innerText('.app-modal')).includes('마저 지울까요'), '이어서 지울 때 안내: ' + await r.page.innerText('.app-modal'));
+  await ok(r.page); await pause(r.page, 1500);
+  assert((await lastToast(r.page)).includes('삭제가 완료'), '완료 안내: ' + await lastToast(r.page));
+  eq(await r.page.evaluate(() => window.__mock.list('classes/c1').filter(p => p === 'classes/c1' || p.startsWith('classes/c1/'))), [], '남은 기록');
+  await r.context.close();
+  // 예전 방식으로 멈춘 반(수강 기록이 남은 채 삭제 중)도 학생에게는 보이지 않음
+  const seed = makeSeed(); Object.assign(seed.docs['classes/c1'], { archived: true, deleting: true });
+  const st = await openAs(b, 'index.html', 's1', { seed, viewport: { width: 390, height: 844 }, tab: 'home' });
+  assert(await st.page.$('#join-form') && !(await st.page.$('[data-past-class="c1"]')) && !(await st.page.$('.past-banner')), '삭제 중인 반이 학생에게 보임');
+});
+
 // ----- 2026-10-30 강사 알림(D14): 앱 설치·알림 설정·알림에서 화면 열기 -----
 // 헤드리스 Chromium은 알림 권한을 늘 'denied'로 알려 주므로, 이 테스트들만 Notification을 대신하는 객체를 넣습니다(앱 코드는 그대로).
 const openPushAdmin = async (b, { rules = 'v6', hash = '', permission = 'default' } = {}) => {
